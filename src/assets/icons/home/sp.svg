@@ -1,0 +1,20 @@
+<svg id="_15x15_photo_back" data-name="15x15 photo back" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="20" height="20" viewBox="0 0 20 20">
+  <defs>
+    <clipPath id="clip-path">
+      <rect id="Rectangle_4561" data-name="Rectangle 4561" width="20" height="20" fill="none"/>
+    </clipPath>
+    <clipPath id="clip-path-2">
+      <path id="Path_23750" data-name="Path 23750" d="M-3.457,0h20V15h-20Z" transform="translate(3.457)" fill="rgba(0,0,0,0.67)"/>
+    </clipPath>
+  </defs>
+  <g id="Mask_Group_859" data-name="Mask Group 859" clip-path="url(#clip-path)">
+    <g id="ps" transform="translate(0 2.5)" clip-path="url(#clip-path-2)">
+      <g id="Group_15063" data-name="Group 15063" transform="translate(-3.75)">
+        <path id="Path_23746" data-name="Path 23746" d="M-7.207,0h30V5h-30Z" transform="translate(7.207)" fill-rule="evenodd"/>
+        <path id="Path_23747" data-name="Path 23747" d="M-7.207,5h30v5h-30Z" transform="translate(7.207)" fill="#fff" fill-rule="evenodd"/>
+        <path id="Path_23748" data-name="Path 23748" d="M-7.207,10h30v5h-30Z" transform="translate(7.207)" fill="#090" fill-rule="evenodd"/>
+        <path id="Path_23749" data-name="Path 23749" d="M-7.207,15l15-7.5-15-7.5Z" transform="translate(7.207)" fill="red" fill-rule="evenodd"/>
+      </g>
+    </g>
+  </g>
+</svg>

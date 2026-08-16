@@ -1,0 +1,14 @@
+services:
+    rdb-web:
+        build:
+            context: .
+            target: dev # uses the 'dev' stage for hot-reload
+        volumes:
+            - .:/app # mount source for live editing
+            - /app/node_modules # keep container node_modules isolated
+        ports:
+            - '3000:3000'
+        environment:
+            - NODE_ENV=development
+            - WATCHPACK_POLLING=true
+        command: pnpm run dev

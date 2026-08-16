@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.example.rdb",
+      "sha256_cert_fingerprints": [
+        "12:5B:32:A9:84:51:66:50:B6:E9:DD:07:95:41:8B:F6:0C:C0:2F:E5:64:6F:99:C6:23:B2:41:0F:62:7D:AC:97"
+      ]
+    }
+  }
+]

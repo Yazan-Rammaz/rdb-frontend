@@ -1,0 +1,9 @@
+{
+  "name": "Ramaaz Digital Banking",
+  "short_name": "Ramaaz",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#3066cc",
+  "orientation": "portrait"
+}

@@ -1,0 +1,13 @@
+<svg id="_20x20" data-name="20x20" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="20" height="20" viewBox="0 0 20 20">
+  <defs>
+    <clipPath id="clip-path">
+      <rect id="Rectangle_4612" data-name="Rectangle 4612" width="20" height="20" fill="none"/>
+    </clipPath>
+  </defs>
+  <g id="Mask_Group_919" data-name="Mask Group 919" clip-path="url(#clip-path)">
+    <g id="images">
+      <circle id="Ellipse_683" data-name="Ellipse 683" cx="1.786" cy="1.786" r="1.786" transform="translate(9.562 6.653)"/>
+      <path id="Path_24014" data-name="Path 24014" d="M18.689,2.31,6.507.026a1.5,1.5,0,0,0-1.756,1.2L4.119,4.6H1.588a1.5,1.5,0,0,0-1.5,1.5V18.5a1.5,1.5,0,0,0,1.5,1.5H13.983a1.5,1.5,0,0,0,1.5-1.5V17.381l.364.068a1.5,1.5,0,0,0,1.756-1.2L19.89,4.065a1.5,1.5,0,0,0-1.2-1.756ZM1.056,13.07V6.691A1.122,1.122,0,0,1,2.178,5.569H13.462a1.053,1.053,0,0,1,1.053,1.053v9.544L9.805,11.753,8.088,12.8,5.46,10.172ZM18.839,4.4,17.08,13.779,15.487,11.6V6.1a1.5,1.5,0,0,0-1.5-1.5H5.108L5.6,1.986a1.122,1.122,0,0,1,1.31-.9L18,3.169A1.053,1.053,0,0,1,18.839,4.4Z"/>
+    </g>
+  </g>
+</svg>

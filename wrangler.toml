@@ -1,0 +1,35 @@
+# Cloudflare WORKER deployment (OpenNext) — replaces the old Pages deployment.
+# Build:  npm run build   (next build + opennextjs-cloudflare build)
+# Deploy: npx wrangler deploy
+name = "rdb"
+main = ".open-next/worker.js"
+compatibility_date = "2025-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = ".open-next/assets"
+binding = "ASSETS"
+
+[observability.logs]
+enabled = true
+invocation_logs = true
+
+[observability.traces]
+enabled = true
+
+[vars]
+ENVIRONMENT = "development"
+NEXT_PUBLIC_RDB_BASE_URL = "https://trydos_wallet_develop.ramaaz.dev"
+# The KYC API now lives in its own repo (github.com/Yazan-Rammaz/ramaaz-kyc) and
+# deploys as the `ramaaz-kyc` Worker. `rdb-kyc-worker` was the old deployment
+# built from this repo's packages/kyc-server, which no longer exists here.
+NEXT_PUBLIC_API_BASE_URL = "https://ramaaz-kyc.yazan-adnof.workers.dev"
+
+# Same-account Worker-to-Worker calls over *.workers.dev URLs never trigger the
+# target Worker (Cloudflare answers the bare 404 "nothing here" page), so the
+# /api/kyc/* proxy must reach the KYC Worker through a service binding instead.
+# Service bindings require both Workers in the SAME Cloudflare account — both are
+# in the yazan-adnof account, so this resolves.
+[[services]]
+binding = "KYC_WORKER"
+service = "ramaaz-kyc"

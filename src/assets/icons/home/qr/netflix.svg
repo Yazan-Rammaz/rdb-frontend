@@ -1,0 +1,25 @@
+<svg id="Group_15459" data-name="Group 15459" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="70" height="70" viewBox="0 0 70 70">
+  <defs>
+    <clipPath id="clip-path">
+      <circle id="Ellipse_680" data-name="Ellipse 680" cx="30" cy="30" r="30" fill="none"/>
+    </clipPath>
+    <linearGradient id="linear-gradient" x1="-0.178" y1="0.612" x2="0.566" y2="0.471" gradientUnits="objectBoundingBox">
+      <stop offset="0" stop-color="#c20000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#9d0000"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-2" x1="1.145" y1="0.423" x2="0.471" y2="0.503" xlink:href="#linear-gradient"/>
+  </defs>
+  <g id="Ellipse_673" data-name="Ellipse 673" fill="none" stroke="#8d8d8d" stroke-width="0.5">
+    <circle cx="35" cy="35" r="35" stroke="none"/>
+    <circle cx="35" cy="35" r="34.75" fill="none"/>
+  </g>
+  <g id="Mask_Group_891" data-name="Mask Group 891" transform="translate(5 5)" clip-path="url(#clip-path)">
+    <g id="netflix-logo-icon" transform="translate(13.566 0)">
+      <path id="Path_23958" data-name="Path 23958" d="M27.05,2H15.566V62A62.236,62.236,0,0,1,27.05,60.493Z" transform="translate(-15.566 -2)" fill="#c20000"/>
+      <path id="Path_23959" data-name="Path 23959" d="M27.05,2H15.566V47.908A62.236,62.236,0,0,1,27.05,46.4Z" transform="translate(-15.566 -2)" fill="url(#linear-gradient)"/>
+      <path id="Path_23960" data-name="Path 23960" d="M48.434,62V2H36.95V60.613A95.274,95.274,0,0,1,48.434,62Z" transform="translate(-15.566 -2)" fill="#c20000"/>
+      <path id="Path_23961" data-name="Path 23961" d="M48.434,62V22.181H36.95V60.613A95.274,95.274,0,0,1,48.434,62Z" transform="translate(-15.566 -2)" fill="url(#linear-gradient-2)"/>
+      <path id="Path_23962" data-name="Path 23962" d="M48.434,62,27.05,2H15.566L36.445,60.582A95.956,95.956,0,0,1,48.434,62Z" transform="translate(-15.566 -2)" fill="#fa0000"/>
+    </g>
+  </g>
+</svg>

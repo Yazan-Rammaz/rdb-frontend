@@ -1,0 +1,18 @@
+<svg id="Group_15457" data-name="Group 15457" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="70" height="70" viewBox="0 0 70 70">
+  <defs>
+    <clipPath id="clip-path">
+      <circle id="Ellipse_681" data-name="Ellipse 681" cx="30" cy="30" r="30" fill="none"/>
+    </clipPath>
+  </defs>
+  <g id="Ellipse_682" data-name="Ellipse 682" fill="none" stroke="#8d8d8d" stroke-width="0.5">
+    <circle cx="35" cy="35" r="35" stroke="none"/>
+    <circle cx="35" cy="35" r="34.75" fill="none"/>
+  </g>
+  <g id="Mask_Group_892" data-name="Mask Group 892" transform="translate(5 5)" clip-path="url(#clip-path)">
+    <g id="youtube-icon-5" transform="translate(-0.001 8.931)">
+      <path id="Path_23963" data-name="Path 23963" d="M45.943,35.41c-5.5-2.94-10.769-5.643-16.153-8.465V43.827c5.666-3.08,11.638-5.9,16.177-8.417Z" transform="translate(-5.976 -14.954)" fill="#fff"/>
+      <path id="Path_23964" data-name="Path 23964" d="M45.943,35.41c-5.5-2.94-16.153-8.465-16.153-8.465l14.2,9.545S41.4,37.926,45.943,35.41Z" transform="translate(-5.976 -14.954)" fill="#e8e0e0"/>
+      <path id="Path_23965" data-name="Path 23965" d="M30.825,57.041c-11.427-.21-15.33-.4-17.728-.894a7.793,7.793,0,0,1-4.068-2.115A8.562,8.562,0,0,1,7.1,50.317a24.3,24.3,0,0,1-.823-5.455,129.566,129.566,0,0,1,0-17.682c.367-3.266.545-7.143,2.986-9.405a8,8,0,0,1,4-2.022c2.351-.446,12.367-.8,22.737-.8,10.346,0,20.384.353,22.738.8a7.822,7.822,0,0,1,4.679,2.774c2.226,3.5,2.265,7.857,2.491,11.263.094,1.623.094,10.839,0,12.462-.352,5.383-.635,7.288-1.434,9.263a6.828,6.828,0,0,1-1.646,2.634,7.887,7.887,0,0,1-4.186,2.14c-9.888.744-18.285.905-27.815.753ZM45.967,35.41c-5.5-2.94-10.769-5.666-16.153-8.488V43.8c5.666-3.08,11.639-5.9,16.177-8.418Z" transform="translate(-5.976 -14.954)" fill="#cd201f"/>
+    </g>
+  </g>
+</svg>

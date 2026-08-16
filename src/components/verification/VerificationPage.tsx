@@ -1,0 +1,124 @@
+'use client';
+
+import React, { useEffect, useRef } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { useVerification } from '@/context/VerificationContext';
+import { useUniversalRouter } from '@/hooks/useUniversalRouter';
+import { apiFetch } from '@/core/utils';
+import { KycVerificationStatus, type KycStatusResponse } from '@/core/types/auth';
+import { Page } from '@/scaling';
+import IntroScreen from './screens/IntroScreen';
+import IDCaptureScreen from './screens/IDCaptureScreen';
+import IDSummaryScreen from './screens/IDSummaryScreen';
+import FaceMatchScreen from './screens/FaceMatchScreen';
+import SuccessScreen from './screens/SuccessScreen';
+import ContactSupportScreen from './screens/ContactSupportScreen';
+import AwsFaceLivenessScreen from './screens/AwsFaceLiveness';
+
+const transition = { duration: 0.35, ease: [0.4, 0, 0.2, 1] as [number, number, number, number] };
+
+export default function VerificationPage() {
+    const { currentStep, direction, setKycSessionId } = useVerification();
+    const router = useUniversalRouter();
+    const checkedRef = useRef(false);
+
+    // On mount: check existing KYC status, fetch a fresh session, and route accordingly
+    useEffect(() => {
+        if (checkedRef.current) return;
+        checkedRef.current = true;
+
+        (async () => {
+            try {
+                // 1. Check existing KYC status (apiFetch → silent token refresh on 401)
+                const statusRes = await apiFetch('/api/kyc/status');
+                const data: KycStatusResponse | null = statusRes.ok ? await statusRes.json() : null;
+                const status = data?.status;
+
+                if (status === KycVerificationStatus.VERIFIED) {
+                    router.push('/home');
+                    return;
+                }
+
+                // 2. Fetch a fresh kycSessionId. MUST use apiFetch: an expired access
+                // token here would otherwise 401 silently, leave kycSessionId null, and
+                // the flow would later skip submit ("Missing verification data").
+                const sessionRes = await apiFetch('/api/kyc/session', { method: 'POST' });
+                if (sessionRes.ok) {
+                    const sessionData = await sessionRes.json();
+                    const sessionId = sessionData.sessionId;
+                    if (sessionId) {
+                        setKycSessionId(sessionId);
+                    } else {
+                        console.error(
+                            '[VerificationPage] session response had no sessionId:',
+                            sessionData,
+                        );
+                    }
+                } else {
+                    console.warn('[VerificationPage] session fetch failed:', sessionRes.status);
+                }
+
+                // 3. Route based on status already fetched in step 1.
+                // The video interview was removed, so there is no in-app step for
+                // a 'pending' record to resume into — and the backend blocks
+                // re-submission while pending. Send them home.
+                if (status === 'pending') {
+                    router.push('/home');
+                    return;
+                }
+                // 'rejected' or null → stay on intro
+            } catch {
+                // Silent — stay on intro
+            }
+        })();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    const variants = {
+        enter: { x: direction * 100 + '%', opacity: 0 },
+        center: { x: 0, opacity: 1 },
+        exit: { x: direction * -100 + '%', opacity: 0 },
+    };
+
+    const renderStep = () => {
+        switch (currentStep) {
+            case 'intro':
+                return <IntroScreen />;
+            case 'face-detection':
+                return <AwsFaceLivenessScreen />;
+            case 'id-capture-front':
+            case 'id-capture-back':
+                return <IDCaptureScreen />;
+            case 'id-summary':
+                return <IDSummaryScreen />;
+            case 'face-match':
+                return <FaceMatchScreen />;
+            case 'success':
+                return <SuccessScreen />;
+            case 'contact-support':
+                return <ContactSupportScreen />;
+            default:
+                return <IntroScreen />;
+        }
+    };
+
+    return (
+        <Page variant="scaled" outerBg={currentStep === 'intro' ? 'intro' : undefined}>
+            <main className="xd-fit-screen fixed inset-0 overflow-hidden">
+                <AnimatePresence mode="wait" initial={false}>
+                    <motion.div
+                        key={currentStep}
+                        variants={variants}
+                        initial="enter"
+                        animate="center"
+                        exit="exit"
+                        transition={transition}
+                        className="absolute inset-0 w-full h-full"
+                    >
+                        {renderStep()}
+                    </motion.div>
+                </AnimatePresence>
+            </main>
+        </Page>
+    );
+}

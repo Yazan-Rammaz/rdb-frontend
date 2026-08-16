@@ -1,0 +1,14 @@
+<svg id="_25x25_Back" data-name="25x25 Back" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="25" height="25" viewBox="0 0 25 25">
+  <defs>
+    <clipPath id="clip-path">
+      <rect id="Rectangle_4609" data-name="Rectangle 4609" width="25" height="25" fill="none"/>
+    </clipPath>
+  </defs>
+  <g id="Mask_Group_618" data-name="Mask Group 618" clip-path="url(#clip-path)">
+    <g id="settings-11" transform="translate(0 1.251)">
+      <path id="Path_22821" data-name="Path 22821" d="M.417,3.332H2.95a2.913,2.913,0,0,0,5.767,0H24.583a.417.417,0,1,0,0-.833H8.717a2.913,2.913,0,0,0-5.767,0H.417a.417.417,0,1,0,0,.833ZM5.833.832A2.083,2.083,0,1,1,3.75,2.916,2.083,2.083,0,0,1,5.833.832Zm0,0" fill="#a2a0a0"/>
+      <path id="Path_22822" data-name="Path 22822" d="M.417,11.666h14.2a2.913,2.913,0,0,0,5.767,0h4.2a.417.417,0,1,0,0-.833h-4.2a2.913,2.913,0,0,0-5.767,0H.417a.417.417,0,1,0,0,.833ZM17.5,9.166a2.083,2.083,0,1,1-2.083,2.083A2.083,2.083,0,0,1,17.5,9.166Zm0,0" fill="#a2a0a0"/>
+      <path id="Path_22823" data-name="Path 22823" d="M.417,20H5.45a2.913,2.913,0,0,0,5.767,0H24.583a.417.417,0,1,0,0-.833H11.217a2.913,2.913,0,0,0-5.767,0H.417a.417.417,0,1,0,0,.833Zm7.917-2.5A2.083,2.083,0,1,1,6.25,19.582,2.083,2.083,0,0,1,8.333,17.5Zm0,0" fill="#a2a0a0"/>
+    </g>
+  </g>
+</svg>

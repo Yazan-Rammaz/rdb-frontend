@@ -1,0 +1,11 @@
+node_modules
+.history
+.vscode
+.next
+!.next/standalone
+!.next/static
+.open-next
+dist
+.git
+.gitignore
+*.md

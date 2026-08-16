@@ -1,0 +1,14 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls", "delegate_permission/common.get_login_creds"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.rdb.www",
+      "sha256_cert_fingerprints": [
+        "7F:FA:8E:4F:FB:71:83:9C:25:30:AF:72:1E:B9:27:E4:EC:67:22:78:55:04:B0:8C:2E:28:EE:B2:47:2E:2A:D3",
+        "49:9E:AB:3A:81:05:DA:78:58:34:7C:35:D8:2A:C8:E0:60:0D:59:19:19:37:9F:0D:B1:BA:9B:82:17:09:84:36",
+        "12:5B:32:A9:84:51:66:50:B6:E9:DD:07:95:41:8B:F6:0C:C0:2F:E5:64:6F:99:C6:23:B2:41:0F:62:7D:AC:97"
+      ]
+    }
+  }
+]
