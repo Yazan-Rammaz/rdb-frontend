@@ -4,6 +4,7 @@ import BalanceHome from './content/balance';
 import TransactionsHome from './content/transactions';
 import { useStore } from '@/context/StoreContext';
 import { useActions } from '@/hooks/useActions';
+import { api } from '@/api';
 import CreatePaymentRequest from '../QR/receive/CreatePaymentRequest';
 import PaymentRequestReview from '../QR/send/payment-request/PaymentRequestReview';
 import TransactionDetails from '../transactions/items/TransactionDetails';
@@ -43,14 +44,13 @@ export const Home = () => {
         }
         // Fetch from API
         setIsLoadingFiltered(true);
-        actions.transactions
-            .GetFinancialLedger({ page: 0, limit: 20, assetSymbol: activeAssetSymbol })
-            .then((res: any) => {
-                if (res && !('error' in res)) {
-                    const items: FinancialLedgerItem[] = res.items || [];
-                    txCacheRef.current[activeAssetSymbol] = items;
-                    setFilteredTx(items);
-                }
+        api.transactions
+            .ledger({ page: 0, limit: 20, assetSymbol: activeAssetSymbol })
+            .then((res) => {
+                if (!res.ok) return;
+                const items = res.data.items ?? [];
+                txCacheRef.current[activeAssetSymbol] = items;
+                setFilteredTx(items);
             })
             .finally(() => setIsLoadingFiltered(false));
     }, [activeAssetSymbol]);

@@ -45,10 +45,8 @@ export {
 export { UploadMedia } from './actions/media';
 
 export {
-    GetWalletBalance,
     GetAccountBalance,
     GetJournalEntries,
-    GetFinancialLedger,
     GetTransactions,
     CheckoutOrder,
     checkTransferBalance,

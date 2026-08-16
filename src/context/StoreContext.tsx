@@ -234,34 +234,34 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                 setIsLoadingBalances(true);
                 setIsLoadingPurposes(true);
 
-                const [walletResult, purposesResult] = await Promise.allSettled([
-                    actions.transactions.GetWalletBalance({ currencySymbol: 'USD' }),
-                    // Migrated to @/api. It never throws, so the allSettled
-                    // wrapper is redundant for this one — kept only so the two
-                    // calls still run in parallel without restructuring the
-                    // wallet branch below.
+                // Promise.all, not allSettled: both calls go through @/api now and
+                // neither throws, so there is no rejection to settle. Failure is
+                // carried in the result union instead, which is one check per call
+                // rather than two.
+                const [walletResult, purposesResult] = await Promise.all([
+                    api.transactions.walletBalance({ currencySymbol: 'USD' }),
                     api.transfers.purposes(),
                 ]);
 
                 // Process wallet balances
-                if (walletResult.status === 'fulfilled') {
-                    setBalances(mapWalletBalances(walletResult.value));
+                if (walletResult.ok) {
+                    const first = walletResult.data.wallets?.[0];
+                    setBalances(mapWalletBalances(walletResult.data));
                     setAccount({
-                        name: walletResult.value?.wallets?.[0]?.name || '',
-                        type: walletResult.value?.wallets?.[0]?.subtype || '',
-                        number: walletResult.value?.wallets?.[0]?.accountNumber || '',
-                        displayId: walletResult.value?.wallets?.[0]?.displayId,
+                        name: first?.name || '',
+                        type: first?.subtype || '',
+                        number: first?.accountNumber || '',
+                        displayId: first?.displayId,
                     });
                 } else {
-                    console.error('Error fetching wallet balances:', walletResult.reason);
+                    console.error('Error fetching wallet balances:', walletResult.error.message);
                 }
                 setIsLoadingBalances(false);
 
-                // Process purposes. Two checks rather than one: allSettled's
-                // `fulfilled`, then the API layer's own ok/error union.
-                if (purposesResult.status === 'fulfilled' && purposesResult.value.ok) {
+                // Process purposes
+                if (purposesResult.ok) {
                     setPurposes(
-                        purposesResult.value.data.map((p): PurposeOption => ({
+                        purposesResult.data.map((p): PurposeOption => ({
                             id: p.id,
                             label: p.name,
                         })),
@@ -271,17 +271,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
                 // 3. Fetch transactions from financial ledger
                 setIsLoadingTransactions(true);
-                const transactionsRes = await actions.transactions.GetFinancialLedger({
-                    page: 0,
-                    limit: 10,
-                });
-                if (transactionsRes && !('error' in transactionsRes)) {
-                    setTransactions(transactionsRes.items || []);
+                const transactionsRes = await api.transactions.ledger({ page: 0, limit: 10 });
+                if (transactionsRes.ok) {
+                    setTransactions(transactionsRes.data.items ?? []);
                     setTransactionPage(0);
-                    setTransactionHasMore(transactionsRes.hasNext ?? false);
+                    setTransactionHasMore(transactionsRes.data.hasNext ?? false);
                     setTransactionTotalPages(
-                        typeof transactionsRes.totalPages === 'number'
-                            ? transactionsRes.totalPages
+                        typeof transactionsRes.data.totalPages === 'number'
+                            ? transactionsRes.data.totalPages
                             : null,
                     );
                 }
@@ -310,14 +307,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (!actions) return;
         setIsLoadingTransactions(true);
         try {
-            const transactionsRes = await actions.transactions.GetFinancialLedger({
-                page: 0,
-                limit: 10,
-            });
-            if (transactionsRes && !('error' in transactionsRes)) {
-                setTransactions(transactionsRes.items || []);
+            const transactionsRes = await api.transactions.ledger({ page: 0, limit: 10 });
+            if (transactionsRes.ok) {
+                setTransactions(transactionsRes.data.items ?? []);
                 setTransactionPage(0);
-                setTransactionHasMore(transactionsRes.hasNext ?? false);
+                setTransactionHasMore(transactionsRes.data.hasNext ?? false);
             }
         } catch (error) {
             console.error('Error refreshing transactions:', error);
@@ -336,16 +330,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             setIsLoadingMoreTransactions(true);
             try {
                 const nextPage = transactionPage + 1;
-                const res = await actions.transactions.GetFinancialLedger({
-                    page: nextPage,
-                    limit: 10,
-                });
-                if (res && !('error' in res)) {
-                    setTransactions((prev) => [...prev, ...(res.items || [])]);
+                const res = await api.transactions.ledger({ page: nextPage, limit: 10 });
+                if (res.ok) {
+                    setTransactions((prev) => [...prev, ...(res.data.items ?? [])]);
                     setTransactionPage(nextPage);
-                    setTransactionHasMore(res.hasNext ?? false);
+                    setTransactionHasMore(res.data.hasNext ?? false);
                     setTransactionTotalPages(
-                        typeof res.totalPages === 'number' ? res.totalPages : null,
+                        typeof res.data.totalPages === 'number' ? res.data.totalPages : null,
                     );
                 }
             } catch (error) {
@@ -365,16 +356,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             try {
                 const symbolToRefresh = currencySymbol || activeAssetSymbol || 'USD';
                 console.log('Refreshing balances for active asset symbol:', symbolToRefresh);
-                const walletResult = await actions.transactions.GetWalletBalance({
+                const walletResult = await api.transactions.walletBalance({
                     currencySymbol: symbolToRefresh,
                 });
-                if (walletResult && !('error' in walletResult)) {
-                    setBalances(mapWalletBalances(walletResult));
+                if (walletResult.ok) {
+                    const first = walletResult.data.wallets?.[0];
+                    setBalances(mapWalletBalances(walletResult.data));
                     setAccount({
-                        name: walletResult?.wallets?.[0]?.name || '',
-                        type: walletResult?.wallets?.[0]?.subtype || '',
-                        number: walletResult?.wallets?.[0]?.accountNumber || '',
-                        displayId: walletResult?.wallets?.[0]?.displayId,
+                        name: first?.name || '',
+                        type: first?.subtype || '',
+                        number: first?.accountNumber || '',
+                        displayId: first?.displayId,
                     });
                 }
             } catch (error) {

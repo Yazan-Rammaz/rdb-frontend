@@ -18,25 +18,6 @@ import type {
 } from '../types/transfer';
 import { fetchServerData, processResponse } from '../utils';
 
-export async function GetWalletBalance({
-    currencySymbol,
-    token,
-    authCookieName,
-}: {
-    currencySymbol: string;
-    token?: string;
-    authCookieName?: string;
-}) {
-    console.log('Fetching wallet balance for currency:', currencySymbol);
-    let response: FetchResponse<GetWalletBalancesApi> = await fetchServerData({
-        method: 'GET',
-        token,
-        authCookieName,
-        url: `/wallets/myAcounts?currencySymbol=${encodeURIComponent(currencySymbol)}`,
-    });
-
-    return processResponse<GetWalletBalancesApi>(response);
-}
 
 export async function GetAccountBalance({
     assetId,
@@ -71,30 +52,6 @@ export async function GetJournalEntries({
     return processResponse<GetJournalEntriesApi>(response);
 }
 
-export async function GetFinancialLedger({
-    token,
-    authCookieName,
-    page = 0,
-    limit = 10,
-    assetSymbol,
-}: {
-    token?: string;
-    authCookieName?: string;
-    page?: number;
-    limit?: number;
-    assetSymbol?: string;
-} = {}) {
-    const params = new URLSearchParams({ page: String(page), limit: String(limit) });
-    if (assetSymbol) params.set('assetSymbol', assetSymbol);
-    let response: FetchResponse<FinancialLedgerApi> = await fetchServerData({
-        method: 'GET',
-        token,
-        authCookieName,
-        url: `/financial-ledger?${params.toString()}`,
-    });
-
-    return processResponse<FinancialLedgerApi>(response);
-}
 
 export async function GetTransactions({
     token,

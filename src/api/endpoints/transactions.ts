@@ -1,21 +1,37 @@
 import { request } from '../client';
 import type { ApiResult, RequestOptions } from '../types/common';
 import type {
+    FinancialLedgerApi,
+    GetWalletBalancesApi,
     LedgerQuery,
-    LedgerResponse,
-    TransactionListResponse,
+    WalletBalanceQuery,
 } from '../types/transactions';
 
-/** Statement and transaction history. */
+/** Balances and transaction history. */
 export const transactions = {
-    ledger: (q: LedgerQuery = {}, o?: RequestOptions): Promise<ApiResult<LedgerResponse>> =>
-        // Undefined filters are dropped by the client, so callers can pass an
-        // options object straight through without pruning it first.
-        request({ path: '/financial-ledger', query: { ...q }, options: o }),
+    /**
+     * Wallets and balances for one currency.
+     *
+     * The path is `/wallets/myAcounts` — the misspelling is the backend's and is
+     * load-bearing. Do not "fix" it here.
+     */
+    walletBalance: (
+        q: WalletBalanceQuery,
+        o?: RequestOptions,
+    ): Promise<ApiResult<GetWalletBalancesApi>> =>
+        request({ path: '/wallets/myAcounts', query: { ...q }, options: o }),
 
-    list: (o?: RequestOptions): Promise<ApiResult<TransactionListResponse>> =>
-        request({ path: '/wallets/my/transactions', options: o }),
-
-    journalEntries: (o?: RequestOptions): Promise<ApiResult<TransactionListResponse>> =>
-        request({ path: '/wallets/my/journal-entries', options: o }),
+    /**
+     * Paginated statement.
+     *
+     * `page` is zero-based, matching the backend. Undefined filters are dropped
+     * by the client, so an omitted assetSymbol means "all assets" rather than
+     * sending `assetSymbol=undefined`.
+     */
+    ledger: (q: LedgerQuery = {}, o?: RequestOptions): Promise<ApiResult<FinancialLedgerApi>> =>
+        request({
+            path: '/financial-ledger',
+            query: { page: q.page ?? 0, limit: q.limit ?? 10, assetSymbol: q.assetSymbol },
+            options: o,
+        }),
 };

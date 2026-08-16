@@ -1,39 +1,31 @@
-/** Request bodies and responses for `endpoints/transactions.ts`. */
+/**
+ * Request bodies and responses for `endpoints/transactions.ts`.
+ *
+ * These re-export the existing definitions in `core/types` rather than
+ * redeclaring them. FinancialLedgerItem alone has 25 fields, and the wallet
+ * envelope nests wallets inside balances — hand-copying that is how a type ends
+ * up subtly wrong and then drifts. One definition, re-exported, cannot diverge.
+ *
+ * The request types below are new, because the actions expressed them as loose
+ * function parameters rather than a shape.
+ */
 
-import type { PageParams } from './common';
-
-// ─── Models ──────────────────────────────────────────────────────────────────
-
-export interface LedgerEntry {
-    id: string;
-    /** Minor units, as a string. */
-    amount: string;
-    currencySymbol: string;
-    direction: 'credit' | 'debit';
-    description?: string;
-    /** ISO 8601. */
-    createdAt: string;
-    counterparty?: { name?: string; accountNumber?: string };
-}
+export type {
+    FinancialLedgerApi,
+    FinancialLedgerItem,
+    GetWalletBalancesApi,
+} from '@/core/types/api';
 
 // ─── Requests ────────────────────────────────────────────────────────────────
 
-export interface LedgerQuery extends PageParams {
-    /** ISO date, inclusive. */
-    from?: string;
-    /** ISO date, inclusive. */
-    to?: string;
-    currencySymbol?: string;
-    direction?: 'credit' | 'debit';
+export interface WalletBalanceQuery {
+    currencySymbol: string;
 }
 
-// ─── Responses ───────────────────────────────────────────────────────────────
-
-export interface LedgerResponse {
-    items: LedgerEntry[];
-    total: number;
-    page: number;
-    limit: number;
+export interface LedgerQuery {
+    /** Zero-based. The backend's first page is 0, not 1. */
+    page?: number;
+    limit?: number;
+    /** Filter to a single asset, e.g. 'USD'. Omit for all. */
+    assetSymbol?: string;
 }
-
-export type TransactionListResponse = LedgerEntry[];

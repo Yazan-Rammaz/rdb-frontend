@@ -1,5 +1,6 @@
 'use client';
 
+import { api } from '@/api';
 import React, {
     createContext,
     useContext,
@@ -253,11 +254,11 @@ function WalletEventBridge() {
     refetchRef.current = (symbol: string) => {
         void (async () => {
             try {
-                const walletResult = await actions.transactions.GetWalletBalance({
+                const walletResult = await api.transactions.walletBalance({
                     currencySymbol: symbol,
                 });
-                if (walletResult && !('error' in walletResult)) {
-                    const fresh = mapWalletBalances(walletResult);
+                if (walletResult.ok) {
+                    const fresh = mapWalletBalances(walletResult.data);
                     console.log(
                         `${LOG} balance refetch for '${symbol}' returned:`,
                         Object.keys(fresh),

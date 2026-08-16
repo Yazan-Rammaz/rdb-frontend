@@ -101,6 +101,13 @@ export interface GetWalletBalancesApi {
             subtype: string;
             status: string;
             name: string;
+            /**
+             * Human-facing client ID, shown in the profile screen and encoded
+             * into the client QR. Optional because the type previously omitted
+             * it entirely — StoreContext read it off an `any`, so a missing
+             * value degraded silently to undefined and nothing ever flagged it.
+             */
+            displayId?: string;
             deletedAt: string | null;
             balances: Array<{
                 id: string;

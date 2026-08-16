@@ -7,13 +7,11 @@ export const CreateBankDeposit = async (args: any) => await coreLogic.CreateBank
 export const GetBankDeposits = async (args: any) => await coreLogic.GetBankDeposits(args);
 export const CalculateFees = async (args: any) => await coreLogic.CalculateFees(args);
 export const UploadMedia = async (args: any) => await coreLogic.UploadMedia(args);
-export const GetWalletBalance = async (args: any) => await coreLogic.GetWalletBalance(args);
 export const GetAccountBalance = async (args: any) => await coreLogic.GetAccountBalance(args);
 export const getAccountByBalanceId = async (args: any) =>
     await coreLogic.getAccountByBalanceId(args);
 export const lookupAccountByPhone = async (args: any) => await coreLogic.lookupAccountByPhone(args);
 export const GetJournalEntries = async (args: any) => await coreLogic.GetJournalEntries(args);
-export const GetFinancialLedger = async (args: any) => await coreLogic.GetFinancialLedger(args);
 export const GetTransactions = async (args: any) => await coreLogic.GetTransactions(args);
 export const CheckoutOrder = async (args: any) => await coreLogic.CheckoutOrder(args);
 export const checkTransferBalance = async (args: any) => await coreLogic.checkTransferBalance(args);
@@ -56,9 +54,7 @@ export async function getServerActions() {
             UploadMedia,
         },
         transactions: {
-            GetWalletBalance,
             GetJournalEntries,
-            GetFinancialLedger,
             GetTransactions,
             CheckoutOrder,
             checkTransferBalance,
