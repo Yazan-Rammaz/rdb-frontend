@@ -7,16 +7,13 @@
 
 // ─── Models ──────────────────────────────────────────────────────────────────
 
-export interface AssetItem {
-    id: string;
-    name: string;
-    displayName: string;
-    symbol: string;
-    symbolImageUrl: string;
-    isActive: boolean;
-    createdAt: string;
-    updatedAt: string;
-}
+// Re-exported, not redeclared. Components import AssetItem from @/core/types to
+// render balance cards, so a second identical copy here would be free to drift
+// from the one they use. Imported as well as re-exported because `export ... from`
+// does not bring the name into this file's scope, and the response type below
+// references it.
+import type { AssetItem } from '@/core/types/models';
+export type { AssetItem };
 
 export interface Bank {
     id: string;

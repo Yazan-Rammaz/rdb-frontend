@@ -12,9 +12,9 @@
  * refuses to let a caller read `.data` without first checking `ok`, which is the
  * mistake that produces "cannot read property of undefined" in production.
  *
- *   const res = await api.wallets.list();
+ *   const res = await api.banking.assets();
  *   if (!res.ok) return showError(res.error);
- *   res.data.forEach(...)          // narrowed, no optional chaining needed
+ *   res.data.currencies.forEach(...)          // narrowed, no optional chaining needed
  */
 export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: ApiError };
 

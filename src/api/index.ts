@@ -3,16 +3,15 @@ import { banking } from './endpoints/banking';
 import { paymentRequests } from './endpoints/paymentRequests';
 import { transactions } from './endpoints/transactions';
 import { transfers } from './endpoints/transfers';
-import { wallets } from './endpoints/wallets';
 
 /**
  * The app's API surface.
  *
  *   import { api } from '@/api';
  *
- *   const res = await api.wallets.list();
+ *   const res = await api.transactions.walletBalance({ currencySymbol: 'USD' });
  *   if (!res.ok) return toast(res.error.message);
- *   setWallets(res.data);
+ *   setBalances(res.data);
  *
  * Calls never throw and never return a bare `any`. `ApiResult` is a
  * discriminated union, so TypeScript will not let you read `.data` before
@@ -24,7 +23,6 @@ export const api = {
     paymentRequests,
     transactions,
     transfers,
-    wallets,
 };
 
 export type { ApiError, ApiResult, Paginated, PageParams, RequestOptions } from './types/common';
@@ -34,4 +32,3 @@ export type * from './types/banking';
 export type * from './types/paymentRequests';
 export type * from './types/transactions';
 export type * from './types/transfers';
-export type * from './types/wallets';

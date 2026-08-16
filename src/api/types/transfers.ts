@@ -13,10 +13,11 @@
 
 // ─── Models ──────────────────────────────────────────────────────────────────
 
-export interface TransferPurpose {
-    id: string;
-    name: string;
-}
+// Re-exported, not redeclared — core/types/transfer.ts already defines it and
+// the transfer screens import it from there. Imported as well, since
+// `export ... from` does not put the name in local scope for the alias below.
+import type { TransferPurpose } from '@/core/types/transfer';
+export type { TransferPurpose };
 
 export interface RecipientAccountDetails {
     found: boolean;

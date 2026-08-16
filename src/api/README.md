@@ -47,6 +47,30 @@ back as `{ ok: false, error }`.
 before checking `.ok`, which is what stops the "cannot read property of
 undefined" class of bug reaching production.
 
+## Why there are two types folders
+
+There are two, and only one rule keeps them apart:
+
+| | holds | owned by |
+|---|---|---|
+| `core/types/` | **domain models** — what a Wallet, AssetItem or LedgerEntry *is*. Imported by components that never touch the API. | the app |
+| `api/types/` | **the call contract** — `ApiResult`/`ApiError`, and request bodies that exist only because an endpoint takes them | this layer |
+
+**A model is declared once, in `core/types`, and re-exported here.** Never
+redeclared. If you find yourself copying an interface across, stop: two identical
+copies are free to drift, and drift is the exact failure this layer exists to
+prevent. `AssetItem` and `TransferPurpose` were briefly duplicated during the
+migration and had to be collapsed back.
+
+Request bodies belong here because they have no life outside a call —
+`VerifyOtpInput` is not a domain concept, it is "what this endpoint accepts".
+Note that a request body is not always the wire body: `auth.verifyOtp` renames
+`type` to `action` and adds `platform: 'web'` before sending.
+
+If a type is only ever produced and consumed by one endpoint, declaring it here
+is fine. The moment a component imports it to render something, it is a domain
+model — move it to `core/types` and re-export.
+
 ## Adding an endpoint
 
 1. Types in `types/<domain>.ts` — body under Requests, response under Responses
