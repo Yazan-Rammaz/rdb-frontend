@@ -81,7 +81,7 @@ interface StoreContextType {
     isLoadingMoreTransactions: boolean;
     isLoadingPurposes: boolean;
     transactionHasMore: boolean;
-    preloadData: (handleUnauthenticated?: () => void) => Promise<void>;
+    preloadData: () => Promise<void>;
     // Refresh functions for updating data after actions
     refreshTransactions: () => Promise<void>;
     loadMoreTransactions: () => Promise<void>;
@@ -124,7 +124,14 @@ export function mapWalletBalances(response: any): BalancesMap {
 // defend against and the mapping is a one-liner at each site.
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-    const { userData } = useAuth();
+    const { userData, removeAuthCookies } = useAuth();
+    // Held in a ref, not read straight from the closure: AuthProvider builds
+    // removeAuthCookies fresh on every render, so putting it in preloadData's
+    // dependency list would give preloadData a new identity each render — and
+    // ClientProviders' preload effect depends on that identity, so it would
+    // re-run continuously.
+    const removeAuthCookiesRef = useRef(removeAuthCookies);
+    removeAuthCookiesRef.current = removeAuthCookies;
     const [currencies, setCurrencies] = useState<AssetItem[]>([]);
     const [metals, setMetals] = useState<AssetItem[]>([]);
     const [balances, setBalances] = useState<BalancesMap>({});
@@ -182,7 +189,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     // Preload all data during splash screen
     const preloadData = useCallback(
-        async (handleUnauthenticated?: () => void) => {
+        async () => {
             // Prevent multiple preload calls
             if (preloadStartedRef.current || isDataLoaded) return;
             preloadStartedRef.current = true;
@@ -211,8 +218,27 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                         code === 'UNAUTHENTICATED' ||
                         (code.includes('USER') && code.includes('NOT') && code.includes('FOUND'));
 
-                    if (isAuthFailure && handleUnauthenticated) {
-                        handleUnauthenticated();
+                    if (isAuthFailure) {
+                        // Only the non-401 cases actually reach here needing
+                        // action: on a 401, apiFetch has already refreshed and —
+                        // if the refresh token is dead too — run hardLogout.
+                        // What it does NOT cover is an auth failure the backend
+                        // reports as a 403 or a 400 "USER NOT FOUND", which is
+                        // why this branch exists at all.
+                        //
+                        // This used to call an injected `handleUnauthenticated`
+                        // from RDBContext — the seam a host app filled when this
+                        // was an npm library. Nothing injected one, so it
+                        // resolved to the default, which only console.warn'd, and
+                        // a non-401 auth failure left the user sitting on a
+                        // half-loaded home screen.
+                        //
+                        // removeAuthCookies, not a bare 'rdb:session-expired'
+                        // dispatch: the event clears client state only, so the
+                        // httpOnly cookies would survive and the next bootstrap
+                        // would restore a session the backend rejects. This
+                        // clears both, exactly like the manual sign-out path.
+                        void removeAuthCookiesRef.current();
                     }
                     setIsLoadingCurrencies(false);
                     setIsLoadingMetals(false);

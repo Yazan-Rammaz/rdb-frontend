@@ -4,7 +4,6 @@ import { RDBLayout } from '@/components/layout/RDBLayout';
 import { AuthProvider } from '@/context/AuthContext';
 import { LayoutProvider } from '@/context/LayoutContext';
 import { generateThemeVariables } from '@/lib/theme';
-import { RDBProvider } from '@/context/RDBContext';
 import { StoreProvider } from '@/context/StoreContext';
 import { I18nProvider } from '@/context/I18nContext';
 import { ToastProvider } from '@/context/ToastContext';
@@ -64,23 +63,20 @@ export default function RootLayout({
                     <AuthProvider>
                         {/* 2b. Passkey Provider: device recognition + lock state machine */}
                         <PasskeyProvider>
-                                {/* 3. RDB config (base URL, locale, unauthenticated handler). */}
-                            <RDBProvider>
-                                <StoreProvider>
-                                    {/* 3. Main UI Shell */}
-                                    <ScannerProvider>
-                                        <RDBLayout>
-                                            {/* 4. Feature-specific State Management */}
-                                            <LayoutProvider>
-                                                <ToastProvider>
-                                                    {children}
-                                                    <ToastContainer />
-                                                </ToastProvider>
-                                            </LayoutProvider>
-                                        </RDBLayout>
-                                    </ScannerProvider>
-                                </StoreProvider>
-                            </RDBProvider>
+                            <StoreProvider>
+                                {/* 3. Main UI Shell */}
+                                <ScannerProvider>
+                                    <RDBLayout>
+                                        {/* 4. Feature-specific State Management */}
+                                        <LayoutProvider>
+                                            <ToastProvider>
+                                                {children}
+                                                <ToastContainer />
+                                            </ToastProvider>
+                                        </LayoutProvider>
+                                    </RDBLayout>
+                                </ScannerProvider>
+                            </StoreProvider>
                         </PasskeyProvider>
                     </AuthProvider>
                 </I18nProvider>

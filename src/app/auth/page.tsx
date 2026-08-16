@@ -25,7 +25,6 @@ import { api } from '@/api';
 import { useToast } from '@/context/ToastContext';
 import { useTranslation } from '@/context/I18nContext';
 import { useStore } from '@/context/StoreContext';
-import { useRDBConfig } from '@/context/RDBContext';
 import { setupPin, unlockWithPin, getDeviceId } from '@/services/passkeyApi';
 import { ResetPasscodeProvider, useResetPasscode } from '@/context/ResetPasscodeContext';
 import ResetPasscodeOverlay from '@/components/resetPasscode/ResetPasscodeOverlay';
@@ -105,7 +104,6 @@ function AuthPageInner() {
     const { toast } = useToast();
     const { t, tr } = useTranslation();
     const { preloadData } = useStore();
-    const { handleUnauthenticated } = useRDBConfig();
     // Read cached auth-flow state synchronously so the first render already
     // shows the correct step (cache is populated during the splash window by
     // ClientProviders).
@@ -303,7 +301,7 @@ function AuthPageInner() {
     };
 
     const preloadHomeData = () => {
-        void preloadData(handleUnauthenticated);
+        void preloadData();
     };
 
     // Post-login navigation to /home. IMPORTANT: nothing may start the store
