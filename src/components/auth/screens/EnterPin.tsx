@@ -4,7 +4,6 @@ import { api } from '@/api';
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import OtpInputs from '@/components/ui/OtpInputs';
-import { useActions } from '@/hooks/useActions';
 import { useTranslation } from '@/context/I18nContext';
 import { FlexibleSpace } from '@/scaling';
 import simSvg from '@/assets/icons/auth/sim.svg';
@@ -53,7 +52,6 @@ export default function EnterPin({
     onResend,
 }: EnterPinScreenProps) {
     const { t } = useTranslation();
-    const actions = useActions();
     const [timeLeft, setTimeLeft] = useState(timerSeconds);
     const [canResend, setCanResend] = useState(false);
 

@@ -81,11 +81,11 @@ interface StoreContextType {
     isLoadingMoreTransactions: boolean;
     isLoadingPurposes: boolean;
     transactionHasMore: boolean;
-    preloadData: (actions?: any, handleUnauthenticated?: () => void) => Promise<void>;
+    preloadData: (handleUnauthenticated?: () => void) => Promise<void>;
     // Refresh functions for updating data after actions
-    refreshTransactions: (actions?: any) => Promise<void>;
-    loadMoreTransactions: (actions?: any) => Promise<void>;
-    refreshBalances: (actions?: any, currencySymbol?: string) => Promise<void>;
+    refreshTransactions: () => Promise<void>;
+    loadMoreTransactions: () => Promise<void>;
+    refreshBalances: (currencySymbol?: string) => Promise<void>;
     transactionTotalPages: number | null;
 }
 
@@ -182,7 +182,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     // Preload all data during splash screen
     const preloadData = useCallback(
-        async (actions?: any, handleUnauthenticated?: () => void) => {
+        async (handleUnauthenticated?: () => void) => {
             // Prevent multiple preload calls
             if (preloadStartedRef.current || isDataLoaded) return;
             preloadStartedRef.current = true;
@@ -303,8 +303,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         console.log('Active asset symbol changed:', activeAssetSymbol);
     }, [activeAssetSymbol]);
     // Refresh transactions after actions like transfer (resets to page 0)
-    const refreshTransactions = useCallback(async (actions?: any) => {
-        if (!actions) return;
+    const refreshTransactions = useCallback(async () => {
         setIsLoadingTransactions(true);
         try {
             const transactionsRes = await api.transactions.ledger({ page: 0, limit: 10 });
@@ -322,8 +321,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     // Load next page and append to existing transactions
     const loadMoreTransactions = useCallback(
-        async (actions?: any) => {
-            if (!actions || isLoadingMoreTransactions || !transactionHasMore) return;
+        async () => {
+            if (isLoadingMoreTransactions || !transactionHasMore) return;
             // لا تطلب إذا وصلنا لآخر صفحة
             if (transactionTotalPages !== null && transactionPage + 1 >= transactionTotalPages)
                 return;
@@ -350,8 +349,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     // Refresh balances after actions like transfer
     const refreshBalances = useCallback(
-        async (actions?: any, currencySymbol?: string) => {
-            if (!actions) return;
+        async (currencySymbol?: string) => {
             setIsLoadingBalances(true);
             try {
                 const symbolToRefresh = currencySymbol || activeAssetSymbol || 'USD';

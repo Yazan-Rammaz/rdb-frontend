@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import { useStore } from '@/context/StoreContext';
-import { useActions } from '@/hooks/useActions';
 import { useToast } from '@/context/ToastContext';
 import { useTranslation } from '@/context/I18nContext';
 import { usePaymentRequestAPI } from '@/hooks/usePaymentRequestAPI';
@@ -51,7 +50,6 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
     onBack,
 }) => {
     const { activeAssetSymbol, balances, account, refreshTransactions } = useStore();
-    const actions = useActions();
     const { toast } = useToast();
     const { t } = useTranslation();
 
@@ -232,7 +230,7 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
             return;
         }
 
-        refreshTransactions(actions);
+        refreshTransactions();
 
         setReceiptData({
             referenceCode: data.requestCode || requestId,
@@ -272,7 +270,7 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
         setData((prev) => (prev ? { ...prev, status: 'CANCELLED' } : prev));
         setIsCancelling(false);
         toastRef.current.success('Payment request cancelled');
-        refreshTransactions(actions);
+        refreshTransactions();
     };
 
     // Cancel via inline input (payer mode)
@@ -296,7 +294,7 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
         setCancelReason('');
         setIsCancelling(false);
         toastRef.current.success('Payment request cancelled');
-        refreshTransactions(actions);
+        refreshTransactions();
     };
 
     // --- Requester action handlers (copy/download/share) ---

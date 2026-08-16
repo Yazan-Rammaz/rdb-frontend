@@ -14,7 +14,6 @@ import ArrowUpIcon from '../../../assets/icons/home/arrwoup.svg';
 import TransferSendIcon from '../../../assets/icons/home/transfer/transfer.svg';
 import TransferReceiveIcon from '../../../assets/icons/home/transfer/recieve.svg';
 import { useStore } from '@/context/StoreContext';
-import { useActions } from '@/hooks/useActions';
 import Skeleton from 'react-loading-skeleton';
 import { useTranslation } from '@/context/I18nContext';
 
@@ -115,7 +114,6 @@ const TransactionsHome = ({
         loadMoreTransactions,
         activeAssetSymbol,
     } = useStore();
-    const actions = useActions();
     const sentinelRef = useRef<HTMLDivElement>(null);
     const currentCurrency = filterByCurrency || activeAssetSymbol;
 
@@ -126,7 +124,7 @@ const TransactionsHome = ({
         const observer = new IntersectionObserver(
             (entries) => {
                 if (entries[0].isIntersecting && transactionHasMore && !isLoadingMoreTransactions) {
-                    loadMoreTransactions(actions);
+                    loadMoreTransactions();
                 }
             },
             { threshold: 0.1 },
@@ -134,7 +132,7 @@ const TransactionsHome = ({
 
         observer.observe(sentinel);
         return () => observer.disconnect();
-    }, [transactionHasMore, isLoadingMoreTransactions, loadMoreTransactions, actions]);
+    }, [transactionHasMore, isLoadingMoreTransactions, loadMoreTransactions]);
 
     // Check if ledger entry is a payment request
     const isPaymentRequestLedger = (ledger: FinancialLedgerItem): boolean => {

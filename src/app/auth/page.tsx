@@ -21,7 +21,6 @@ import {
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { usePasskey } from '@/context/PasskeyContext';
-import { useActions } from '@/hooks/useActions';
 import { api } from '@/api';
 import { useToast } from '@/context/ToastContext';
 import { useTranslation } from '@/context/I18nContext';
@@ -89,7 +88,6 @@ export default function AuthPage() {
 }
 
 function AuthPageInner() {
-    const actions = useActions();
     const router = useRouter();
     const {
         saveAuthCookies,
@@ -305,7 +303,7 @@ function AuthPageInner() {
     };
 
     const preloadHomeData = () => {
-        void preloadData(actions, handleUnauthenticated);
+        void preloadData(handleUnauthenticated);
     };
 
     // Post-login navigation to /home. IMPORTANT: nothing may start the store

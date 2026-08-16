@@ -10,7 +10,6 @@ import { FlexibleSpace } from '@/scaling';
 import { RdbIcon } from '../../icons';
 import { CustomQRCode } from '@/components/ui/CustomQR';
 import { useAuthLinkSocket } from '@/hooks/useAuthLinkSocket';
-import { useActions } from '@/hooks/useActions';
 import closeSvg from '@/assets/icons/auth/close.svg';
 
 interface QrLoginScreenProps {
@@ -40,7 +39,6 @@ const QR_CARD = '#FCFCFC';
 
 export default function QrLoginScreen({ onApproved, onCancel }: QrLoginScreenProps) {
     const { t } = useTranslation();
-    const actions = useActions();
     const [status, setStatus] = useState<QrStatus>('loading');
     const [session, setSession] = useState<QrSession | null>(null);
     const [qrToken, setQrToken] = useState<string>('');
@@ -87,7 +85,7 @@ export default function QrLoginScreen({ onApproved, onCancel }: QrLoginScreenPro
             setSession(null);
             setStatus('error');
         }
-    }, [actions]);
+    }, []);
 
     useEffect(() => {
         if (autoStartedRef.current) return;
@@ -118,7 +116,7 @@ export default function QrLoginScreen({ onApproved, onCancel }: QrLoginScreenPro
             }
         }, session.refreshIntervalMs);
         return () => clearInterval(id);
-    }, [status, session, startSession, actions]);
+    }, [status, session, startSession]);
 
     // ── Realtime updates over the /auth-link socket ───────────────────────────
     useAuthLinkSocket(session?.linkId ?? null, session?.subscribeSecret ?? null, {

@@ -3,7 +3,6 @@ import NavHome from './content/nav';
 import BalanceHome from './content/balance';
 import TransactionsHome from './content/transactions';
 import { useStore } from '@/context/StoreContext';
-import { useActions } from '@/hooks/useActions';
 import { api } from '@/api';
 import CreatePaymentRequest from '../QR/receive/CreatePaymentRequest';
 import PaymentRequestReview from '../QR/send/payment-request/PaymentRequestReview';
@@ -25,7 +24,6 @@ export const Home = () => {
         transactions,
         setTransactions,
     } = useStore();
-    const actions = useActions();
 
     // Per-symbol transaction cache: symbol → items
     const txCacheRef = useRef<Record<string, FinancialLedgerItem[]>>({});

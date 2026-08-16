@@ -478,8 +478,8 @@ const TransferSend: React.FC<TransferSendProps> = ({
             } else {
                 const result = res.data as TransferResult;
                 // Refresh transactions and balances in background
-                refreshTransactions(actions);
-                refreshBalances(actions, assetSymbol);
+                refreshTransactions();
+                refreshBalances(assetSymbol);
 
                 setForm((prev) => ({
                     ...prev,

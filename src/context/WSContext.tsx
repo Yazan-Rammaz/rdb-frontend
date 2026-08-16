@@ -15,7 +15,6 @@ import { getWsAccessToken } from '@/core/actions/websocket';
 import { refreshAccessToken } from '@/core/utils';
 import { useStore, mapWalletBalances } from './StoreContext';
 import type { WalletBalance } from './StoreContext';
-import { useActions } from '@/hooks/useActions';
 import type { FinancialLedgerItem } from '@/core/types';
 import type {
     ConnectionState,
@@ -244,7 +243,6 @@ function seedBalanceFromEvent(p: BalanceUpdatePayload): WalletBalance {
 function WalletEventBridge() {
     const { on } = useWS();
     const { balances, setBalances, setTransactions } = useStore();
-    const actions = useActions();
     const balancesRef = React.useRef(balances);
     balancesRef.current = balances;
     // Silent refetch for symbols missing from the store (first balance in a new

@@ -2,7 +2,6 @@
 
 import React, { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-import { useActions } from '../../hooks/useActions';
 import { useRDBConfig } from '../../context/RDBContext';
 import { useStore } from '../../context/StoreContext';
 import { AuthProtected, useAuth } from '../../context/AuthContext';
@@ -32,14 +31,13 @@ import ResetPasscodeOverlay from '../../components/resetPasscode/ResetPasscodeOv
  * actually mounted a protected route removes that race entirely.
  */
 function PreloadStore() {
-    const actions = useActions();
     const { handleUnauthenticated } = useRDBConfig();
     const { preloadData, isDataLoaded } = useStore();
     const { refreshUser } = useAuth();
 
     useEffect(() => {
         if (!isDataLoaded) {
-            void preloadData(actions, handleUnauthenticated);
+            void preloadData(handleUnauthenticated);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isDataLoaded]);

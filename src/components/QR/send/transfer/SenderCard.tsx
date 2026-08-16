@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import { useStore } from '@/context/StoreContext';
-import { useActions } from '@/hooks/useActions';
 import { useToast } from '@/context/ToastContext';
 import Image from 'next/image';
 import DollarIcon from '@/assets/icons/home/dollar.svg';
@@ -27,7 +26,6 @@ const SenderCard: React.FC<SenderCardProps> = ({ selectedAssetSymbol, displayAmo
         setBalanceHidden,
         refreshBalances,
     } = useStore();
-    const actions = useActions();
     const { toast } = useToast();
     const { t, rtl, language } = useTranslation();
     const [isRefreshing, setIsRefreshing] = useState(false);
@@ -50,7 +48,7 @@ const SenderCard: React.FC<SenderCardProps> = ({ selectedAssetSymbol, displayAmo
         if (isRefreshing) return;
         setIsRefreshing(true);
         try {
-            await refreshBalances(actions, fallbackSymbol);
+            await refreshBalances(fallbackSymbol);
         } catch {
             toast.error(t.transfer.sender.refreshBalance);
         } finally {

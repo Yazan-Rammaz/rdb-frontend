@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { useActions } from '@/hooks/useActions';
 import { useRDBConfig } from '@/context/RDBContext';
 import { useAuth } from '@/context/AuthContext';
 import { usePasskey } from '@/context/PasskeyContext';
@@ -32,7 +31,6 @@ export function ClientProviders({
     onSplashCompleteAction?: () => void;
 }) {
     const router = useRouter();
-    const actions = useActions();
     const { baseUrl, handleUnauthenticated } = useRDBConfig();
     const { userData, isLoading } = useAuth();
     const { bootReady } = usePasskey();
@@ -57,9 +55,9 @@ export function ClientProviders({
             return;
         }
         if (!isDataLoaded && userData) {
-            preloadData(actions, handleUnauthenticated);
+            preloadData(handleUnauthenticated);
         }
-    }, [userData, preloadData, actions, handleUnauthenticated, isDataLoaded]);
+    }, [userData, preloadData, handleUnauthenticated, isDataLoaded]);
 
     return (
         <div
