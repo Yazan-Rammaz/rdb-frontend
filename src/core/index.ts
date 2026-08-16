@@ -55,8 +55,6 @@ export {
     GetTransactions,
     CheckoutOrder,
     checkTransferBalance,
-    verifyTransfer,
-    SendTransfer,
     getPaymentRequest,
 } from './actions/transactions';
 

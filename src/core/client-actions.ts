@@ -35,8 +35,6 @@ import {
     validateRecipientAccount,
     lookupAccountByPhone,
     checkTransferBalance,
-    verifyTransfer,
-    SendTransfer,
     getPaymentRequest,
     createPaymentRequest,
     lookupPaymentRequest,
@@ -73,8 +71,6 @@ const serverOnlyActions = {
         GetTransactions,
         CheckoutOrder,
         checkTransferBalance,
-        verifyTransfer,
-        SendTransfer,
         getPaymentRequest,
     },
     wallets: {

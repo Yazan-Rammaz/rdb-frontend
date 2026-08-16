@@ -3,6 +3,8 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { useActions } from '@/hooks/useActions';
+import { api } from '@/api';
+import type { TransferResult } from '@/api';
 import { useStore } from '@/context/StoreContext';
 import { useToast } from '@/context/ToastContext';
 import { useScanner } from '@/context/ScannerContext';
@@ -280,23 +282,31 @@ const TransferSend: React.FC<TransferSendProps> = ({
             assetType,
         );
         try {
-            const result = await actions.transactions.verifyTransfer({
+            // `senderAvailableBalance` is no longer passed: the old action
+            // destructured it but never put it in the request body, so it was
+            // dead weight. The balance check below uses the value the server
+            // returns, which is the authoritative one.
+            const res = await api.transfers.verify({
                 toAccountNumber: form.recipientDetails.accountNumber,
                 assetSymbol: assetSymbol,
                 assetType: assetType,
                 amount: numAmount,
-                senderAvailableBalance: senderBalance?.available,
             });
 
-            if ('error' in result) {
+            if (!res.ok) {
                 setForm((prev) => ({
                     ...prev,
                     isCheckingBalance: false,
-                    amountError: result.error,
+                    amountError: res.error.message,
                     amountConfirmed: false,
                     verifyResult: null,
                 }));
-            } else if (!result.valid) {
+                return;
+            }
+
+            const result = res.data;
+
+            if (!result.valid) {
                 setForm((prev) => ({
                     ...prev,
                     isCheckingBalance: false,
@@ -414,7 +424,7 @@ const TransferSend: React.FC<TransferSendProps> = ({
             const idempotencyKey = `transfer-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
 
             const attempt = () =>
-                actions.transactions.SendTransfer({
+                api.transfers.send({
                     toAccountNumber: form.recipientDetails!.accountNumber,
                     assetSymbol: assetSymbol,
                     assetType: assetType,
@@ -425,27 +435,43 @@ const TransferSend: React.FC<TransferSendProps> = ({
                     idempotencyKey,
                 });
 
-            let result = await attempt();
+            let res = await attempt();
 
-            // Step-up: NestJS may require a face re-verification before completing.
-            const stepUp = extractStepUp(result);
+            // A transport/HTTP failure is terminal — do not retry, because a
+            // timeout may mean the transfer DID land and only the response was
+            // lost. The idempotency key protects a deliberate retry; a silent one
+            // here would just hide the ambiguity from the user.
+            if (!res.ok) {
+                setForm((prev) => ({ ...prev, isSending: false }));
+                toast.error(res.error.message);
+                return;
+            }
+
+            // Step-up arrives as a 200 whose body carries a challenge instead of
+            // a transfer, so it is checked on `data`, not on the HTTP result.
+            const stepUp = extractStepUp(res.data);
             if (stepUp) {
                 const satisfied = await satisfyStepUp(stepUp);
                 if (!satisfied) {
                     setForm((prev) => ({ ...prev, isSending: false }));
                     return;
                 }
-                result = await attempt();
+                // Same idempotencyKey on purpose: the backend dedups rather than
+                // creating a second transfer.
+                res = await attempt();
+                if (!res.ok) {
+                    setForm((prev) => ({ ...prev, isSending: false }));
+                    toast.error(res.error.message);
+                    return;
+                }
             }
 
-            if (extractStepUp(result)) {
+            if (extractStepUp(res.data)) {
                 // Still gated after a satisfied challenge — surface as an error.
                 setForm((prev) => ({ ...prev, isSending: false }));
                 toast.error(t.transfer.error.generic);
-            } else if ('error' in result) {
-                setForm((prev) => ({ ...prev, isSending: false }));
-                toast.error(result.error);
             } else {
+                const result = res.data as TransferResult;
                 // Refresh transactions and balances in background
                 refreshTransactions(actions);
                 refreshBalances(actions, assetSymbol);

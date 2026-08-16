@@ -19,7 +19,7 @@ function langCode(): string {
  * Money movement.
  *
  * `verify` then `send` is a deliberate two-step: the sender confirms a resolved
- * name and a quoted total before anything moves. Never call `send` without
+ * recipient name and amount before anything moves. Never call `send` without
  * showing the user what `verify` returned.
  */
 export const transfers = {
@@ -41,15 +41,37 @@ export const transfers = {
             },
         }),
 
-    lookupAccount: (accountNumber: string, o?: RequestOptions): Promise<ApiResult<LookupAccountResponse>> =>
+    /** Resolves an account number to a display name before the sender commits. */
+    lookupAccount: (
+        accountNumber: string,
+        o?: RequestOptions,
+    ): Promise<ApiResult<LookupAccountResponse>> =>
         request({
+            // Encoded here, not by the caller — an account number containing a
+            // slash must not be able to alter the path.
             path: `/transfers/lookup-account/${encodeURIComponent(accountNumber)}`,
             options: o,
         }),
 
-    verify: (body: VerifyTransferBody, o?: RequestOptions): Promise<ApiResult<VerifyTransferResponse>> =>
+    verify: (
+        body: VerifyTransferBody,
+        o?: RequestOptions,
+    ): Promise<ApiResult<VerifyTransferResponse>> =>
         request({ path: '/transfers/verify', method: 'POST', body, options: o }),
 
+    /**
+     * Commits the transfer.
+     *
+     * `idempotencyKey` must be stable across retries of the same transfer — a
+     * retry after a timeout that generates a fresh key charges the user twice.
+     */
     send: (body: SendTransferBody, o?: RequestOptions): Promise<ApiResult<SendTransferResponse>> =>
-        request({ path: '/transfers/send', method: 'POST', body, options: o }),
+        request({
+            path: '/transfers/send',
+            method: 'POST',
+            // `note` is normalised to '' rather than omitted, matching what the
+            // previous action sent — NestJS has been receiving a string here.
+            body: { ...body, note: body.note || '' },
+            options: o,
+        }),
 };
