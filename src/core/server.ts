@@ -21,7 +21,6 @@ export const GetFinancialLedger = async (args: any) => await coreLogic.GetFinanc
 export const GetTransactions = async (args: any) => await coreLogic.GetTransactions(args);
 export const CheckoutOrder = async (args: any) => await coreLogic.CheckoutOrder(args);
 export const checkTransferBalance = async (args: any) => await coreLogic.checkTransferBalance(args);
-export const getTransferPurposes = async (args: any) => await coreLogic.getTransferPurposes(args);
 export const verifyTransfer = async (args: any) => await coreLogic.verifyTransfer(args);
 export const SendTransfer = async (args: any) => await coreLogic.SendTransfer(args);
 export const getPaymentRequest = async (args: any) => await coreLogic.getPaymentRequest(args);
@@ -72,7 +71,6 @@ export async function getServerActions() {
             GetTransactions,
             CheckoutOrder,
             checkTransferBalance,
-            getTransferPurposes,
             verifyTransfer,
             SendTransfer,
             getPaymentRequest,

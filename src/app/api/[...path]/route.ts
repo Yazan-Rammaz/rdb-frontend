@@ -95,6 +95,11 @@ async function proxy(req: NextRequest): Promise<NextResponse> {
 
     const contentType = req.headers.get('content-type');
     const acceptLanguage = req.headers.get('accept-language');
+    // NestJS localises some responses (transfer purposes, for one) from `x-lang`
+    // rather than Accept-Language. This proxy rebuilds headers from scratch, so
+    // anything not copied here is silently dropped — which is exactly how a
+    // browser-side call ends up with default-language content.
+    const xLang = req.headers.get('x-lang');
 
     // Next.js injects the [...path] catch-all segment into searchParams under the key
     // `path`. Strip it so it isn't forwarded to NestJS (whose strict validation rejects
@@ -112,6 +117,7 @@ async function proxy(req: NextRequest): Promise<NextResponse> {
     const headers: Record<string, string> = {};
     if (contentType) headers['Content-Type'] = contentType;
     if (acceptLanguage) headers['Accept-Language'] = acceptLanguage;
+    if (xLang) headers['x-lang'] = xLang;
 
     // Inject auth for NestJS-direct calls. KYC carries its own cookie chain to the
     // Worker, which still injects auth there.

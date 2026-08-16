@@ -166,23 +166,6 @@ export async function checkTransferBalance({
     };
 }
 
-export async function getTransferPurposes({
-    token,
-    authCookieName,
-}: { token?: string; authCookieName?: string } = {}) {
-    let response: FetchResponse<TransferPurpose[]> = await fetchServerData({
-        method: 'GET',
-        token,
-        authCookieName,
-        url: `/transfer-purpose?type=ALL`,
-        headers: {
-            'x-lang': (initialData.Locale || 'en-gb').split('-')[0],
-        },
-    });
-
-    return processResponse<TransferPurpose[]>(response);
-}
-
 export async function verifyTransfer({
     toAccountNumber,
     assetSymbol,

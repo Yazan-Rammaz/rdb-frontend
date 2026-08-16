@@ -17,6 +17,7 @@ import React, {
     use,
 } from 'react';
 import { useAuth } from './AuthContext';
+import { api } from '@/api';
 
 /** A single balance entry enriched with wallet-level account info */
 export interface WalletBalance {
@@ -117,13 +118,10 @@ export function mapWalletBalances(response: any): BalancesMap {
     return allBalances;
 }
 
-/** Helper: map API purposes response into PurposeOption[] */
-export function mapPurposes(result: any): PurposeOption[] {
-    if (Array.isArray(result)) {
-        return result.map((p: any) => ({ id: p.id, label: p.name }));
-    }
-    return [];
-}
+// mapPurposes lived here: it took `any` and guarded with Array.isArray, because
+// the action layer gave no type to check against. Both call sites now go through
+// @/api, where the response is typed, so the runtime guard has nothing left to
+// defend against and the mapping is a one-liner at each site.
 
 export function StoreProvider({ children }: { children: ReactNode }) {
     const { userData } = useAuth();
@@ -229,7 +227,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
                 const [walletResult, purposesResult] = await Promise.allSettled([
                     actions.transactions.GetWalletBalance({ currencySymbol: 'USD' }),
-                    actions.transactions.getTransferPurposes(),
+                    // Migrated to @/api. It never throws, so the allSettled
+                    // wrapper is redundant for this one — kept only so the two
+                    // calls still run in parallel without restructuring the
+                    // wallet branch below.
+                    api.transfers.purposes(),
                 ]);
 
                 // Process wallet balances
@@ -246,9 +248,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                 }
                 setIsLoadingBalances(false);
 
-                // Process purposes
-                if (purposesResult.status === 'fulfilled') {
-                    setPurposes(mapPurposes(purposesResult.value));
+                // Process purposes. Two checks rather than one: allSettled's
+                // `fulfilled`, then the API layer's own ok/error union.
+                if (purposesResult.status === 'fulfilled' && purposesResult.value.ok) {
+                    setPurposes(
+                        purposesResult.value.data.map((p): PurposeOption => ({
+                            id: p.id,
+                            label: p.name,
+                        })),
+                    );
                 }
                 setIsLoadingPurposes(false);
 
