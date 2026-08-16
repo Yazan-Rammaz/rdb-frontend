@@ -25,12 +25,7 @@ export const getWsAccessToken = async (cookieName?: string) =>
     await coreLogic.getWsAccessToken(cookieName);
 export const checkWallet = async (args: any) => await coreLogic.checkWallet(args);
 export const createWallet = async (args: any) => await coreLogic.createWallet(args);
-export const sendOtp = async (args: any) => await coreLogic.sendOtp(args);
-export const reSendOtp = async (args: any) => await coreLogic.reSendOtp(args);
-export const verifyOtp = async (args: any) => await coreLogic.verifyOtp(args);
 export const verifyMe = async (args: any) => await coreLogic.verifyMe(args);
-export const createQrSession = async (args: any) => await coreLogic.createQrSession(args);
-export const refreshQrToken = async (args: any) => await coreLogic.refreshQrToken(args);
 export const savePasscode = async (args: any) => await coreLogic.savePasscode(args);
 export const verifyPasscode = async (args: any) => await coreLogic.verifyPasscode(args);
 export const updateUserProfile = async (args: any) => await coreLogic.updateUserProfile(args);
@@ -65,15 +60,10 @@ export async function getServerActions() {
             createWallet,
         },
         auth: {
-            sendOtp,
-            reSendOtp,
-            verifyOtp,
             verifyMe,
             savePasscode,
             verifyPasscode,
             updateUserProfile,
-            createQrSession,
-            refreshQrToken,
         },
         paymentRequests: {
             createPaymentRequest,

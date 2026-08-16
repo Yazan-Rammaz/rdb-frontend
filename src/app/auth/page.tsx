@@ -22,6 +22,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { usePasskey } from '@/context/PasskeyContext';
 import { useActions } from '@/hooks/useActions';
+import { api } from '@/api';
 import { useToast } from '@/context/ToastContext';
 import { useTranslation } from '@/context/I18nContext';
 import { useStore } from '@/context/StoreContext';
@@ -411,18 +412,19 @@ function AuthPageInner() {
     const handleSelectMethod = async (selectedMethod: 'sms' | 'whatsapp') => {
         setMethod(selectedMethod);
         setLoading('send-pin');
-        const sendOtpRes = await actions.auth.sendOtp({
+        // `type` is dropped: the old action accepted it but never put it in the
+        // request body, so it never reached the backend.
+        const sendOtpRes = await api.auth.sendOtp({
             phoneNumber: `+${phone}`,
             channel: selectedMethod,
-            type: authType,
         });
         setLoading('');
-        if ('error' in sendOtpRes) {
-            toast.error(tr('auth.otp.sendError', { error: sendOtpRes.error }));
+        if (!sendOtpRes.ok) {
+            toast.error(tr('auth.otp.sendError', { error: sendOtpRes.error.message }));
             return;
         }
-        if (sendOtpRes.sessionInfo) {
-            setSessionInfo(sendOtpRes.sessionInfo);
+        if (sendOtpRes.data.sessionInfo) {
+            setSessionInfo(sendOtpRes.data.sessionInfo);
             setPin('');
             goTo('enter-pin');
             toast.success(
@@ -437,7 +439,7 @@ function AuthPageInner() {
 
     const handleVerifyPin = async (pinValue: string) => {
         setLoading('verify-pin');
-        const verifyOtpRes = await actions.auth.verifyOtp({
+        const verifyOtpRes = await api.auth.verifyOtp({
             phoneNumber: `+${phone}`,
             otpCode: pinValue,
             sessionInfo,
@@ -450,9 +452,10 @@ function AuthPageInner() {
             },
         });
 
-        if ('error' in verifyOtpRes) {
+        if (!verifyOtpRes.ok) {
             setLoading('');
-            if (verifyOtpRes.error.includes('Invalid') || verifyOtpRes.error.includes('expired')) {
+            const message = verifyOtpRes.error.message;
+            if (message.includes('Invalid') || message.includes('expired')) {
                 setIsValidPin('notvalid');
                 toast.error(t.auth.otp.invalidExpired);
                 setTimeout(() => {
@@ -461,19 +464,19 @@ function AuthPageInner() {
                 }, 1500);
             } else if (
                 authType === 'signIn' &&
-                (verifyOtpRes.error.toLowerCase().includes('not found') ||
-                    verifyOtpRes.error.toLowerCase().includes('not registered') ||
-                    verifyOtpRes.error.toLowerCase().includes('no account') ||
-                    verifyOtpRes.error.toLowerCase().includes('does not exist'))
+                (message.toLowerCase().includes('not found') ||
+                    message.toLowerCase().includes('not registered') ||
+                    message.toLowerCase().includes('no account') ||
+                    message.toLowerCase().includes('does not exist'))
             ) {
                 goTo('not-registered');
             } else {
-                toast.error(verifyOtpRes.error || t.auth.otp.verificationFailed);
+                toast.error(message || t.auth.otp.verificationFailed);
             }
             return;
         }
 
-        const res = verifyOtpRes as any;
+        const res = verifyOtpRes.data as any;
 
         // Session step required.
         if (res.status === 'requires_passcode' || res.status === 'requires_approval') {

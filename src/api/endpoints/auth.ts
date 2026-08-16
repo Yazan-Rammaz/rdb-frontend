@@ -1,46 +1,73 @@
 import { request } from '../client';
 import type { ApiResult, RequestOptions } from '../types/common';
 import type {
-    AuthTokens,
-    CurrentUser,
-    LoginResponse,
-    OtpSentResponse,
+    CreateQrSessionBody,
     QrSessionResponse,
+    QrTokenResponse,
+    RefreshQrTokenQuery,
+    ResendOtpBody,
     SendOtpBody,
-    SetPasscodeBody,
-    UpdateProfileBody,
-    VerifyOtpBody,
-    VerifyPasscodeBody,
+    SendOtpResponse,
+    VerifyOtpInput,
+    VerifyOtpResponse,
 } from '../types/auth';
 
 /**
- * Authentication and the current user.
+ * Phone/OTP sign-in and QR desktop login.
  *
- * Passcode calls route through the opaque gateway (`op`) so their endpoint names
- * stay out of the client bundle — a passcode endpoint is worth not advertising.
+ * These are all pre-session calls, so none of them can benefit from the
+ * refresh-on-401 retry — there is no token to refresh yet. They go through the
+ * same client anyway for consistent error shapes.
  */
 export const auth = {
-    me: (o?: RequestOptions): Promise<ApiResult<CurrentUser>> =>
-        request({ path: '/users/me', options: o }),
-
-    updateProfile: (body: UpdateProfileBody, o?: RequestOptions): Promise<ApiResult<CurrentUser>> =>
-        request({ path: '/users/me', method: 'PATCH', body, options: o }),
-
-    sendOtp: (body: SendOtpBody, o?: RequestOptions): Promise<ApiResult<OtpSentResponse>> =>
+    sendOtp: (body: SendOtpBody, o?: RequestOptions): Promise<ApiResult<SendOtpResponse>> =>
         request({ path: '/auth/phone/send-otp', method: 'POST', body, options: o }),
 
-    resendOtp: (body: SendOtpBody, o?: RequestOptions): Promise<ApiResult<OtpSentResponse>> =>
+    /** Note the backend spells this "resend"; only the action was camelCased. */
+    resendOtp: (body: ResendOtpBody, o?: RequestOptions): Promise<ApiResult<SendOtpResponse>> =>
         request({ path: '/auth/phone/resend-otp', method: 'POST', body, options: o }),
 
-    verifyOtp: (body: VerifyOtpBody, o?: RequestOptions): Promise<ApiResult<LoginResponse>> =>
-        request({ path: '/auth/phone/verify', method: 'POST', body, options: o }),
+    /**
+     * Exchanges an OTP for a session.
+     *
+     * The wire body is not the input shape: `type` is sent as `action`, and
+     * `platform: 'web'` is added. Optional ids are omitted rather than sent as
+     * undefined, matching what the action did.
+     */
+    verifyOtp: (input: VerifyOtpInput, o?: RequestOptions): Promise<ApiResult<VerifyOtpResponse>> =>
+        request({
+            path: '/auth/phone/verify',
+            method: 'POST',
+            body: {
+                phoneNumber: input.phoneNumber,
+                otpCode: input.otpCode,
+                msegatId: input.msegatId,
+                sessionInfo: input.sessionInfo,
+                action: input.type,
+                platform: 'web',
+                ...(input.deviceId ? { deviceId: input.deviceId } : {}),
+                ...(input.deviceInfo ? { deviceInfo: input.deviceInfo } : {}),
+            },
+            options: o,
+        }),
 
-    setPasscode: (body: SetPasscodeBody, o?: RequestOptions): Promise<ApiResult<AuthTokens>> =>
-        request({ path: '/auth/passcode', method: 'POST', body, op: 'sp', options: o }),
+    createQrSession: (
+        body: CreateQrSessionBody = {},
+        o?: RequestOptions,
+    ): Promise<ApiResult<QrSessionResponse>> =>
+        request({ path: '/auth/qr/session', method: 'POST', body, options: o }),
 
-    verifyPasscode: (body: VerifyPasscodeBody, o?: RequestOptions): Promise<ApiResult<LoginResponse>> =>
-        request({ path: '/auth/passcode/verify', method: 'POST', body, op: 'sv', options: o }),
-
-    createQrSession: (o?: RequestOptions): Promise<ApiResult<QrSessionResponse>> =>
-        request({ path: '/auth/qr/session', method: 'POST', options: o }),
+    /**
+     * Rotates the qrToken for a live login attempt.
+     *
+     * A 410/404 here means the link is gone and the caller should regenerate —
+     * that is expected state, not a failure, so `refreshQrToken` in
+     * `api/helpers/qrLogin.ts` maps it rather than leaving every call site to
+     * remember which status codes mean "expired".
+     */
+    refreshQrToken: (
+        q: RefreshQrTokenQuery,
+        o?: RequestOptions,
+    ): Promise<ApiResult<QrTokenResponse>> =>
+        request({ path: '/auth/qr/refresh', query: { ...q }, options: o }),
 };

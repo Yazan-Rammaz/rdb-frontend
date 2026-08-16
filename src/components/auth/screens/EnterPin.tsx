@@ -1,4 +1,5 @@
 'use client';
+import { api } from '@/api';
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
@@ -86,17 +87,17 @@ export default function EnterPin({
             return;
         }
         setLoading?.('resend-pin');
-        const res = await actions.auth.reSendOtp({
+        const res = await api.auth.resendOtp({
             phoneNumber: `+${phone}`,
             channel: method === 'whatsapp' ? 'whatsapp' : 'sms',
         });
         setLoading?.('');
-        if ('error' in res) return;
-        if (res.sessionInfo) {
+        if (!res.ok) return;
+        if (res.data.sessionInfo) {
             setTimeLeft(timerSeconds);
             setCanResend(false);
             setPin('');
-            setSessionInfo?.(res.sessionInfo);
+            setSessionInfo?.(res.data.sessionInfo);
         }
     };
 

@@ -1,4 +1,6 @@
 'use client';
+import { api } from '@/api';
+import { refreshQrToken } from '@/api/helpers/qrLogin';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
@@ -64,9 +66,14 @@ export default function QrLoginScreen({ onApproved, onCancel }: QrLoginScreenPro
                 typeof navigator !== 'undefined'
                     ? { browser: 'web', os: navigator.platform, userAgent: navigator.userAgent }
                     : undefined;
-            const data = await actions.auth.createQrSession({ deviceInfo });
-            if ('error' in data || !data?.linkId || !data?.qrToken || !data?.subscribeSecret) {
-                throw new Error('error' in data ? data.error : 'malformed session response');
+            const res = await api.auth.createQrSession({ deviceInfo });
+            if (!res.ok) throw new Error(res.error.message);
+
+            const data = res.data;
+            // The shape check stays: a 200 carrying an incomplete session would
+            // otherwise render a QR that can never be claimed.
+            if (!data?.linkId || !data?.qrToken || !data?.subscribeSecret) {
+                throw new Error('malformed session response');
             }
             setSession({
                 linkId: data.linkId,
@@ -92,10 +99,8 @@ export default function QrLoginScreen({ onApproved, onCancel }: QrLoginScreenPro
     useEffect(() => {
         if (status !== 'pending' || !session) return;
         const id = setInterval(async () => {
-            const result = await actions.auth.refreshQrToken({
-                linkId: session.linkId,
-                subscribeSecret: session.subscribeSecret,
-            });
+            // The helper maps 410/404 → { expired: true }; see api/helpers/qrLogin.
+            const result = await refreshQrToken(session.linkId, session.subscribeSecret);
             // expired → the whole 5-min login attempt is gone (NOT just the 75s
             // qrToken — every refresh mints a fresh token, so token-level expiry
             // never surfaces here). It can't be revived, so auto-regenerate a

@@ -56,15 +56,10 @@ export {
 export { checkWallet, createWallet } from './actions/wallets';
 
 export {
-    sendOtp,
-    reSendOtp,
-    verifyOtp,
     verifyMe,
     savePasscode,
     verifyPasscode,
     updateUserProfile,
-    createQrSession,
-    refreshQrToken,
 } from './actions/auth';
 
 export {
