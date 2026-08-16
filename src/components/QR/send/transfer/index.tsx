@@ -2,10 +2,10 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import Image from 'next/image';
-import { useActions } from '@/hooks/useActions';
 import { api } from '@/api';
 import type { TransferResult } from '@/api';
 import { resolveRecipient } from '@/api/helpers/resolveRecipient';
+import { lookupAccountByPhoneMock } from '@/api/helpers/lookupAccountByPhone.mock';
 import { useStore } from '@/context/StoreContext';
 import { useToast } from '@/context/ToastContext';
 import { useScanner } from '@/context/ScannerContext';
@@ -33,7 +33,6 @@ const TransferSend: React.FC<TransferSendProps> = ({
     prefillAccountNumber,
     prefillCurrencySymbol,
 }) => {
-    const actions = useActions();
     const { activeAssetSymbol, activeAssetType, balances, refreshTransactions, refreshBalances } =
         useStore();
     const { toast } = useToast();
@@ -126,7 +125,7 @@ const TransferSend: React.FC<TransferSendProps> = ({
                 }));
             }
         },
-        [actions],
+        [t],
     );
 
     // Effect to handle pending QR validation
@@ -221,15 +220,9 @@ const TransferSend: React.FC<TransferSendProps> = ({
         try {
             let result: Awaited<ReturnType<typeof resolveRecipient>>;
             if (form.recipientInputMode === 'phone') {
-                // NOT migrated to @/api on purpose: lookupAccountByPhone has no
-                // backend. It is a hardcoded mock — a 1.5s sleep and one
-                // recognised number — so there is no endpoint to describe. It
-                // stays an action until a real phone-lookup route exists.
-                const phone = await actions.banking.lookupAccountByPhone({ phoneNumber: value });
-                result =
-                    'error' in phone
-                        ? { ok: false, message: phone.error }
-                        : { ok: true, recipient: phone };
+                // A mock, not an API call — there is no phone-lookup endpoint
+                // yet. See the file for what to do when one exists.
+                result = await lookupAccountByPhoneMock(value);
             } else {
                 // Format as xxxx-xxxx for the API
                 const cleaned = value.replace(/-/g, '');
@@ -262,7 +255,7 @@ const TransferSend: React.FC<TransferSendProps> = ({
                 accountError: t.transfer.error.validateAccount,
             }));
         }
-    }, [form.recipientAccountNumber, form.recipientInputMode, actions]);
+    }, [form.recipientAccountNumber, form.recipientInputMode]);
 
     // Validate amount via verify API
     const handleValidateAmount = useCallback(async () => {
@@ -349,7 +342,7 @@ const TransferSend: React.FC<TransferSendProps> = ({
                 amountError: t.transfer.error.verifyTransfer,
             }));
         }
-    }, [form.amount, form.recipientDetails, actions, assetSymbol, assetType]);
+    }, [form.amount, form.recipientDetails, assetSymbol, assetType]);
 
     // Edit handlers with cascade reset
     const handleEditAccount = () => {

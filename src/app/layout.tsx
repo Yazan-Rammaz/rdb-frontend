@@ -5,7 +5,6 @@ import { AuthProvider } from '@/context/AuthContext';
 import { LayoutProvider } from '@/context/LayoutContext';
 import { generateThemeVariables } from '@/lib/theme';
 import { RDBProvider } from '@/context/RDBContext';
-import { serverActions } from '@/core/client-actions';
 import { StoreProvider } from '@/context/StoreContext';
 import { I18nProvider } from '@/context/I18nContext';
 import { ToastProvider } from '@/context/ToastContext';
@@ -65,11 +64,8 @@ export default function RootLayout({
                     <AuthProvider>
                         {/* 2b. Passkey Provider: device recognition + lock state machine */}
                         <PasskeyProvider>
-                            {/* 3. RDB Specific Logic & Server Actions.
-                                serverActions is the 'use server' action set when
-                                NEXT_PUBLIC_USE_SERVER_ACTIONS=true, else null →
-                                RDBProvider falls back to core (client fetches). */}
-                            <RDBProvider actions={serverActions ?? undefined}>
+                                {/* 3. RDB config (base URL, locale, unauthenticated handler). */}
+                            <RDBProvider>
                                 <StoreProvider>
                                     {/* 3. Main UI Shell */}
                                     <ScannerProvider>
