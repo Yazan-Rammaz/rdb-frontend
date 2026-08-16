@@ -1,40 +1,80 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { useStore, mapPurposes, type PurposeOption } from '@/context/StoreContext';
-import { useActions } from '@/hooks/useActions';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useStore, type PurposeOption } from '@/context/StoreContext';
+import { api } from '@/api';
 
 export type { PurposeOption };
 
+/**
+ * Transfer purposes, cached in the store.
+ *
+ * ─── Reference migration to `@/api` ─────────────────────────────────────────
+ * This hook previously called `actions.transactions.getTransferPurposes()` and
+ * then had to work out what came back:
+ *
+ *     const result = await actions.transactions.getTransferPurposes();
+ *     const mapped = mapPurposes(result);              // result: any
+ *     if (mapped.length > 0) setPurposes(mapped);
+ *     else if (result && 'error' in result) setError(result.error);
+ *
+ * Three problems, all of which the typed layer removes:
+ *
+ *   1. `result` was `any`, so `mapPurposes` guarded with `Array.isArray` at
+ *      runtime. A shape change in the backend would surface as an empty list,
+ *      not a compile error.
+ *   2. Failure arrived two different ways — an `error` property on the result,
+ *      or a thrown exception — so both a branch and a try/catch were needed, and
+ *      "succeeded but returned nothing" was indistinguishable from "failed".
+ *   3. It went through Server Actions, which do not refresh an expired token.
+ *      The same call from an `apiFetch` screen would silently recover; here the
+ *      user just saw an error.
+ *
+ * The `api` layer never throws and returns a discriminated union, so there is
+ * one branch, no try/catch, and `res.data` is typed.
+ */
 export function useTransferPurposes() {
     const { purposes: storePurposes, setPurposes, isLoadingPurposes } = useStore();
-    const actions = useActions();
     const [error, setError] = useState<string | null>(null);
     const [isFetching, setIsFetching] = useState(false);
 
+    // Abort an in-flight request if the component unmounts, so a late response
+    // cannot setState on something that is gone.
+    const abortRef = useRef<AbortController | null>(null);
+
     const fetchPurposes = useCallback(async () => {
+        abortRef.current?.abort();
+        const controller = new AbortController();
+        abortRef.current = controller;
+
         setIsFetching(true);
         setError(null);
-        try {
-            const result = await actions.transactions.getTransferPurposes();
-            const mapped = mapPurposes(result);
-            if (mapped.length > 0) {
-                setPurposes(mapped);
-            } else if (result && 'error' in result) {
-                setError(result.error);
-            }
-        } catch {
-            setError('Failed to load purposes. Please try again.');
-        } finally {
-            setIsFetching(false);
-        }
-    }, [actions, setPurposes]);
 
-    // If store has no purposes and preload isn't loading, fetch as fallback
+        const res = await api.transfers.purposes({ signal: controller.signal });
+
+        if (controller.signal.aborted) return;
+
+        if (!res.ok) {
+            // A cancelled request is not a failure the user should see.
+            if (res.error.status !== 0) setError(res.error.message);
+            setIsFetching(false);
+            return;
+        }
+
+        setPurposes(res.data.map((p): PurposeOption => ({ id: p.id, label: p.name })));
+        setIsFetching(false);
+    }, [setPurposes]);
+
+    useEffect(() => {
+        return () => abortRef.current?.abort();
+    }, []);
+
+    // Fall back to fetching when the store has nothing and no preload is running.
     useEffect(() => {
         if (storePurposes.length === 0 && !isLoadingPurposes && !isFetching) {
-            fetchPurposes();
+            void fetchPurposes();
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [storePurposes.length, isLoadingPurposes]);
 
     return {
