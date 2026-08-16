@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useActions } from '@/hooks/useActions';
 import { api } from '@/api';
 import type { TransferResult } from '@/api';
+import { resolveRecipient } from '@/api/helpers/resolveRecipient';
 import { useStore } from '@/context/StoreContext';
 import { useToast } from '@/context/ToastContext';
 import { useScanner } from '@/context/ScannerContext';
@@ -97,15 +98,13 @@ const TransferSend: React.FC<TransferSendProps> = ({
             try {
                 const cleaned = value.replace(/-/g, '');
                 const formatted = `${cleaned.slice(0, 4)}-${cleaned.slice(4)}`;
-                const result = await actions.banking.validateRecipientAccount({
-                    accountNumber: formatted,
-                });
+                const result = await resolveRecipient(formatted);
 
-                if ('error' in result) {
+                if (!result.ok) {
                     setForm((prev) => ({
                         ...prev,
                         isValidatingAccount: false,
-                        accountError: result.error,
+                        accountError: result.message,
                         recipientDetails: null,
                         accountConfirmed: false,
                     }));
@@ -113,7 +112,7 @@ const TransferSend: React.FC<TransferSendProps> = ({
                     setForm((prev) => ({
                         ...prev,
                         isValidatingAccount: false,
-                        recipientDetails: result,
+                        recipientDetails: result.recipient,
                         accountConfirmed: true,
                         accountError: null,
                         currencyWarning: null,
@@ -220,23 +219,29 @@ const TransferSend: React.FC<TransferSendProps> = ({
         }));
 
         try {
-            let result;
+            let result: Awaited<ReturnType<typeof resolveRecipient>>;
             if (form.recipientInputMode === 'phone') {
-                result = await actions.banking.lookupAccountByPhone({ phoneNumber: value });
+                // NOT migrated to @/api on purpose: lookupAccountByPhone has no
+                // backend. It is a hardcoded mock — a 1.5s sleep and one
+                // recognised number — so there is no endpoint to describe. It
+                // stays an action until a real phone-lookup route exists.
+                const phone = await actions.banking.lookupAccountByPhone({ phoneNumber: value });
+                result =
+                    'error' in phone
+                        ? { ok: false, message: phone.error }
+                        : { ok: true, recipient: phone };
             } else {
                 // Format as xxxx-xxxx for the API
                 const cleaned = value.replace(/-/g, '');
                 const formatted = `${cleaned.slice(0, 4)}-${cleaned.slice(4)}`;
-                result = await actions.banking.validateRecipientAccount({
-                    accountNumber: formatted,
-                });
+                result = await resolveRecipient(formatted);
             }
 
-            if ('error' in result) {
+            if (!result.ok) {
                 setForm((prev) => ({
                     ...prev,
                     isValidatingAccount: false,
-                    accountError: result.error,
+                    accountError: result.message,
                     recipientDetails: null,
                     accountConfirmed: false,
                 }));
@@ -244,7 +249,7 @@ const TransferSend: React.FC<TransferSendProps> = ({
                 setForm((prev) => ({
                     ...prev,
                     isValidatingAccount: false,
-                    recipientDetails: result,
+                    recipientDetails: result.recipient,
                     accountConfirmed: true,
                     accountError: null,
                     currencyWarning: null,

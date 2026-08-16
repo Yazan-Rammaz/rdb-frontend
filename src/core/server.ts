@@ -2,8 +2,6 @@
 
 import * as coreLogic from '../core/index';
 
-export const getSupportedAssets = async (args: any) => await coreLogic.getSupportedAssets(args);
-export const getCurrencies = async (args: any) => await coreLogic.getCurrencies(args);
 export const GetBanks = async (args: any) => await coreLogic.GetBanks(args);
 export const CreateBankDeposit = async (args: any) => await coreLogic.CreateBankDeposit(args);
 export const GetBankDeposits = async (args: any) => await coreLogic.GetBankDeposits(args);
@@ -13,8 +11,6 @@ export const GetWalletBalance = async (args: any) => await coreLogic.GetWalletBa
 export const GetAccountBalance = async (args: any) => await coreLogic.GetAccountBalance(args);
 export const getAccountByBalanceId = async (args: any) =>
     await coreLogic.getAccountByBalanceId(args);
-export const validateRecipientAccount = async (args: any) =>
-    await coreLogic.validateRecipientAccount(args);
 export const lookupAccountByPhone = async (args: any) => await coreLogic.lookupAccountByPhone(args);
 export const GetJournalEntries = async (args: any) => await coreLogic.GetJournalEntries(args);
 export const GetFinancialLedger = async (args: any) => await coreLogic.GetFinancialLedger(args);
@@ -49,14 +45,11 @@ export const endVideoCall = async (args: any) => await coreLogic.endVideoCall(ar
 export async function getServerActions() {
     return {
         banking: {
-            getSupportedAssets,
-            getCurrencies,
             GetBanks,
             CreateBankDeposit,
             GetBankDeposits,
             CalculateFees,
             getAccountByBalanceId,
-            validateRecipientAccount,
             lookupAccountByPhone,
         },
         media: {

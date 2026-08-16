@@ -194,17 +194,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                 // 1. Fetch supported assets (currencies + metals)
                 setIsLoadingCurrencies(true);
                 setIsLoadingMetals(true);
-                const assetsRes = await actions.banking.getSupportedAssets({});
+                const assetsRes = await api.banking.assets();
 
-                if (!assetsRes || 'error' in assetsRes) {
-                    const errorCode = assetsRes?.error?.toUpperCase() || '';
-                    if (
-                        (errorCode === 'UNAUTHENTICATED' ||
-                            (errorCode.includes('USER') &&
-                                errorCode.includes('NOT') &&
-                                errorCode.includes('FOUND'))) &&
-                        handleUnauthenticated
-                    ) {
+                if (!assetsRes.ok) {
+                    // Prefer the status code. This previously had to uppercase the
+                    // error string and look for 'UNAUTHENTICATED' or 'USER NOT
+                    // FOUND', because the action layer surfaced no status — a
+                    // reworded backend message would have silently stopped
+                    // logging the user out. The string check is kept as a
+                    // fallback for backends that return those as a 400.
+                    const { status, message } = assetsRes.error;
+                    const code = message.toUpperCase();
+                    const isAuthFailure =
+                        status === 401 ||
+                        status === 403 ||
+                        code === 'UNAUTHENTICATED' ||
+                        (code.includes('USER') && code.includes('NOT') && code.includes('FOUND'));
+
+                    if (isAuthFailure && handleUnauthenticated) {
                         handleUnauthenticated();
                     }
                     setIsLoadingCurrencies(false);
@@ -214,8 +221,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                     return;
                 }
 
-                const currencyList = assetsRes?.currencies || [];
-                const metalList = assetsRes?.metals || [];
+                // Narrowed by the !assetsRes.ok guard above, so `.data` is safe
+                // to read without optional chaining.
+                const currencyList = assetsRes.data.currencies ?? [];
+                const metalList = assetsRes.data.metals ?? [];
                 setCurrencies(currencyList);
                 setMetals(metalList);
                 setIsLoadingCurrencies(false);

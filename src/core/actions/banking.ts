@@ -11,63 +11,6 @@ import type { RecipientAccountDetails } from '../types/transfer';
 import { fetchServerData, processResponse } from '../utils';
 import { initialData } from '@/config/runtime';
 
-export async function getSupportedAssets({
-    token,
-    authCookieName,
-}: {
-    token?: string;
-    authCookieName?: string;
-} = {}): Promise<SupportedAssetsApi | { error: string }> {
-    try {
-        const headers: Record<string, string> = {};
-        const countryCode = initialData.CountryCode;
-        if (countryCode) {
-            headers['x-country-code'] = countryCode;
-        }
-
-        let response = await fetchServerData({
-            method: 'GET',
-            url: '/assets/supported',
-            token,
-            authCookieName,
-            headers,
-        });
-
-        return processResponse<SupportedAssetsApi | { error: string }>(response);
-    } catch (error) {
-        console.error(error);
-        throw error;
-    }
-}
-
-/** @deprecated Use getSupportedAssets() instead */
-export async function getCurrencies({
-    token,
-    authCookieName,
-}: {
-    token?: string;
-    authCookieName?: string;
-} = {}): Promise<CurrenciesApi | { error: string }> {
-    try {
-        const result = await getSupportedAssets({ token, authCookieName });
-        if ('error' in result) {
-            return result;
-        }
-        return {
-            items: result.currencies as unknown as CurrenciesApi['items'],
-            total: result.currencies.length,
-            page: 1,
-            limit: result.currencies.length,
-            totalPages: 1,
-            hasNext: false,
-            hasPrevious: false,
-        };
-    } catch (error) {
-        console.error(error);
-        throw error;
-    }
-}
-
 export async function GetBanks({
     token,
     authCookieName,
@@ -212,57 +155,6 @@ export async function getAccountByBalanceId({
     }
 }
 
-export async function validateRecipientAccount({
-    accountNumber,
-    token,
-    authCookieName,
-}: {
-    accountNumber: string;
-    token?: string;
-    authCookieName?: string;
-}): Promise<RecipientAccountDetails | { error: string }> {
-    try {
-        // Ensure format is xxxx-xxxx
-        const formatted = accountNumber.includes('-')
-            ? accountNumber
-            : `${accountNumber.slice(0, 4)}-${accountNumber.slice(4)}`;
-
-        const response: FetchResponse<{
-            found: boolean;
-            accountNumber: string;
-            name: string;
-        }> = await fetchServerData({
-            method: 'GET',
-            url: `/transfers/lookup-account/${encodeURIComponent(formatted)}`,
-            token,
-            authCookieName,
-        });
-
-        const result = await processResponse<{
-            found: boolean;
-            accountNumber: string;
-            name: string;
-        }>(response);
-
-        if ('error' in result) {
-            return { error: result.error };
-        }
-
-        if (!result.found) {
-            return { error: 'Account not found. Please verify the account number.' };
-        }
-
-        return {
-            found: result.found,
-            accountNumber: result.accountNumber,
-            name: result.name,
-            maskedName: result.name, // API returns pre-masked name like "P***y W."
-        };
-    } catch (error) {
-        console.error('Error validating recipient account:', error);
-        return { error: 'Failed to validate account. Please try again.' };
-    }
-}
 
 export async function lookupAccountByPhone({
     phoneNumber,

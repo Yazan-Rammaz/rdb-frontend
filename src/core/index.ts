@@ -34,14 +34,11 @@ export { banking, media, transactions, wallets, auth, paymentRequests, websocket
  */
 
 export {
-    getSupportedAssets,
-    getCurrencies,
     GetBanks,
     CreateBankDeposit,
     GetBankDeposits,
     CalculateFees,
     getAccountByBalanceId,
-    validateRecipientAccount,
     lookupAccountByPhone,
 } from './actions/banking';
 

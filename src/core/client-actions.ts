@@ -7,8 +7,6 @@ const USE_SERVER_ACTIONS = process.env.NEXT_PUBLIC_USE_SERVER_ACTIONS === 'true'
 // When true:  passes server actions (Next.js 'use server' functions)
 
 import {
-    getSupportedAssets,
-    getCurrencies,
     GetBanks,
     CreateBankDeposit,
     GetBankDeposits,
@@ -32,7 +30,6 @@ import {
     createQrSession,
     refreshQrToken,
     getAccountByBalanceId,
-    validateRecipientAccount,
     lookupAccountByPhone,
     checkTransferBalance,
     getPaymentRequest,
@@ -50,14 +47,11 @@ import {
 
 const serverOnlyActions = {
     banking: {
-        getSupportedAssets,
-        getCurrencies,
         GetBanks,
         CreateBankDeposit,
         GetBankDeposits,
         CalculateFees,
         getAccountByBalanceId,
-        validateRecipientAccount,
         lookupAccountByPhone,
     },
     media: {

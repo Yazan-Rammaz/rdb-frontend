@@ -1,18 +1,19 @@
 import { request } from '../client';
 import type { ApiResult, RequestOptions } from '../types/common';
 import type {
-    AssetListResponse,
     BankDepositListResponse,
     BankListResponse,
     CalculateFeesBody,
     CreateBankDepositBody,
     CreateBankDepositResponse,
     FeeQuote,
+    SupportedAssetsResponse,
 } from '../types/banking';
 
 /** Supported assets, banks, and bank deposits. */
 export const banking = {
-    assets: (o?: RequestOptions): Promise<ApiResult<AssetListResponse>> =>
+    /** Currencies and metals, returned as two lists in one envelope. */
+    assets: (o?: RequestOptions): Promise<ApiResult<SupportedAssetsResponse>> =>
         request({ path: '/assets/supported', options: o }),
 
     banks: (o?: RequestOptions): Promise<ApiResult<BankListResponse>> =>
