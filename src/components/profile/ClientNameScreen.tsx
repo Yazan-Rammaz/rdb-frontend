@@ -7,7 +7,7 @@ import verifiedBigIcon from '@/assets/icons/verification/verified-big.svg';
 import warnSvg from '@/assets/icons/profile/warn.svg';
 import infoSvg from '@/assets/icons/profile/info.svg';
 import { useToast } from '@/context/ToastContext';
-import { apiFetch } from '@/core/utils';
+import { apiFetch, apiFetchOp } from '@/core/utils';
 
 interface ClientNameScreenProps {
     onBack: () => void;
@@ -66,11 +66,12 @@ export default function ClientNameScreen({
 
         setSaving(true);
         try {
-            const res = await apiFetch('/api/profile/update', {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(lastName ? { firstName, lastName } : { firstName }),
-            });
+            // 'pu' through the gateway, not apiFetch('/api/profile/update'):
+            // the named route is gated by notGateway(), which 404s anything
+            // without the internal x-pg header whenever OPAQUE_API is on. That
+            // is off in .env.development.local and on in .env, so the direct
+            // call worked locally and failed in production.
+            const res = await apiFetchOp('pu', lastName ? { firstName, lastName } : { firstName });
             if (res.ok) {
                 onSaved?.(trimmed);
                 toast.success('Name updated successfully');

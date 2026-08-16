@@ -37,7 +37,7 @@ import LoginHistoryScreen from './LoginHistoryScreen';
 import { QRCodeDisplay } from '../QR/send/shared/QRCodeDisplay';
 
 import { KycVerificationStatus, type KycStatusResponse } from '@/core/types/auth';
-import { apiFetch } from '@/core/utils';
+import { apiFetch, apiFetchOp } from '@/core/utils';
 
 const ProfileContent = () => {
     const { userData, removeAuthCookies, refreshUser, isLoading } = useAuth();
@@ -87,11 +87,9 @@ const ProfileContent = () => {
         if (!dataUrl) {
             setLocalPhotoUrl(undefined);
             setImgError(false);
-            const delRes = await apiFetch('/api/profile/update', {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ profilePictureURL: '' }),
-            });
+            // Gateway opcode, not the named route — see the note in
+            // ClientNameScreen: notGateway() 404s direct hits in production.
+            const delRes = await apiFetchOp('pu', { profilePictureURL: '' });
             if (delRes.ok) {
                 toast.success('Photo removed successfully');
             } else {
@@ -119,15 +117,11 @@ const ProfileContent = () => {
         const imageUrl = uploaded.url;
 
         // Update profile via API route
-        const updateRes = await apiFetch('/api/profile/update', {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                firstName: user.firstName,
-                lastName: user.lastName,
-                profilePictureURL: imageUrl,
-                language: user.language,
-            }),
+        const updateRes = await apiFetchOp('pu', {
+            firstName: user.firstName,
+            lastName: user.lastName,
+            profilePictureURL: imageUrl,
+            language: user.language,
         });
         if (!updateRes.ok) {
             toast.error('Failed to update photo');

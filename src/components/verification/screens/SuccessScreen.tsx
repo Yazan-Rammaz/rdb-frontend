@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { useVerification } from '@/context/VerificationContext';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { apiFetch } from '@/core/utils';
+import { apiFetchOp } from '@/core/utils';
 import { KycVerificationStatus } from '@/core/types/auth';
 import verifiedBigSvg from '@/assets/icons/verification/verified-big.svg';
 
@@ -52,11 +52,12 @@ export default function SuccessScreen() {
                 firstName = parts[0] ?? '';
                 lastName = parts.length > 1 ? parts.slice(1).join(' ') : '';
                 try {
-                    await apiFetch('/api/profile/update', {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(lastName ? { firstName, lastName } : { firstName }),
-                    });
+                    // Gateway opcode, not the named route — see the note in
+                    // ClientNameScreen: notGateway() 404s direct hits in
+                    // production. This one failed silently (the catch below is
+                    // deliberately non-fatal), so the verified name never
+                    // reached the backend even though the UI showed it.
+                    await apiFetchOp('pu', lastName ? { firstName, lastName } : { firstName });
                 } catch {
                     // non-fatal — the optimistic update + reconcile below still apply
                 }
