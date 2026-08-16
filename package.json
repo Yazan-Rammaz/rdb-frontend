@@ -2,31 +2,6 @@
     "name": "rdb",
     "version": "1.0.0",
     "description": "Ramaaz Digital Banking Library",
-    "main": "./dist/index.js",
-    "module": "./dist/index.mjs",
-    "types": "./dist/index.d.ts",
-    "exports": {
-        ".": {
-            "types": "./dist/index.d.ts",
-            "import": "./dist/index.mjs",
-            "require": "./dist/index.js"
-        },
-        "./server": {
-            "types": "./dist/server/index.d.ts",
-            "browser": "./dist/server/browser.mjs",
-            "import": "./dist/server/index.mjs",
-            "require": "./dist/server/index.js"
-        },
-        "./core": {
-            "types": "./dist/core/index.d.ts",
-            "import": "./dist/core/index.mjs",
-            "require": "./dist/core/index.js"
-        },
-        "./styles": "./dist/styles/styles.css"
-    },
-    "files": [
-        "dist"
-    ],
     "scripts": {
         "dev": "concurrently -n proxy,web -c cyan,green \"node ./scripts/local-proxy.mjs\" \"cross-env NODE_OPTIONS=--max-old-space-size=4096 next dev --port 3000\"",
         "dev:https": "concurrently -n proxy,web -c cyan,green \"node ./scripts/local-proxy.mjs\" \"cross-env NODE_OPTIONS=--max-old-space-size=4096 next dev --port 3000 --experimental-https\"",
@@ -37,11 +12,6 @@
         "deploy": "npm run build && wrangler deploy",
         "start": "next start",
         "lint": "next lint",
-        "clean": "rimraf dist",
-        "lib:build": "npm run clean && tsup && npm run css:build",
-        "css:build": "npx @tailwindcss/cli -i ./src/styles/styles.css -o ./dist/styles/styles.css --minify",
-        "cf:build": "npm run lib:build && npx @cloudflare/next-on-pages",
-        "pages:deploy": "npm run cf:build && wrangler pages deploy .vercel/output/static",
         "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
         "sync:vendor": "node ./scripts/sync-vendor.mjs",
         "postinstall": "node ./scripts/sync-vendor.mjs"
@@ -60,7 +30,6 @@
         "qr-scanner": "^1.4.2",
         "qrcode": "^1.5.4",
         "react-loading-skeleton": "^3.3.1",
-        "react-router-dom": "^7.13.0",
         "socket.io-client": "^4.8.3",
         "xd-config": "github:Yazan-Rammaz/xd-config"
     },
@@ -82,10 +51,9 @@
         "postcss": "^8.5.6",
         "react": "19.2.5",
         "react-dom": "19.2.5",
-        "rimraf": "^5.0.0",
         "tailwindcss": "^4.1.18",
-        "tsup": "^8.5.1",
         "typescript": "^5",
         "wrangler": "^4.71.0"
-    }
+    },
+    "private": true
 }

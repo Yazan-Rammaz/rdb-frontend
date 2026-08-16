@@ -1,7 +1,7 @@
 import { FetchResponse } from '@/core/types';
 import { SendOtpResponse, User, VerifyOtpResponse } from '@/core/types/auth';
 import { fetchServerData, processResponse } from '@/core/utils';
-import { initialData } from '@/rdb/types/RDBProps';
+import { initialData } from '@/config/runtime';
 
 /**
  * Validates the current user session.

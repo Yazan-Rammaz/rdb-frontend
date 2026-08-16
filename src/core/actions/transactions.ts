@@ -6,7 +6,7 @@ import {
     GetTransactionsApi,
     GetWalletBalancesApi,
 } from '../types';
-import { initialData } from '@/rdb/types/RDBProps';
+import { initialData } from '@/config/runtime';
 import type {
     BalanceCheckResult,
     PaymentRequestData,

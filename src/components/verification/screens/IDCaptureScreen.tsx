@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { useVerification } from '@/context/VerificationContext';
-import { useUniversalRouter } from '@/hooks/useUniversalRouter';
+import { useRouter } from 'next/navigation';
 import { useCamera } from '@/hooks/useCamera';
 import { createKycService } from '@/services/kyc';
 import { verifyBackMatchesFront } from '@/services/kyc/backSideVerifier';
@@ -106,7 +106,7 @@ const BACK_SIDE_FACE_BLOCK_MIN_AREA_RATIO = 0.08;
 
 export default function IDCaptureScreen() {
     const { goTo, setIdDocument, markCompleted } = useVerification();
-    const router = useUniversalRouter();
+    const router = useRouter();
     const {
         videoRef,
         canvasRef,

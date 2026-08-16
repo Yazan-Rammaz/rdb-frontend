@@ -3,14 +3,14 @@
 import React from 'react';
 import Image from 'next/image';
 import { useVerification } from '@/context/VerificationContext';
-import { useUniversalRouter } from '@/hooks/useUniversalRouter';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import shieldSvg from '@/assets/icons/verification/shield.svg';
 import notVerifiedSvg from '@/assets/icons/verification/not-verified.svg';
 
 export default function IntroScreen() {
     const { goTo } = useVerification();
-    const router = useUniversalRouter();
+    const router = useRouter();
     const { userData } = useAuth();
 
     const userName = userData?.user?.firstName || userData?.user?.lastName || 'RDB User';

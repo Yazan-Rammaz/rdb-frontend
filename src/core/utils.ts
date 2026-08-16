@@ -1,6 +1,6 @@
 import { FetchResponse } from "./types";
 import { resolveAuthToken } from "./auth/resolve-token";
-import { initialData } from "@/rdb/types/RDBProps";
+import { initialData } from '@/config/runtime';
 import { pfetch } from "@/lib/p";
 
 // --- Silent token refresh (client-side only) -------------------------------

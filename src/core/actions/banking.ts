@@ -9,7 +9,7 @@ import {
 } from '../types';
 import type { RecipientAccountDetails } from '../types/transfer';
 import { fetchServerData, processResponse } from '../utils';
-import { initialData } from '@/rdb/types/RDBProps';
+import { initialData } from '@/config/runtime';
 
 export async function getSupportedAssets({
     token,

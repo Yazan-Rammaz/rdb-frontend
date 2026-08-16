@@ -3,7 +3,7 @@
 import React, { useEffect, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useVerification } from '@/context/VerificationContext';
-import { useUniversalRouter } from '@/hooks/useUniversalRouter';
+import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/core/utils';
 import { KycVerificationStatus, type KycStatusResponse } from '@/core/types/auth';
 import { Page } from '@/scaling';
@@ -19,7 +19,7 @@ const transition = { duration: 0.35, ease: [0.4, 0, 0.2, 1] as [number, number, 
 
 export default function VerificationPage() {
     const { currentStep, direction, setKycSessionId } = useVerification();
-    const router = useUniversalRouter();
+    const router = useRouter();
     const checkedRef = useRef(false);
 
     // On mount: check existing KYC status, fetch a fresh session, and route accordingly

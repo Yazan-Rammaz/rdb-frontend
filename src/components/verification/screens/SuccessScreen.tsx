@@ -4,7 +4,7 @@ import React, { useEffect } from 'react';
 import Image from 'next/image';
 import { useVerification } from '@/context/VerificationContext';
 import { useAuth } from '@/context/AuthContext';
-import { useUniversalRouter } from '@/hooks/useUniversalRouter';
+import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/core/utils';
 import { KycVerificationStatus } from '@/core/types/auth';
 import verifiedBigSvg from '@/assets/icons/verification/verified-big.svg';
@@ -12,7 +12,7 @@ import verifiedBigSvg from '@/assets/icons/verification/verified-big.svg';
 export default function SuccessScreen() {
     const { markCompleted, idDocument } = useVerification();
     const { userData, refreshUser, updateUser } = useAuth();
-    const router = useUniversalRouter();
+    const router = useRouter();
 
     // Show the verified person's name — `idDocument.name` (e.g. "DANI MANSOUR"),
     // NOT `idDocument.idName` (the document-type label "Passport"). Fall back to the

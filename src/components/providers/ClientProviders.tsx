@@ -6,7 +6,7 @@ import { useRDBConfig } from '@/context/RDBContext';
 import { useAuth } from '@/context/AuthContext';
 import { usePasskey } from '@/context/PasskeyContext';
 import { useStore } from '@/context/StoreContext';
-import { useUniversalRouter } from '@/hooks/useUniversalRouter';
+import { useRouter } from 'next/navigation';
 import SplashScreen from '@/components/SplashScreen';
 import { preloadAuthFlowState } from '@/lib/authFlowCookie';
 
@@ -31,7 +31,7 @@ export function ClientProviders({
     children: React.ReactNode;
     onSplashCompleteAction?: () => void;
 }) {
-    const router = useUniversalRouter();
+    const router = useRouter();
     const actions = useActions();
     const { baseUrl, handleUnauthenticated } = useRDBConfig();
     const { userData, isLoading } = useAuth();

@@ -18,7 +18,7 @@ import {
     clearAuthFlowState,
     getCachedAuthFlowState,
 } from '@/lib/authFlowCookie';
-import { useUniversalRouter } from '@/hooks/useUniversalRouter';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { usePasskey } from '@/context/PasskeyContext';
 import { useActions } from '@/hooks/useActions';
@@ -89,7 +89,7 @@ export default function AuthPage() {
 
 function AuthPageInner() {
     const actions = useActions();
-    const router = useUniversalRouter();
+    const router = useRouter();
     const {
         saveAuthCookies,
         userData,

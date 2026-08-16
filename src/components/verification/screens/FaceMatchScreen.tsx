@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useVerification } from '@/context/VerificationContext';
-import { useUniversalRouter } from '@/hooks/useUniversalRouter';
+import { useRouter } from 'next/navigation';
 import { createKycService } from '@/services/kyc';
 import ExitConfirmDialog from '../ExitConfirmDialog';
 import faceDetectSvg from '@/assets/icons/verification/face-detect.svg';
@@ -30,7 +30,7 @@ export default function FaceMatchScreen() {
         kycSessionId,
         setKycSessionId,
     } = useVerification();
-    const router = useUniversalRouter();
+    const router = useRouter();
     const kycService = useRef(createKycService());
 
     const [matchState, setMatchState] = useState<MatchState>('matching');

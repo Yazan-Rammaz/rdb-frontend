@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { usePasskey } from '@/context/PasskeyContext';
-import { useUniversalRouter } from '@/hooks/useUniversalRouter';
+import { useRouter } from 'next/navigation';
 
 /**
  * AuthProtected — wraps all protected routes.
@@ -14,7 +14,7 @@ import { useUniversalRouter } from '@/hooks/useUniversalRouter';
  * immediately after this component in the protected layout.
  */
 export function AuthProtected({ children }: { children: React.ReactNode }) {
-    const router = useUniversalRouter();
+    const router = useRouter();
     const { userData, checkAuth, isLoading } = useAuth();
     const { bootReady } = usePasskey();
     const [isVerified, setIsVerified] = useState(false);

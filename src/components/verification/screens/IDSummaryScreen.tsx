@@ -3,7 +3,7 @@
 import React, { useCallback } from 'react';
 import Image from 'next/image';
 import { MAX_ATTEMPTS, useVerification } from '@/context/VerificationContext';
-import { useUniversalRouter } from '@/hooks/useUniversalRouter';
+import { useRouter } from 'next/navigation';
 import { createKycService } from '@/services/kyc';
 import ExitConfirmDialog from '../ExitConfirmDialog';
 import liveDetectIdSvg from '@/assets/icons/verification/live-detect-id.svg';
@@ -20,7 +20,7 @@ export default function IDSummaryScreen() {
         attemptCounts,
         incrementAttempt,
     } = useVerification();
-    const router = useUniversalRouter();
+    const router = useRouter();
     const [showExitDialog, setShowExitDialog] = React.useState(false);
     const [submitting, setSubmitting] = React.useState(false);
     const [submitError, setSubmitError] = React.useState<string | null>(null);

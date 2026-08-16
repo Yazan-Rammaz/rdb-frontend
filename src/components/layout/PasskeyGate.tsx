@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { usePasskey } from '@/context/PasskeyContext';
 import { useResetPasscode } from '@/context/ResetPasscodeContext';
 import { useSessionTakeover } from '@/context/SessionTakeoverContext';
-import { useUniversalRouter } from '@/hooks/useUniversalRouter';
+import { useRouter } from 'next/navigation';
 import { useIdleTimer } from '@/hooks/useIdleTimer';
 import { useToast } from '@/context/ToastContext';
 import PasscodeScreen from '@/components/auth/screens/PasscodeScreen';
@@ -34,7 +34,7 @@ const IDLE_TIMEOUT_MS = process.env.NEXT_PUBLIC_IDLE_TIMEOUT_MS
  * UNLOCKED         → render children; idle timer is active
  */
 export default function PasskeyGate({ children }: PasskeyGateProps) {
-    const router = useUniversalRouter();
+    const router = useRouter();
     const { toast } = useToast();
     const { start: startPasscodeReset } = useResetPasscode();
     const { takeoverSince } = useSessionTakeover();

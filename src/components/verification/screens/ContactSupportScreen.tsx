@@ -2,14 +2,14 @@
 
 import React, { useEffect } from 'react';
 import Image from 'next/image';
-import { useUniversalRouter } from '@/hooks/useUniversalRouter';
+import { useRouter } from 'next/navigation';
 import shieldSvg from '@/assets/icons/verification/shield.svg';
 import liveDetectIdSvg from '@/assets/icons/verification/live-detect-id.svg';
 import ExitConfirmDialog from '../ExitConfirmDialog';
 import { useVerification } from '@/context/VerificationContext';
 
 export default function ContactSupportScreen() {
-    const router = useUniversalRouter();
+    const router = useRouter();
     const { idDocument } = useVerification();
     const isPassport = (idDocument?.idType ?? '').toLowerCase().includes('passport');
     const [showExitDialog, setShowExitDialog] = React.useState(false);

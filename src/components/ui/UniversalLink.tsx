@@ -2,28 +2,22 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Link as RouterLink } from 'react-router-dom';
-import { useRDBConfig } from '../../context/RDBContext';
 
 interface UniversalLinkProps extends React.AnchorHTMLAttributes<HTMLAnchorElement> {
-  href: string;
-  children: React.ReactNode;
+    href: string;
+    children: React.ReactNode;
 }
 
-export const UniversalLink = ({ href, children, ...props }: UniversalLinkProps) => {
-  const { isLibrary } = useRDBConfig();
-
-  if (isLibrary) {
-    return (
-      <RouterLink to={href} {...props as any}>
-        {children}
-      </RouterLink>
-    );
-  }
-
-  return (
+/**
+ * Thin wrapper over next/link.
+ *
+ * It used to switch between next/link and react-router's Link depending on
+ * whether the app was running standalone or embedded as a library in a host
+ * app. There is no library build any more, so only one branch survives. The
+ * component is kept so call sites stay unchanged.
+ */
+export const UniversalLink = ({ href, children, ...props }: UniversalLinkProps) => (
     <Link href={href} {...props}>
-      {children}
+        {children}
     </Link>
-  );
-};
+);

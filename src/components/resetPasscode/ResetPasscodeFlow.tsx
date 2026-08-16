@@ -8,7 +8,7 @@ import { usePasskey } from '@/context/PasskeyContext';
 import { useAuth } from '@/context/AuthContext';
 import { clearAuthFlowState } from '@/lib/authFlowCookie';
 import { useToast } from '@/context/ToastContext';
-import { useUniversalRouter } from '@/hooks/useUniversalRouter';
+import { useRouter } from 'next/navigation';
 import {
     resetPasscodeApi,
     createStepResetPasscodeApi,
@@ -46,7 +46,7 @@ export default function ResetPasscodeFlow() {
     const { confirmUnlock } = usePasskey();
     const { loginStep, setLoginStep } = useAuth();
     const { toast } = useToast();
-    const router = useUniversalRouter();
+    const router = useRouter();
 
     // Pick the endpoint set by entry point (doc §0.1). The mid-login set carries
     // the 10-min login stepToken as its bearer; the idle set rides on rdb_at.

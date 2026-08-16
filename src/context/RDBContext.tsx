@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useMemo } from 'react';
 import { RDBActions } from '@/core/types/actions';
 import { core as coreActions } from '../core';
-import { initialData } from '@/rdb/types/RDBProps';
+import { initialData } from '@/config/runtime';
 
 // const MyToken =
 //     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5OGUyYTYwNTA1MTU0ZjlmMTRhZmViZCIsImVtYWlsIjoicGhvbmVfOTYzOTgwMDMzNDk2QHRyeWRvcy1vdHAubG9jYWwiLCJ0eXBlIjoidXNlciIsImxhbmciOiJlbiIsImt5Y1N0YXR1cyI6Im5vdF9zdWJtaXR0ZWQiLCJpYXQiOjE3NzEwNzQyMjksImV4cCI6MTc3MzY2NjIyOX0.jeiRwUv9aV2Ks1dvqPjkKy5H8N8VpzO8Fvxbw40Ph_k';
@@ -18,7 +18,6 @@ export interface RDBContextValue {
     local: string;
     storeKey?: string;
     handleUnauthenticated: () => void;
-    isLibrary: boolean;
     /**
      * The cookie name from which the auth token is read server-side.
      * Defaults to 'rdb_at' (the internal secure cookie).
@@ -33,7 +32,6 @@ const defaultConfig: RDBContextValue = {
     baseUrl: initialData.BaseUrl || 'http://localhost:3000',
     local: initialData.Locale || 'gb-en',
     handleUnauthenticated: () => console.warn('[RDB] Unauthenticated (Default Handler)'),
-    isLibrary: false,
     authCookieName: 'rdb_at',
     actions: undefined,
 };
@@ -84,7 +82,6 @@ export const RDBProvider = ({
             baseUrl,
             local,
             authCookieName,
-            isLibrary: config?.isLibrary ?? (config ? true : defaultConfig.isLibrary),
             handleUnauthenticated:
                 config?.handleUnauthenticated ?? defaultConfig.handleUnauthenticated,
             actions: boundActions,

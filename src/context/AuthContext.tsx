@@ -8,7 +8,7 @@ import {
 import { clearAuthFlowState } from '@/lib/authFlowCookie';
 import { refreshAccessToken } from '@/core/utils';
 import { pfetch } from '@/lib/p';
-import { useUniversalRouter } from '@/hooks/useUniversalRouter';
+import { useRouter } from 'next/navigation';
 
 // Shapes the NestJS session login/step endpoints can return
 export type LoginApiResponse =

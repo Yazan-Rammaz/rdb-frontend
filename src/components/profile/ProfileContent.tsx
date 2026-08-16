@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
 import { useStore } from '@/context/StoreContext';
-import { useUniversalRouter } from '@/hooks/useUniversalRouter';
+import { useRouter } from 'next/navigation';
 import { ChevronRight, Check } from 'lucide-react';
 import type { SupportedLanguage } from '@/i18n';
 import Image from 'next/image';
@@ -43,7 +43,7 @@ const ProfileContent = () => {
     const { userData, removeAuthCookies, refreshUser, isLoading } = useAuth();
     const { account } = useStore();
     const { toast } = useToast();
-    const router = useUniversalRouter();
+    const router = useRouter();
     const { t, language, setLanguage } = useTranslation();
     const [showLogoutDialog, setShowLogoutDialog] = useState(false);
     const [imgError, setImgError] = useState(false);

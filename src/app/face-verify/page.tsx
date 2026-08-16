@@ -1,8 +1,7 @@
 'use client';
 
 import React, { Suspense, useCallback } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { useUniversalRouter } from '@/hooks/useUniversalRouter';
+import {useSearchParams, useRouter } from 'next/navigation';
 import FaceVerifyFlow from '@/components/faceReverify/FaceVerifyFlow';
 import type { FaceReverifyOutcome } from '@/context/FaceReverifyContext';
 import { pfetch } from '@/lib/p';
@@ -19,7 +18,7 @@ import { pfetch } from '@/lib/p';
  */
 function FaceVerifyPageInner() {
     const params = useSearchParams();
-    const router = useUniversalRouter();
+    const router = useRouter();
 
     const challengeId = params.get('challengeId') ?? '';
     const reason = params.get('reason') ?? undefined;

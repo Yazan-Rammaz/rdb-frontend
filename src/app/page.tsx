@@ -1,11 +1,11 @@
 'use client';
 import { useEffect, useState, useRef } from 'react';
-import { useUniversalRouter } from '@/hooks/useUniversalRouter';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import SplashScreen from '@/components/SplashScreen';
 
 export default function RootPage() {
-    const router = useUniversalRouter();
+    const router = useRouter();
     const { userData, isLoading: isAuthLoading } = useAuth();
     const [splashDone, setSplashDone] = useState(false);
     const hasRedirected = useRef(false);

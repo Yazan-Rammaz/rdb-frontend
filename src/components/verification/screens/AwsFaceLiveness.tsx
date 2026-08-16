@@ -17,7 +17,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useVerification } from '@/context/VerificationContext';
-import { useUniversalRouter } from '@/hooks/useUniversalRouter';
+import { useRouter } from 'next/navigation';
 import { useCamera } from '@/hooks/useCamera';
 import { createKycService } from '@/services/kyc';
 import type { LivenessChallenge } from '@/services/kyc/kycService.interface';
@@ -686,7 +686,7 @@ function SparkleField({
 
 export default function AwsFaceLivenessScreen() {
     const { goTo, setLivenessResult, incrementAttempt, markCompleted } = useVerification();
-    const router = useUniversalRouter();
+    const router = useRouter();
     const {
         videoRef,
         canvasRef,
