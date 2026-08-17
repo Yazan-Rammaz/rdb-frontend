@@ -6,8 +6,6 @@ import { POST as saveSessionToken } from '../auth/save-session-token/route';
 import { POST as refresh } from '../auth/refresh/route';
 import { POST as logout } from '../auth/logout/route';
 import { GET as wsToken } from '../auth/token/route';
-import { GET as profileMe } from '../profile/me/route';
-import { PATCH as profileUpdate } from '../profile/update/route';
 import { GET as sessionsGet, POST as sessionsPost, DELETE as sessionsDelete } from '../sessions/[...path]/route';
 
 /**
@@ -27,8 +25,6 @@ import { GET as sessionsGet, POST as sessionsPost, DELETE as sessionsDelete } fr
  *   rf → POST   /api/auth/refresh
  *   lo → POST   /api/auth/logout
  *   tk → GET    /api/auth/token
- *   me → GET    /api/profile/me
- *   pu → PATCH  /api/profile/update
  *   ps → GET    /api/sessions/passcode/status
  *   pc → POST   /api/sessions/passcode/set
  *   pv → POST   /api/sessions/passcode/verify
@@ -53,8 +49,6 @@ const HANDLERS: Record<string, Handler> = {
     rf: refresh,
     lo: logout,
     tk: wsToken,
-    me: profileMe,
-    pu: profileUpdate,
     ps: sessionsGet,
     pc: sessionsPost,
     pv: sessionsPost,

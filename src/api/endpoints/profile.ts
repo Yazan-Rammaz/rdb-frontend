@@ -1,38 +1,51 @@
 import { request } from '../client';
+import { normalizeUser } from '../helpers/profile';
 import type { ApiResult, RequestOptions } from '../types/common';
 import type { ProfileResponse, UpdateProfileBody, UploadPhotoResponse } from '../types/profile';
 
 /**
  * The signed-in user's profile.
  *
- * `me` and `update` are the app's first opcode-routed endpoints. Their Next
- * handlers are gated by `notGateway()`, which answers 404 to any request
- * missing the internal `x-pg` header — so the opcode is not a preference here,
- * it is the only way in when NEXT_PUBLIC_OPAQUE_API is on (it is, in `.env`).
- * Calling the descriptive path directly works locally and 404s in production,
- * which is exactly the bug that motivated centralising these calls.
+ * `me` and `update` both hit NestJS `/users/me` by its real name, so the generic
+ * `[...path]` proxy carries them — same as `banking.assets()` or `transfers`.
+ * They used to go to bespoke handlers under `app/api/profile/`, which existed
+ * for two reasons: to translate the invented paths `/profile/me` and
+ * `/profile/update` into `/users/me`, and to keep an `rdb_user` cookie in sync.
+ * Nothing read that cookie, so once the paths matched, both handlers were doing
+ * nothing the proxy does not already do and were deleted.
  *
- * `path` is still declared on the opcode calls: `request()` ignores it when
- * `op` is set, but it documents where the call lands and matches the opcode
- * table in `lib/opcodeMap.ts`.
+ * The response shaping they also did now lives in `helpers/profile.ts`.
  */
 export const profile = {
-    me: (o?: RequestOptions): Promise<ApiResult<ProfileResponse>> =>
-        request({ path: '/profile/me', op: 'me', options: o }),
-
-    update: (
-        body: UpdateProfileBody,
-        o?: RequestOptions,
-    ): Promise<ApiResult<ProfileResponse>> =>
-        request({ path: '/profile/update', method: 'PATCH', op: 'pu', body, options: o }),
+    me: async (o?: RequestOptions): Promise<ApiResult<ProfileResponse>> => {
+        const res = await request<unknown>({ path: '/users/me', options: o });
+        return res.ok ? { ok: true, data: normalizeUser(res.data) } : res;
+    },
 
     /**
-     * Multipart, so it cannot be routed through the opcode gateway — its
-     * envelope is JSON. This is the one profile route reachable by its real
-     * name; it has no `notGateway()` guard for that reason.
+     * Normalised like `me`: NestJS answers a PATCH with the updated user, and a
+     * caller should not have to care which of the two endpoints it came from.
+     */
+    update: async (
+        body: UpdateProfileBody,
+        o?: RequestOptions,
+    ): Promise<ApiResult<ProfileResponse>> => {
+        const res = await request<unknown>({
+            path: '/users/me',
+            method: 'PATCH',
+            body,
+            options: o,
+        });
+        return res.ok ? { ok: true, data: normalizeUser(res.data) } : res;
+    },
+
+    /**
+     * Keeps its own route handler, and needs to: it is a genuine remap to a
+     * different NestJS endpoint (`/media/upload/direct`) plus a rebuilt
+     * multipart body with a `type` field derived from the file's MIME. That is
+     * work the path-stripping proxy cannot do.
      *
-     * The server derives the `type` field from the file's MIME type, so callers
-     * pass the File and nothing else.
+     * Multipart also cannot ride the opcode gateway, whose envelope is JSON.
      */
     uploadPhoto: (file: File, o?: RequestOptions): Promise<ApiResult<UploadPhotoResponse>> => {
         const formData = new FormData();
