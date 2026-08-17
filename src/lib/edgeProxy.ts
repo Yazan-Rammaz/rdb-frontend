@@ -1,26 +1,4 @@
 import { appConfig } from '@/config/app';
-import { OPAQUE_API } from '@/lib/opcodeMap';
-import { NextRequest, NextResponse } from 'next/server';
-
-/**
- * Routes fronted by the opcode gateway answer 404 to direct external hits.
- * The gateway invokes their handlers as functions with the internal X-PG
- * marker stamped on a synthesized request — only those pass. This hides the
- * descriptive endpoint names from both the Network tab and endpoint scanners.
- *
- * With NEXT_PUBLIC_OPAQUE_API=false (real-API debug mode) the named routes
- * answer direct hits again, matching the client calling them by name.
- */
-/** Marker header the opcode gateway stamps on requests it synthesizes. */
-export const PG_HEADER = 'x-pg';
-
-export function notGateway(req: NextRequest): NextResponse | null {
-    if (!OPAQUE_API) return null;
-    return req.headers.get(PG_HEADER) === '1'
-        ? null
-        : NextResponse.json({ error: 'Not found' }, { status: 404 });
-}
-
 /**
  * Edge-runtime proxy helpers for Next.js Route Handlers (Cloudflare Pages Functions).
  *

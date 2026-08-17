@@ -97,9 +97,12 @@ type SendTransferResponse =
 The caller has to handle both. With optional fields it would compile while
 silently treating a challenge as a success.
 
-**Opaque routing is a client detail.** Pass `op: 'sv'` in the endpoint module and
-the call goes through the `/api/p` gateway instead of a named URL. Call sites do
-not know or care.
+**Endpoints are named by their real path.** There was an opcode gateway that
+routed some calls through a random-hash URL so endpoint names stayed out of the
+bundle. It was removed: it was obfuscation rather than access control — every
+endpoint still requires the httpOnly auth cookie — and it cost a second routing
+table, a synthesized-request dispatcher, and endpoint modules that could not name
+the route they called.
 
 ## What this replaced
 

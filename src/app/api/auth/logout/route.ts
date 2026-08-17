@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { NEST_BASE, COOKIES, backendFetch, notGateway } from '@/lib/edgeProxy';
+import { NEST_BASE, COOKIES, backendFetch } from '@/lib/edgeProxy';
 
 
 const isProduction = process.env.NODE_ENV === 'production';
@@ -19,8 +19,6 @@ function clearCookie(name: string, secure: boolean) {
  * cookies and report success regardless.
  */
 export async function POST(req: NextRequest) {
-    const _b = notGateway(req);
-    if (_b) return _b;
     const secure = isProduction;
     const at = req.cookies.get(COOKIES.access)?.value;
     const rt = req.cookies.get(COOKIES.refresh)?.value;

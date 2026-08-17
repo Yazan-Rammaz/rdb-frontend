@@ -1,5 +1,4 @@
-import { apiFetch, apiFetchOp } from '@/core/utils';
-import { pfetch } from '@/lib/p';
+import { apiFetch } from '@/core/utils';
 import type { ApiError, ApiResult, RequestOptions } from './types/common';
 
 /**
@@ -9,119 +8,55 @@ import type { ApiError, ApiResult, RequestOptions } from './types/common';
  * should call `fetch` directly, and no component should ever build a URL.
  *
  * ─── Why one client ─────────────────────────────────────────────────────────
- * There used to be four browser→server paths: apiFetch, apiFetchOp, pfetch, and
+ * There used to be four browser→server paths: apiFetch, apiFetchOp, pfetch and
  * Server Actions via useActions(). A component picked one largely by which era
  * it was written in — and they did not behave alike. Only the apiFetch pair
  * refreshed an expired token, so the same operation could silently recover in
  * one screen and log the user out in another.
  *
- * This wraps apiFetch (and apiFetchOp for opaque routing), so refresh-on-401 is
- * guaranteed for every call rather than depending on which helper was chosen.
+ * This wraps apiFetch, so refresh-on-401 is guaranteed for every call rather
+ * than depending on which helper was chosen.
  *
- * ─── Opaque routing ─────────────────────────────────────────────────────────
- * An endpoint can be reached by name (`/api/users/me`) or through the opcode
- * gateway, which keeps the endpoint name out of the client bundle and the
- * Network tab. That is a routing detail, not something a call site should think
- * about: pass `op` and the client handles it.
+ * Endpoints are addressed by their real path. There was an opcode gateway that
+ * routed some of them through a random-hash URL to keep endpoint names out of
+ * the bundle; it was removed deliberately. It was obfuscation rather than
+ * access control — every endpoint still requires the httpOnly auth cookie —
+ * and it cost a second routing table, a synthesized-request dispatcher, and
+ * endpoint modules that could not name the route they called.
  */
 
-interface CommonSpec {
+/** Never throws. Failures come back as `{ ok: false }` so callers must handle them. */
+export async function request<T>(spec: {
+    /** Path under /api, e.g. '/users/me'. */
+    path: string;
     method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
     /** JSON body. Omit for GET. */
     body?: unknown;
-    options?: RequestOptions;
-}
-
-interface PathSpec extends CommonSpec {
-    /** Path under /api, e.g. '/users/me'. */
-    path: string;
-    op?: never;
     /**
-     * Multipart body. Mutually exclusive with `body`. Path-routed only: the
-     * opcode gateway's envelope is JSON `{o, d}`, so a file has no way through
-     * it. Content-Type is left unset so fetch writes the boundary itself.
+     * Multipart body. Mutually exclusive with `body`. Content-Type is left
+     * unset so fetch writes the boundary itself.
      */
     formData?: FormData;
     /** Query params. Undefined and null values are dropped. */
     query?: Record<string, string | number | boolean | undefined | null>;
-}
-
-/**
- * Opcode-routed call.
- *
- * On the wire everything is one payload — the `d` in `{o, d}` — but which part
- * of the request it becomes is decided server-side by the opcode's entry in
- * `lib/opcodeMap.ts`: a JSON body, a query string, or a path segment. Naming all
- * three `body` made GET calls read as though they were sending one, and made an
- * opcode call look nothing like the path-routed call beside it.
- *
- * So the three are named for what they become. `request()` folds whichever is
- * set into `d`; they are alternatives, not combinable.
- */
-interface OpSpec extends CommonSpec {
-    /** Opcode — routes through the opaque gateway. */
-    op: string;
-    /** Becomes a query string, e.g. `?page=0&limit=10`. */
-    query?: Record<string, string | number | boolean | undefined | null>;
-    /** Interpolated into the path, e.g. an account number or an id. */
-    params?: Record<string, string | number>;
-    /**
-     * Forbidden alongside `op`, and the reason is not style.
-     *
-     * `path` used to be accepted here and ignored, declared next to the opcode
-     * as documentation of where the call lands. It is a string literal in a
-     * client module, so it shipped: the production bundle carried
-     * `{path:"/auth/reset-passcode/init",op:"ri"}` and friends — handing a
-     * reader the complete opcode-to-endpoint mapping in one place, which is
-     * precisely what routing through the gateway exists to withhold.
-     * (`lib/opcodeMap.ts` holds the same table but is tree-shaken out of the
-     * client build, so it does not leak.)
-     *
-     * `never` makes the leak a compile error rather than a habit.
-     */
-    path?: never;
-    formData?: never;
-}
-
-/** Never throws. Failures come back as `{ ok: false }` so callers must handle them. */
-export async function request<T>(spec: PathSpec | OpSpec): Promise<ApiResult<T>> {
-    const { method = 'GET', body, options } = spec;
-    const op = 'op' in spec ? spec.op : undefined;
-    const path = 'path' in spec ? spec.path : undefined;
-    const formData = 'formData' in spec ? spec.formData : undefined;
-    const query = 'query' in spec ? spec.query : undefined;
+    options?: RequestOptions;
+}): Promise<ApiResult<T>> {
+    const { path, method = 'GET', body, formData, query, options } = spec;
 
     try {
-        let res: Response;
-        if (op) {
-            // body / query / params are three names for one wire field: the `d`
-            // of `{o, d}`. Which one a call uses says what the opcode's route
-            // does with it — the gateway decides that, not the client.
-            const payload = body ?? query ?? ('params' in spec ? spec.params : undefined);
-            // pfetch is the same transport apiFetchOp uses, minus the retry —
-            // see RequestOptions.skipRefresh for the one case that needs it.
-            res = options?.skipRefresh
-                ? await pfetch(op, payload, { headers: options.headers, signal: options.signal })
-                : await apiFetchOp(op, payload, {
-                      headers: options?.headers,
-                      signal: options?.signal,
-                  });
-        } else {
-            const hasJsonBody = body !== undefined;
-            // Non-null: the union guarantees a path whenever `op` is absent.
-            res = await apiFetch(buildUrl(path!, query), {
-                method,
-                headers: {
-                    // Never set Content-Type for FormData — the browser must
-                    // append its own multipart boundary.
-                    ...(hasJsonBody ? { 'Content-Type': 'application/json' } : {}),
-                    ...options?.headers,
-                },
-                ...(hasJsonBody ? { body: JSON.stringify(body) } : {}),
-                ...(formData ? { body: formData } : {}),
-                signal: options?.signal,
-            });
-        }
+        const hasJsonBody = body !== undefined;
+        const res = await apiFetch(buildUrl(path, query), {
+            method,
+            headers: {
+                // Never set Content-Type for FormData — the browser must
+                // append its own multipart boundary.
+                ...(hasJsonBody ? { 'Content-Type': 'application/json' } : {}),
+                ...options?.headers,
+            },
+            ...(hasJsonBody ? { body: JSON.stringify(body) } : {}),
+            ...(formData ? { body: formData } : {}),
+            signal: options?.signal,
+        });
 
         return await toResult<T>(res);
     } catch (err) {

@@ -1,43 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { NEST_BASE, WORKER_BASE, COOKIES, backendFetch, safeJson } from '@/lib/edgeProxy';
-import { OPAQUE_API, PROXY_OP_ROUTES } from '@/lib/opcodeMap';
-import { dispatchOpcode } from '@/lib/opcodeGateway';
-
-/**
- * Per-request random gateway paths (see src/lib/p.ts): the client posts each
- * opcode to `/api/<24 lowercase hex chars>` so the Network tab shows a
- * different name every time instead of a constant "p". No real proxied
- * endpoint is a bare 24-hex segment, so the shape alone identifies a gateway
- * call. Kept in sync with gatewayPath() in p.ts.
- */
-const GATEWAY_PATH = /^\/api\/[0-9a-f]{24}$/;
-
-// Proxied-path opcodes (NestJS reset-passcode, KYC worker re-verify) live in
-// the shared map so the client can call the real endpoints when
-// NEXT_PUBLIC_OPAQUE_API=false. A random-hash gateway request whose `o`
-// matches rewrites to the real path/method and falls through to the normal
-// proxy flow (auth injection, step-token rewrite, KYC service binding all
-// apply); any other opcode dispatches to the opcode gateway (lib/opcodeGateway).
-
-/**
- * Real paths of the proxied opcodes. In opaque mode these are reachable ONLY
- * via the random-hash gateway; a direct external hit to the descriptive name
- * gets 404 (mirrors notGateway() for the gateway handlers) so scanners can't
- * confirm the endpoint exists.
- *
- * Not all of these paths are static any more: the money opcodes carry a query
- * string or an account number. Each path is reduced to the part before any `?`,
- * and one that ends in `/` (a stripped path parameter) matches by prefix — so
- * /api/transfers/lookup-account/0000-0016 is hidden, not just the bare stem.
- */
-const PROXY_OP_PATHS = Object.values(PROXY_OP_ROUTES).map((r) => r.path().split('?')[0]);
-
-function isHiddenProxyPath(pathname: string): boolean {
-    return PROXY_OP_PATHS.some(
-        (base) => pathname === base || (base.endsWith('/') && pathname.startsWith(base)),
-    );
-}
 
 /**
  * Service binding to the KYC Worker. Same-account Worker→Worker fetches over
@@ -67,40 +30,11 @@ function kycBinding(): { fetch: typeof fetch } | null {
  * have dedicated, more-specific route handlers that take precedence over this one.
  */
 async function proxy(req: NextRequest): Promise<NextResponse> {
-    let { pathname } = req.nextUrl;
-    let method = req.method;
-    let body: ArrayBuffer | string | undefined;
+    const { pathname } = req.nextUrl;
+    const method = req.method;
 
-    if (req.method === 'POST' && GATEWAY_PATH.test(pathname)) {
-        // Random-hash gateway call ({o, d} body). Proxied-path opcodes rewrite
-        // to their real endpoint and continue through the proxy flow below;
-        // every other opcode dispatches to the opcode gateway.
-        const raw = await req.text();
-        let op: { o?: string; d?: unknown } = {};
-        try {
-            op = JSON.parse(raw);
-        } catch {
-            /* unknown shape → gateway answers 404 */
-        }
-        const def = PROXY_OP_ROUTES[op.o ?? ''];
-        if (!def) {
-            return dispatchOpcode(
-                new NextRequest(req.nextUrl, { method: 'POST', headers: req.headers, body: raw }),
-            );
-        }
-        pathname = def.path(op.d);
-        method = def.method;
-        body = method === 'GET' ? undefined : JSON.stringify(op.d ?? {});
-    } else {
-        // Opaque mode: a direct external hit to a proxied opcode's descriptive
-        // path (not arriving via the hash gateway) is hidden — 404, so scanners
-        // can't confirm the endpoint exists. Legitimate traffic always rewrites
-        // in through the gateway branch above (viaGateway = true).
-        if (OPAQUE_API && isHiddenProxyPath(pathname)) {
-            return NextResponse.json({ error: 'Not found' }, { status: 404 });
-        }
-        body = method === 'GET' || method === 'HEAD' ? undefined : await req.arrayBuffer();
-    }
+    const body =
+        method === 'GET' || method === 'HEAD' ? undefined : await req.arrayBuffer();
 
     const isKyc = pathname === '/api/kyc' || pathname.startsWith('/api/kyc/');
 

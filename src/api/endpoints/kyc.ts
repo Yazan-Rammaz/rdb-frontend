@@ -27,10 +27,10 @@ import type {
 /**
  * Identity verification.
  *
- * Every call here previously went out one of three ways: raw `fetch` (five of
- * them, which therefore never refreshed an expired token — an access token
- * expiring mid-verification just failed the step), `apiFetch`, or `apiFetchOp`.
- * They are one transport now, so refresh-on-401 applies uniformly.
+ * Every call here previously went out one of three ways, including raw `fetch`
+ * for five of them — which therefore never refreshed an expired token, so an
+ * access token expiring mid-verification just failed the step. They are one
+ * transport now, so refresh-on-401 applies uniformly.
  *
  * `HttpKycService` is the domain layer on top of this: it maps these results
  * onto the throwing `IKycService` contract its callers and its mock share.
@@ -83,15 +83,12 @@ export const kyc = {
         request({ path: '/kyc/webhook-nestjs', method: 'POST', body, options: o }),
 
     // ─── Step-up re-verification ─────────────────────────────────────────────
-    // Opcode-routed (PROXY_OP_ROUTES 'vs'/'vv' in lib/opcodeMap.ts): these
-    // resolve to /api/kyc/reverify/* through the catch-all, and the opcode keeps
-    // the endpoint name out of the Network tab.
 
     reverifyStart: (
         body: ReverifyStartBody,
         o?: RequestOptions,
     ): Promise<ApiResult<ReverifySession>> =>
-        request({ method: 'POST', op: 'vs', body, options: o }),
+        request({ method: 'POST', path: '/kyc/reverify/start', body, options: o }),
 
     /**
      * Returns a structured verdict even when it answers 4xx, so callers should
@@ -102,5 +99,5 @@ export const kyc = {
         body: ReverifyPayload,
         o?: RequestOptions,
     ): Promise<ApiResult<Record<string, unknown>>> =>
-        request({ method: 'POST', op: 'vv', body, options: o }),
+        request({ method: 'POST', path: '/kyc/reverify/verify', body, options: o }),
 };

@@ -38,29 +38,29 @@ export const session = {
         body: SessionTokenBody,
         o?: RequestOptions,
     ): Promise<ApiResult<SessionCompleteResponse>> =>
-        request({ method: 'POST', op: 'sc', body, options: o }),
+        request({ method: 'POST', path: '/auth/session-complete', body, options: o }),
 
     saveSessionToken: (body: SessionTokenBody, o?: RequestOptions): Promise<ApiResult<unknown>> =>
-        request({ method: 'POST', op: 'ss', body, options: o }),
+        request({ method: 'POST', path: '/auth/save-session-token', body, options: o }),
 
     /** Pass an empty string to clear the step cookie. */
     saveStepToken: (body: StepTokenBody, o?: RequestOptions): Promise<ApiResult<unknown>> =>
-        request({ method: 'POST', op: 'st', body, options: o }),
+        request({ method: 'POST', path: '/auth/save-step-token', body, options: o }),
 
     logout: (o?: RequestOptions): Promise<ApiResult<unknown>> =>
-        request({ method: 'POST', op: 'lo', options: o }),
+        request({ method: 'POST', path: '/auth/logout', options: o }),
 
     /** Short-lived token for the WebSocket handshake, which cannot send cookies. */
     wsToken: (o?: RequestOptions): Promise<ApiResult<WsTokenResponse>> =>
-        request({ op: 'tk', options: o }),
+        request({ path: '/auth/token', options: o }),
 
     // ─── Passcode ────────────────────────────────────────────────────────────
 
     passcodeStatus: (o?: RequestOptions): Promise<ApiResult<PasscodeStatusResponse>> =>
-        request({ op: 'ps', options: o }),
+        request({ path: '/sessions/passcode/status', options: o }),
 
     setPasscode: (body: PasscodeBody, o?: RequestOptions): Promise<ApiResult<unknown>> =>
-        request({ method: 'POST', op: 'pc', body, options: o }),
+        request({ method: 'POST', path: '/sessions/passcode/set', body, options: o }),
 
     /**
      * A wrong passcode is a 200 with `{ valid: false }`, not an error status —
@@ -70,7 +70,7 @@ export const session = {
         body: PasscodeBody,
         o?: RequestOptions,
     ): Promise<ApiResult<PasscodeVerifyResponse>> =>
-        request({ method: 'POST', op: 'pv', body, options: o }),
+        request({ method: 'POST', path: '/sessions/passcode/verify', body, options: o }),
 
     // ─── Mid-login step ──────────────────────────────────────────────────────
 
@@ -88,24 +88,28 @@ export const session = {
     ): Promise<ApiResult<StepPasscodeVerifyResponse>> =>
         request({
             method: 'POST',
-            op: 'sv',
+            path: '/sessions/step/passcode/verify',
             body,
             options: o,
         }),
 
     /** Polled while a login waits for approval from the phone app. */
     stepApproval: (id: string, o?: RequestOptions): Promise<ApiResult<StepApprovalResponse>> =>
-        request({ op: 'sa', params: { id }, options: o }),
+        request({
+            // Encoded, so an id containing a slash cannot alter the path.
+            path: `/sessions/step/approval/${encodeURIComponent(id)}`,
+            options: o,
+        }),
 
     // ─── Passkey / WebAuthn ──────────────────────────────────────────────────
 
     passkeyList: (o?: RequestOptions): Promise<ApiResult<PasskeyListResponse>> =>
-        request({ op: 'kl', options: o }),
+        request({ path: '/sessions/passkey/list', options: o }),
 
     passkeyRegisterOptions: (o?: RequestOptions): Promise<ApiResult<PasskeyRegisterOptions>> =>
         request({
             method: 'POST',
-            op: 'ko',
+            path: '/sessions/passkey/register-options',
             body: {},
             options: o,
         }),
@@ -114,12 +118,12 @@ export const session = {
         body: PasskeyRegisterBody,
         o?: RequestOptions,
     ): Promise<ApiResult<Record<string, any>>> =>
-        request({ method: 'POST', op: 'kr', body, options: o }),
+        request({ method: 'POST', path: '/sessions/passkey/register', body, options: o }),
 
     passkeyAuthOptions: (o?: RequestOptions): Promise<ApiResult<PasskeyAuthOptions>> =>
         request({
             method: 'POST',
-            op: 'ka',
+            path: '/sessions/passkey/auth-options',
             body: {},
             options: o,
         }),
@@ -128,9 +132,9 @@ export const session = {
         body: PasskeyVerifyBody,
         o?: RequestOptions,
     ): Promise<ApiResult<PasskeyVerifyResponse>> =>
-        request({ method: 'POST', op: 'kv', body, options: o }),
+        request({ method: 'POST', path: '/sessions/passkey/verify', body, options: o }),
 
     /** Revokes the current session server-side. */
     deleteCurrent: (o?: RequestOptions): Promise<ApiResult<unknown>> =>
-        request({ method: 'DELETE', op: 'dc', options: o }),
+        request({ method: 'DELETE', path: '/sessions/current', options: o }),
 };

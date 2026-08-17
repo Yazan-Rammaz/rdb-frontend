@@ -19,18 +19,15 @@ import type {
  *           login stepToken, which the proxy rewrites from `X-Step-Token`.
  *
  * Same six operations either way, so `set` is a parameter rather than two
- * duplicated modules. Every call is opcode-routed (PROXY_OP_ROUTES): the
- * catch-all rewrites each op to the real NestJS path server-side, so the
- * descriptive endpoint names never appear in the Network tab.
+ * duplicated modules — the step set is the idle set under a /step prefix, which
+ * is all `base()` encodes. Both reach NestJS through the /api/[...path] proxy.
  *
  * These return domain results on 4xx as well as 2xx — a wrong quiz answer is a
  * business outcome carrying `attemptsRemaining`, not a transport failure — so
  * `resetPasscodeApi` reads `error.body` rather than discarding it.
  */
-const OPS = {
-    idle: { init: 'ri', sendOtp: 'ro', verifyOtp: 'rv', questions: 'rq', answers: 'ra', complete: 'rc' },
-    step: { init: 'si', sendOtp: 'so', verifyOtp: 'sw', questions: 'sq', answers: 'sn', complete: 'sp' },
-} as const;
+/** Idle calls sit at /auth/reset-passcode/*, mid-login ones a /step deeper. */
+const base = (set: ResetSet) => (set === 'step' ? '/auth/reset-passcode/step' : '/auth/reset-passcode');
 
 export const resetPasscode = {
     /**
@@ -38,7 +35,7 @@ export const resetPasscode = {
      * JSON content-type cannot trip NestJS's body parser.
      */
     init: (set: ResetSet, o?: RequestOptions): Promise<ApiResult<ResetInitResponse>> =>
-        request({ method: 'POST', op: OPS[set].init, body: {}, options: o }),
+        request({ method: 'POST', path: `${base(set)}/init`, body: {}, options: o }),
 
     /**
      * Exists on the step set too, but is unnecessary there — the login OTP has
@@ -49,28 +46,28 @@ export const resetPasscode = {
         body: { phoneNumber: string; channel?: string },
         o?: RequestOptions,
     ): Promise<ApiResult<ResetSendOtpResponse>> =>
-        request({ method: 'POST', op: OPS[set].sendOtp, body, options: o }),
+        request({ method: 'POST', path: `${base(set)}/send-otp`, body, options: o }),
 
     verifyOtp: (
         set: ResetSet,
         body: { phoneNumber: string; otpCode: string },
         o?: RequestOptions,
     ): Promise<ApiResult<ResetVerifyOtpResponse>> =>
-        request({ method: 'POST', op: OPS[set].verifyOtp, body, options: o }),
+        request({ method: 'POST', path: `${base(set)}/verify-otp`, body, options: o }),
 
     /** GET server-side — the opcode carries no body. */
     questions: (
         set: ResetSet,
         o?: RequestOptions,
     ): Promise<ApiResult<Partial<ResetQuestionsResponse>>> =>
-        request({ op: OPS[set].questions, options: o }),
+        request({ path: `${base(set)}/questions`, options: o }),
 
     answers: (
         set: ResetSet,
         body: { answers: ResetAnswer[] },
         o?: RequestOptions,
     ): Promise<ApiResult<ResetAnswersResponse>> =>
-        request({ method: 'POST', op: OPS[set].answers, body, options: o }),
+        request({ method: 'POST', path: `${base(set)}/answers`, body, options: o }),
 
     /**
      * Quiz branch sends `resetToken` in the body. The face branch sends neither:
@@ -83,5 +80,5 @@ export const resetPasscode = {
         body: { passcode: string; resetToken?: string },
         o?: RequestOptions,
     ): Promise<ApiResult<ResetCompleteResponse>> =>
-        request({ method: 'POST', op: OPS[set].complete, body, options: o }),
+        request({ method: 'POST', path: `${base(set)}/complete`, body, options: o }),
 };

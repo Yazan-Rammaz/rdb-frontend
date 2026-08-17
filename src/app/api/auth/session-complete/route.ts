@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { NEST_BASE, backendFetch, safeJson, maxAgeFromExpiry, notGateway } from '@/lib/edgeProxy';
+import { NEST_BASE, backendFetch, safeJson, maxAgeFromExpiry } from '@/lib/edgeProxy';
 
 
 const isProduction = process.env.NODE_ENV === 'production';
@@ -14,8 +14,6 @@ function cookieOpts(maxAge: number, secure: boolean) {
  * and sets the cookies here (the Pages Function can do both).
  */
 export async function POST(req: NextRequest) {
-    const _b = notGateway(req);
-    if (_b) return _b;
     const body = await req.text();
 
     let upstream: Response;

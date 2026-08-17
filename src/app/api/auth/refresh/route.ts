@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { NEST_BASE, COOKIES, backendFetch, safeJson, maxAgeFromExpiry, notGateway } from '@/lib/edgeProxy';
+import { NEST_BASE, COOKIES, backendFetch, safeJson, maxAgeFromExpiry } from '@/lib/edgeProxy';
 
 
 const isProduction = process.env.NODE_ENV === 'production';
@@ -23,8 +23,6 @@ function cookieOpts(maxAge: number, secure: boolean) {
  * return 401 so the client performs a hard logout.
  */
 export async function POST(req: NextRequest) {
-    const _b = notGateway(req);
-    if (_b) return _b;
     const secure = isProduction;
     const rt = req.cookies.get(COOKIES.refresh)?.value;
 

@@ -1,7 +1,16 @@
 import { FetchResponse } from "./types";
 import { resolveAuthToken } from "./auth/resolve-token";
 import { initialData } from '@/config/runtime';
-import { pfetch } from "@/lib/p";
+
+/** POST with an empty JSON body — the cookie-only auth routes take no payload. */
+function postEmpty(path: string): Promise<Response> {
+  return fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}',
+    cache: 'no-store',
+  });
+}
 
 // --- Silent token refresh (client-side only) -------------------------------
 // Access tokens are ~15 min. On a 401 we rotate the token via /api/auth/refresh
@@ -29,7 +38,7 @@ export function readAccessTokenExpiry(): number | null {
 
 async function performRefresh(): Promise<RefreshResult> {
   try {
-    const res = await pfetch("rf");
+    const res = await postEmpty("/api/auth/refresh");
     if (res.ok) return 'refreshed';
     // Only a 401 means the refresh token is dead / reused / revoked → session over.
     if (res.status === 401) return 'unauthenticated';
@@ -86,7 +95,7 @@ function hardLogout(): void {
   // routes to Get Started.
   if ((window as unknown as { __rdbSessionTakeover?: boolean }).__rdbSessionTakeover) return;
   loggingOut = true;
-  pfetch("lo")
+  postEmpty("/api/auth/logout")
     .catch(() => {})
     .finally(() => {
       window.dispatchEvent(new CustomEvent("rdb:session-expired"));
@@ -97,8 +106,14 @@ function hardLogout(): void {
     });
 }
 
-// Endpoints where a 401 is NOT an expired access token (login + step-token flows),
-// so refreshing/retrying would be wrong.
+// Endpoints where a 401 is NOT an expired access token (login + step-token
+// flows), so refreshing/retrying would be wrong.
+//
+// These two prefixes cover exactly what the opcode skip-list used to enumerate:
+// every /auth/* route (session handoffs, refresh, logout, ws token, and both
+// reset-passcode sets) and the mid-login /sessions/step/* pair. Passcode,
+// passkey and session-revoke calls sit under /api/sessions/ without /step/, so
+// they still refresh — as they did before.
 const SKIP_REFRESH_PREFIXES = ["/api/auth/", "/api/sessions/step/"];
 
 /**
@@ -127,35 +142,3 @@ export async function apiFetch(input: string, init?: RequestInit): Promise<Respo
   return res;
 }
 
-// Opcodes whose 401 is NOT an expired access token (login/step + cookie-setters,
-// plus the reset-passcode sets, where a step 401 means the login stepToken
-// expired), so the silent-refresh retry must be skipped — mirrors
-// SKIP_REFRESH_PREFIXES.
-const SKIP_REFRESH_OPS = new Set([
-  'sc', 'st', 'ss', 'rf', 'lo', 'tk', 'sv', 'sa',
-  'ri', 'ro', 'rv', 'rq', 'ra', 'rc',
-  'si', 'so', 'sw', 'sq', 'sn', 'sp',
-]);
-
-/**
- * Gateway-aware apiFetch: same silent-refresh contract, but routes through the
- * opaque opcode gateway (pfetch) instead of a named URL. Used by the passcode /
- * passkey / device-status call sites so their endpoint names never appear in the
- * Network tab.
- */
-export async function apiFetchOp(
-  o: string,
-  d?: unknown,
-  init?: { headers?: Record<string, string>; signal?: AbortSignal },
-): Promise<Response> {
-  let res = await pfetch(o, d, init);
-  if (res.status === 401 && typeof window !== 'undefined' && !SKIP_REFRESH_OPS.has(o)) {
-    const result = await refreshAccessToken();
-    if (result === 'refreshed') {
-      res = await pfetch(o, d, init);
-    } else if (result === 'unauthenticated') {
-      hardLogout();
-    }
-  }
-  return res;
-}

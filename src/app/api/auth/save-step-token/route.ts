@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { COOKIES, cookieOptions, notGateway } from '@/lib/edgeProxy';
+import { COOKIES, cookieOptions } from '@/lib/edgeProxy';
 
 
 /** Persists (or clears) a step-up token in the short-lived httpOnly rdb_step cookie. */
 export async function POST(req: NextRequest) {
-    const _b = notGateway(req);
-    if (_b) return _b;
     const { stepToken } = (await req.json().catch(() => ({}))) as { stepToken?: string };
     const res = NextResponse.json({ success: true });
 

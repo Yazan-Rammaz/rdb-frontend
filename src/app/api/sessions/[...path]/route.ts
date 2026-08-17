@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { NEST_BASE, COOKIES, backendFetch, cookieOptions, safeJson, notGateway } from '@/lib/edgeProxy';
+import { NEST_BASE, COOKIES, backendFetch, cookieOptions, safeJson } from '@/lib/edgeProxy';
 
 
 /**
@@ -16,8 +16,6 @@ import { NEST_BASE, COOKIES, backendFetch, cookieOptions, safeJson, notGateway }
  * cookie APIs are used directly here.
  */
 async function proxy(req: NextRequest): Promise<NextResponse> {
-    const blocked = notGateway(req);
-    if (blocked) return blocked;
     const { pathname } = req.nextUrl;
     const sub = pathname.replace(/^\/api\/sessions\/?/, '');
     const pathParts = sub.split('/').filter(Boolean);
