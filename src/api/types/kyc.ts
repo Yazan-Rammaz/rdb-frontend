@@ -62,6 +62,11 @@ export interface FaceMatchBody {
     liveFaceImageData: string;
 }
 
+export interface CompareFaceBody {
+    selfieImageData: string;
+    idFaceImageData: string;
+}
+
 export interface CompleteVideoBody {
     kycSessionId: string;
     videoCallUrl: string;
@@ -114,6 +119,13 @@ export interface FaceMatchResponse {
 export interface CurrentKycResponse {
     kycRequest?: unknown;
     [key: string]: unknown;
+}
+
+/** AWS CompareFaces. Reports failure in the body with status: 'error', not a 4xx. */
+export interface CompareFaceResponse {
+    status: 'success' | 'error';
+    matchScore?: number;
+    message?: string;
 }
 
 export interface WebhookResponse {

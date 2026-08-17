@@ -29,7 +29,8 @@
  *     token expired → `StepExpiredError` → restart the login.
  */
 
-import { apiFetchOp } from '@/core/utils';
+import { api } from '@/api';
+import type { ApiResult, ResetSet } from '@/api';
 
 // ─── Contract types ──────────────────────────────────────────────────────────
 
@@ -125,16 +126,6 @@ export interface ResetPasscodeApi {
 // ─── Implementation ──────────────────────────────────────────────────────────
 
 /**
- * Opcodes for the random-hash gateway (PROXY_OPS in app/api/[...path]/route.ts).
- * The catch-all rewrites each op to the real NestJS path server-side, so the
- * descriptive reset-passcode endpoint names never appear in the Network tab.
- */
-const OPCODES = {
-    idle: { init: 'ri', sendOtp: 'ro', verifyOtp: 'rv', questions: 'rq', answers: 'ra', complete: 'rc' },
-    step: { init: 'si', sendOtp: 'so', verifyOtp: 'sw', questions: 'sq', answers: 'sn', complete: 'sp' },
-} as const;
-
-/**
  * Thrown when a `step/*` call returns 401 — the 10-min login step token expired.
  * Doc §5: restart the login (new OTP) for a fresh step token, then `step/init`.
  * Quiz attempts/lockouts are durable server-side, so nothing is lost.
@@ -146,13 +137,7 @@ export class StepExpiredError extends Error {
     }
 }
 
-/** Parse a JSON body, falling back to a safe default on empty/non-JSON. */
-async function readJson<T>(res: Response, fallback: T): Promise<T> {
-    return (await res.json().catch(() => fallback)) as T;
-}
-
-function makeApi(set: keyof typeof OPCODES, stepToken?: string): ResetPasscodeApi {
-    const ops = OPCODES[set];
+function makeApi(set: ResetSet, stepToken?: string): ResetPasscodeApi {
     const isStepSet = set === 'step';
     const headers: Record<string, string> = {
         // Mid-login set: the proxy rewrites X-Step-Token → Authorization Bearer.
@@ -160,50 +145,43 @@ function makeApi(set: keyof typeof OPCODES, stepToken?: string): ResetPasscodeAp
         ...(stepToken ? { 'X-Step-Token': stepToken } : {}),
     };
 
-    const guard = (res: Response): Response => {
-        if (isStepSet && res.status === 401) throw new StepExpiredError();
-        return res;
+    /**
+     * These endpoints answer with a domain result on 4xx as well as 2xx — a
+     * wrong quiz answer is a business outcome carrying `attemptsRemaining`, not
+     * a transport failure — so the error body is unwrapped rather than dropped.
+     * `fallback` covers an empty or non-JSON body, exactly as readJson did.
+     *
+     * The one status that is NOT a domain result is a 401 on the step set: the
+     * 10-min login step token expired and the flow has to restart.
+     */
+    const unwrap = <T>(res: ApiResult<T>, fallback: T): T => {
+        if (res.ok) return res.data;
+        if (isStepSet && res.error.status === 401) throw new StepExpiredError();
+        return (res.error.body as T | undefined) ?? fallback;
     };
 
-    const call = async <T>(
-        o: string,
-        body: unknown,
-        fallback: T,
-        extraHeaders?: Record<string, string>,
-    ): Promise<T> => {
-        const res = guard(
-            await apiFetchOp(o, body, {
-                headers: extraHeaders ? { ...headers, ...extraHeaders } : headers,
-            }),
-        );
-        return readJson<T>(res, fallback);
-    };
+    const opts = (extraHeaders?: Record<string, string>) => ({
+        headers: extraHeaders ? { ...headers, ...extraHeaders } : headers,
+    });
 
     return {
-        // Body is documented as "none", but we send {} so an empty body with a JSON
-        // content-type can't trip NestJS's body parser.
-        init: () => call<ResetInitResponse>(ops.init, {}, { isVerified: false }),
+        init: async () =>
+            unwrap(await api.resetPasscode.init(set, opts()), { isVerified: false }),
 
-        // OTP endpoints exist on the step set too but are unnecessary there (the
-        // login OTP just passed) — only the idle flow calls them.
-        sendOtp: (phoneNumber, channel) =>
-            call<ResetSendOtpResponse>(
-                ops.sendOtp,
-                { phoneNumber, channel },
-                { ok: false, error: 'Could not send the code. Please try again.' },
-            ),
+        sendOtp: async (phoneNumber, channel) =>
+            unwrap(await api.resetPasscode.sendOtp(set, { phoneNumber, channel }, opts()), {
+                ok: false,
+                error: 'Could not send the code. Please try again.',
+            }),
 
-        verifyOtp: (phoneNumber, otpCode) =>
-            call<ResetVerifyOtpResponse>(
-                ops.verifyOtp,
-                { phoneNumber, otpCode },
-                { ok: false, error: 'Invalid code' },
-            ),
+        verifyOtp: async (phoneNumber, otpCode) =>
+            unwrap(await api.resetPasscode.verifyOtp(set, { phoneNumber, otpCode }, opts()), {
+                ok: false,
+                error: 'Invalid code',
+            }),
 
         getQuestions: async () => {
-            // GET server-side — the op carries no body (the catch-all rewrites it).
-            const res = guard(await apiFetchOp(ops.questions, undefined, { headers }));
-            const data = await readJson<Partial<ResetQuestionsResponse>>(res, {});
+            const data = unwrap(await api.resetPasscode.questions(set, opts()), {});
             // 409 (OTP step not passed) or any error → empty set; the flow surfaces it.
             return {
                 questions: data.questions ?? [],
@@ -211,23 +189,20 @@ function makeApi(set: keyof typeof OPCODES, stepToken?: string): ResetPasscodeAp
             };
         },
 
-        submitAnswers: (answers) =>
-            call<ResetAnswersResponse>(
-                ops.answers,
-                { answers },
-                { success: false, attemptsRemaining: 0 },
-            ),
+        submitAnswers: async (answers) =>
+            unwrap(await api.resetPasscode.answers(set, { answers }, opts()), {
+                success: false,
+                attemptsRemaining: 0,
+            }),
 
-        // Quiz branch: resetToken in the body. Face branch, idle entry: neither —
-        // the proxy forwards the proof from the rdb_step cookie as X-Step-Token.
-        // Face branch, mid-login entry: the proof travels in X-Face-Step-Token
-        // (X-Step-Token is taken by the login stepToken → Authorization rewrite).
-        complete: (passcode, resetToken, faceStepToken) =>
-            call<ResetCompleteResponse>(
-                ops.complete,
-                { passcode, resetToken },
+        complete: async (passcode, resetToken, faceStepToken) =>
+            unwrap(
+                await api.resetPasscode.complete(
+                    set,
+                    { passcode, resetToken },
+                    opts(faceStepToken ? { 'X-Face-Step-Token': faceStepToken } : undefined),
+                ),
                 { success: false, error: 'Could not verify. Please try again.' },
-                faceStepToken ? { 'X-Face-Step-Token': faceStepToken } : undefined,
             ),
     };
 }

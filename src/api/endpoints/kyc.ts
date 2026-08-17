@@ -2,6 +2,8 @@ import { request } from '../client';
 import type { ApiResult, RequestOptions } from '../types/common';
 import type {
     AnalyzeIdBody,
+    CompareFaceBody,
+    CompareFaceResponse,
     AnalyzeIdResult,
     CompleteVideoBody,
     CurrentKycResponse,
@@ -63,6 +65,10 @@ export const kyc = {
 
     analyzeId: (body: AnalyzeIdBody, o?: RequestOptions): Promise<ApiResult<AnalyzeIdResult>> =>
         request({ path: '/kyc/analyze-id', method: 'POST', body, options: o }),
+
+    /** AWS CompareFaces — a distinct endpoint from faceMatch, used by the ID/selfie step. */
+    compareFace: (body: CompareFaceBody, o?: RequestOptions): Promise<ApiResult<CompareFaceResponse>> =>
+        request({ path: '/kyc/compare-face', method: 'POST', body, options: o }),
 
     faceMatch: (body: FaceMatchBody, o?: RequestOptions): Promise<ApiResult<FaceMatchResponse>> =>
         request({ path: '/kyc/face-match', method: 'POST', body, options: o }),

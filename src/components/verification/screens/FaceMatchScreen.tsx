@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useVerification } from '@/context/VerificationContext';
+import { api } from '@/api';
 import { useRouter } from 'next/navigation';
 import { createKycService } from '@/services/kyc';
 import ExitConfirmDialog from '../ExitConfirmDialog';
@@ -198,20 +199,16 @@ export default function FaceMatchScreen() {
         }
 
         // Fire AWS CompareFaces in parallel with the 10s animation.
-        try {
-            const res = await fetch('/api/kyc/compare-face', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ selfieImageData: liveFace, idFaceImageData: idFace }),
-            });
-            apiResultRef.current = (await res.json()) as {
-                status: 'success' | 'error';
-                matchScore?: number;
-                message?: string;
-            };
-        } catch {
-            apiResultRef.current = { status: 'error', message: 'Compare service unreachable' };
-        }
+        // This was a raw fetch, so an access token that expired during the
+        // verification flow failed the match outright; api.kyc refreshes and
+        // retries. It also never throws, so the catch is gone.
+        const res = await api.kyc.compareFace({
+            selfieImageData: liveFace,
+            idFaceImageData: idFace,
+        });
+        apiResultRef.current = res.ok
+            ? res.data
+            : { status: 'error', message: res.error.message };
     }, [livenessResult, idDocument, handleFailure]);
 
     useEffect(() => {
