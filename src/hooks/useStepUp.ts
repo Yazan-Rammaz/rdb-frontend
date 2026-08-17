@@ -3,7 +3,7 @@
 import { useCallback } from 'react';
 import { useFaceReverify } from '@/context/FaceReverifyContext';
 import type { StepUpRequirement } from '@/core/types/api';
-import { pfetch } from '@/lib/p';
+import { api } from '@/api';
 
 /**
  * Detect a step-up requirement on a gated-action response.
@@ -71,7 +71,9 @@ export function useStepUp() {
         async (req: StepUpRequirement): Promise<boolean> => {
             const outcome = await runStepUp(req);
             if (!outcome.ok) return false;
-            await pfetch('st', { stepToken: outcome.stepToken }).catch(() => {});
+            // stepToken is optional on the outcome; the handler treats a falsy
+            // value as 'clear the cookie', which is what undefined did before.
+            await api.session.saveStepToken({ stepToken: outcome.stepToken ?? '' });
             return true;
         },
         [runStepUp],

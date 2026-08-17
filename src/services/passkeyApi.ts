@@ -10,8 +10,8 @@
  */
 
 import { startRegistration, startAuthentication } from '@simplewebauthn/browser';
-import { apiFetchOp } from '@/core/utils';
-import { pfetch } from '@/lib/p';
+import { api } from '@/api';
+import { passcodeEnabled, passkeyList as unwrapPasskeyList } from '@/api/helpers/session';
 import type {
     DeviceStatus,
     PinSetupResult,
@@ -83,39 +83,42 @@ function getRpId(): string {
 // Device status
 // ---------------------------------------------------------------------------
 
-function fetchOpWithTimeout(o: string, ms = 5000): Promise<Response | null> {
+/**
+ * Both device-status reads are bounded: a hung request must not stall the lock
+ * screen, so an abort resolves to "unknown" and the caller falls back.
+ *
+ * The api client turns an abort into `{ ok: false, status: 0 }` rather than a
+ * throw, so the old `.catch(() => null)` is no longer needed — but the timer
+ * still has to be cleared either way.
+ */
+async function withTimeout<T>(call: (signal: AbortSignal) => Promise<T>, ms = 5000): Promise<T> {
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), ms);
-    // apiFetchOp so an expired access token (e.g. unlocking after the idle window)
-    // silently refreshes instead of resolving device status as "no PIN".
-    return apiFetchOp(o, undefined, { signal: controller.signal })
-        .catch(() => null)
-        .finally(() => clearTimeout(id));
+    try {
+        return await call(controller.signal);
+    } finally {
+        clearTimeout(id);
+    }
 }
 
 export async function getDeviceStatus(): Promise<DeviceStatus> {
+    // Refresh-on-401 matters here: an expired access token (unlocking after the
+    // idle window) must refresh rather than resolve device status as "no PIN".
     const [passcodeRes, passkeysRes] = await Promise.all([
-        fetchOpWithTimeout('ps'),
-        fetchOpWithTimeout('kl'),
+        withTimeout((signal) => api.session.passcodeStatus({ signal })),
+        withTimeout((signal) => api.session.passkeyList({ signal })),
     ]);
 
-    const passcode = passcodeRes?.ok ? await passcodeRes.json().catch(() => ({}) as any) : {};
-    const passkeysBody = passkeysRes?.ok ? await passkeysRes.json().catch(() => ({}) as any) : {};
-
-    const passcodeEnabled = passcode?.data?.enabled ?? passcode?.enabled ?? false;
-    const passkeyList = Array.isArray(passkeysBody)
-        ? passkeysBody
-        : Array.isArray(passkeysBody?.data)
-          ? passkeysBody.data
-          : [];
+    const hasPin = passcodeRes.ok ? passcodeEnabled(passcodeRes.data) : false;
+    const passkeys = passkeysRes.ok ? unwrapPasskeyList(passkeysRes.data) : [];
 
     const localBiometric =
         typeof window !== 'undefined' &&
         localStorage.getItem(BIOMETRIC_ENROLLED_KEY) === 'true';
 
     return {
-        hasPin: passcodeEnabled,
-        hasBiometricEnrolled: passkeyList.length > 0 || localBiometric,
+        hasPin,
+        hasBiometricEnrolled: passkeys.length > 0 || localBiometric,
     };
 }
 
@@ -124,39 +127,37 @@ export async function getDeviceStatus(): Promise<DeviceStatus> {
 // ---------------------------------------------------------------------------
 
 export async function setupPin(pin: string): Promise<PinSetupResult> {
-    const res = await apiFetchOp('pc', { passcode: pin });
-    if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        return { success: false, error: data.error ?? 'ALREADY_SET' };
-    }
-    return { success: true };
+    const res = await api.session.setPasscode({ passcode: pin });
+    if (res.ok) return { success: true };
+
+    // ALREADY_SET only when the server actually said so. This used to be
+    // `data.error ?? 'ALREADY_SET'` on an untyped body, so EVERY failure —
+    // a 500, a dropped connection — reported ALREADY_SET, and PasskeyContext
+    // treats that as equivalent to success (it calls setHasPin(true)). The
+    // device was then marked PIN-protected when the server had set no PIN.
+    return res.error.code === 'ALREADY_SET'
+        ? { success: false, error: 'ALREADY_SET' }
+        : { success: false };
 }
 
 export async function unlockWithPin(pin: string): Promise<UnlockResult> {
-    let res: Response;
-    try {
-        res = await apiFetchOp('pv', { passcode: pin });
-    } catch {
-        return { success: false, error: 'WRONG_PIN' };
-    }
-
-    // A 401 here is never a wrong passcode (those return 200 {valid:false}). apiFetch
-    // already attempted a token refresh; a surviving 401 means the session is gone
-    // (refresh token dead/revoked) → restart login instead of flashing "wrong PIN".
-    if (res.status === 401) {
-        return { success: false, error: 'SESSION_EXPIRED' };
-    }
+    const res = await api.session.verifyPasscode({ passcode: pin });
 
     if (res.ok) {
-        const data = await res.json().catch(() => ({}));
-        return data.valid === false
+        return res.data.valid === false
             ? { success: false, error: 'WRONG_PIN' }
             : { success: true };
     }
 
-    const data = await res.json().catch(() => ({}));
-    const message = ((data.message ?? '') as string).toLowerCase();
-    if (message.includes('lock')) {
+    // A 401 here is never a wrong passcode (those return 200 {valid:false}). The
+    // client already attempted a token refresh; a surviving 401 means the session
+    // is gone (refresh token dead/revoked) → restart login instead of flashing
+    // "wrong PIN".
+    if (res.error.status === 401) {
+        return { success: false, error: 'SESSION_EXPIRED' };
+    }
+
+    if (res.error.message.toLowerCase().includes('lock')) {
         return { success: false, error: 'LOCKED_OUT', lockoutRemainingMs: 30_000 };
     }
     return { success: false, error: 'WRONG_PIN' };
@@ -167,9 +168,9 @@ export async function unlockWithPin(pin: string): Promise<UnlockResult> {
 // ---------------------------------------------------------------------------
 
 export async function registerBiometric(userId?: string): Promise<BiometricEnrollResult> {
-    const optRes = await apiFetchOp('ko', {});
+    const optRes = await api.session.passkeyRegisterOptions();
     if (!optRes.ok) return { success: false, error: 'PLATFORM_ERROR' };
-    const options = await optRes.json();
+    const options = optRes.data;
 
     // Override rpId to match the current origin so WebAuthn works on localhost/dev
     if (options?.rp) options.rp.id = getRpId();
@@ -186,10 +187,10 @@ export async function registerBiometric(userId?: string): Promise<BiometricEnrol
         return { success: false, error: 'PLATFORM_ERROR' };
     }
 
-    const verifyRes = await apiFetchOp('kr', { registrationResponse });
+    const verifyRes = await api.session.passkeyRegister({ registrationResponse });
 
     if (!verifyRes.ok) return { success: false, error: 'PLATFORM_ERROR' };
-    const result = await verifyRes.json();
+    const result = verifyRes.data;
     if (typeof window !== 'undefined') {
         localStorage.setItem(BIOMETRIC_ENROLLED_KEY, 'true');
     }
@@ -197,9 +198,9 @@ export async function registerBiometric(userId?: string): Promise<BiometricEnrol
 }
 
 export async function verifyBiometric(): Promise<UnlockResult> {
-    const optRes = await apiFetchOp('ka', {});
+    const optRes = await api.session.passkeyAuthOptions();
     if (!optRes.ok) return { success: false, error: 'WEBAUTHN_FAILED' };
-    const options = await optRes.json();
+    const options = optRes.data;
 
     // Override rpId to match the current origin so WebAuthn works on localhost/dev
     if (options?.rpId !== undefined) options.rpId = getRpId();
@@ -213,10 +214,9 @@ export async function verifyBiometric(): Promise<UnlockResult> {
         return { success: false, error: 'WEBAUTHN_FAILED' };
     }
 
-    const verifyRes = await apiFetchOp('kv', { authenticationResponse: authResponse });
+    const verifyRes = await api.session.passkeyVerify({ authenticationResponse: authResponse });
 
-    const data = await verifyRes.json().catch(() => ({}));
-    if (!verifyRes.ok || !data.valid) return { success: false, error: 'WEBAUTHN_FAILED' };
+    if (!verifyRes.ok || !verifyRes.data.valid) return { success: false, error: 'WEBAUTHN_FAILED' };
     return { success: true };
 }
 
@@ -225,7 +225,8 @@ export async function verifyBiometric(): Promise<UnlockResult> {
 // ---------------------------------------------------------------------------
 
 export async function revokeSession(): Promise<void> {
-    await pfetch('dc').catch(() => {});
+    // Best-effort: the local sign-out proceeds regardless of what the server says.
+    await api.session.deleteCurrent();
 }
 
 // ---------------------------------------------------------------------------

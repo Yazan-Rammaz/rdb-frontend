@@ -26,7 +26,8 @@ import QuizScreen from './screens/QuizScreen';
 import QuizFailOnce from './screens/QuizFailOnce';
 import QuizLockout from './screens/QuizLockout';
 import ResetSetPasscode from './screens/ResetSetPasscode';
-import { pfetch } from '@/lib/p';
+// Aliased: this component already has a local `api` (ResetPasscodeApi).
+import { api as apiClient } from '@/api';
 
 type ResetStep =
     | 'intro'
@@ -67,7 +68,7 @@ export default function ResetPasscodeFlow() {
         toast.error('Your login session expired. Please log in again.');
         setLoginStep(null);
         clearAuthFlowState();
-        pfetch('st', { stepToken: '' }).catch(() => {});
+        void apiClient.session.saveStepToken({ stepToken: '' });
         close();
         // The auth page tracks its screen in LOCAL state ('enter-passcode'), which
         // survives setLoginStep(null) — leaving the user on a passcode screen whose

@@ -4,7 +4,7 @@ import React, { Suspense, useCallback } from 'react';
 import {useSearchParams, useRouter } from 'next/navigation';
 import FaceVerifyFlow from '@/components/faceReverify/FaceVerifyFlow';
 import type { FaceReverifyOutcome } from '@/context/FaceReverifyContext';
-import { pfetch } from '@/lib/p';
+import { api } from '@/api';
 
 /**
  * Standalone face re-verification route.
@@ -28,7 +28,7 @@ function FaceVerifyPageInner() {
         async (outcome: FaceReverifyOutcome) => {
             if (outcome.ok) {
                 // Persist the step token so the retried action can carry it.
-                await pfetch('st', { stepToken: outcome.stepToken }).catch(() => {});
+                await api.session.saveStepToken({ stepToken: outcome.stepToken });
                 const sep = returnTo.includes('?') ? '&' : '?';
                 router.push(`${returnTo}${sep}stepUp=face`);
             } else {

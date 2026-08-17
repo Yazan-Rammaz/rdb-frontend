@@ -11,8 +11,8 @@ import {
     revokeSession,
     isPlatformAuthenticatorAvailable,
 } from '@/services/passkeyApi';
-import { useAuth } from '@/context/AuthContext';
-import { pfetch } from '@/lib/p';
+import { useAuth, type LoginApiResponse } from '@/context/AuthContext';
+import { api, type StepPasscodeVerifyResponse } from '@/api';
 
 // ---------------------------------------------------------------------------
 // State & Action types
@@ -228,30 +228,35 @@ export function PasskeyProvider({ children }: PasskeyProviderProps) {
         // would 401 with STEP_TOKEN_MISSING because rdb_step is cleared once
         // a full session exists).
         if (loginStep?.status === 'requires_passcode' && !userData) {
-            const res = await pfetch('sv', { passcode: pin }, {
-                headers: { 'X-Step-Token': loginStep.stepToken },
-            });
+            const res = await api.session.verifyStepPasscode(
+                { passcode: pin },
+                { headers: { 'X-Step-Token': loginStep.stepToken } },
+            );
 
-            if (res.status === 401) {
+            if (!res.ok && res.error.status === 401) {
                 // Either the rdb_step cookie is missing (proxy returns
                 // STEP_TOKEN_MISSING) or the backend rejected the stepToken.
                 // In both cases the mid-login flow can't continue — clear
                 // state and signal the UI to redirect to /auth.
                 setLoginStep(null);
-                await pfetch('st', { stepToken: '' });
+                await api.session.saveStepToken({ stepToken: '' });
                 return { success: false, error: 'STEP_EXPIRED' };
             }
 
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok || data.valid === false) {
-                return { success: false, error: 'WRONG_PIN', failedAttempts: data.failedAttempts };
+            if (!res.ok || res.data.valid === false) {
+                // failedAttempts rides the body on both paths — a 200 with
+                // valid:false and a 4xx alike — so read it off whichever we got.
+                const body: StepPasscodeVerifyResponse = res.ok
+                    ? res.data
+                    : ((res.error.body ?? {}) as StepPasscodeVerifyResponse);
+                return { success: false, error: 'WRONG_PIN', failedAttempts: body.failedAttempts };
             }
 
             // Returns active | requires_approval — AuthContext handles routing.
             // Set flag before handleLoginResponse so the userId-change effect that
             // fires initialize() is skipped and lockStatus stays UNLOCKED.
             skipNextInitializeRef.current = true;
-            await handleLoginResponse(data);
+            await handleLoginResponse(res.data as unknown as LoginApiResponse);
             setLockStatus('UNLOCKED');
             return { success: true };
         }

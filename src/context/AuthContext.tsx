@@ -7,7 +7,6 @@ import {
 } from '@/core/auth/secure-cookies';
 import { clearAuthFlowState } from '@/lib/authFlowCookie';
 import { refreshAccessToken } from '@/core/utils';
-import { pfetch } from '@/lib/p';
 import { api } from '@/api';
 import { useRouter } from 'next/navigation';
 
@@ -269,13 +268,10 @@ export function AuthProvider({
 
         if (!useCookies) return;
 
-        try {
-            // Worker route deletes all auth cookies server-side (clearAuthCookies uses
-            // next/headers which is server-only and silently fails on the client).
-            await pfetch('lo');
-        } catch (error) {
-            console.error('removeAuthCookies error:', error);
-        }
+        // Route deletes all auth cookies server-side (clearAuthCookies uses
+        // next/headers, which is server-only and silently fails on the client).
+        // Best-effort: local state is already cleared above either way.
+        await api.session.logout();
     };
 
     const updateUser = async (user: User): Promise<boolean> => {
@@ -319,13 +315,17 @@ export function AuthProvider({
         if (result.status === 'active' || result.status === 'approved') {
             // Exchange the sessionToken for accessToken + refreshToken + user
             try {
-                const completeRes = await pfetch('sc', { sessionToken: result.sessionToken });
+                const completeRes = await api.session.complete({
+                    sessionToken: result.sessionToken,
+                });
                 if (completeRes.ok) {
-                    const completeData = await completeRes.json();
+                    const completeData = completeRes.data;
                     await saveAuthCookies(completeData);
                     setPartialUserPhone(null);
                     if (completeData.sessionToken) {
-                        await pfetch('ss', { sessionToken: completeData.sessionToken });
+                        await api.session.saveSessionToken({
+                            sessionToken: completeData.sessionToken,
+                        });
                     }
                 }
             } catch (err) {
@@ -341,7 +341,7 @@ export function AuthProvider({
                 stepToken: result.stepToken,
                 user: result.user,
             });
-            pfetch('st', { stepToken: result.stepToken }).catch(() => {});
+            void api.session.saveStepToken({ stepToken: result.stepToken });
         } else if (result.status === 'requires_approval') {
             setLoginStep({
                 status: 'requires_approval',
@@ -349,7 +349,7 @@ export function AuthProvider({
                 expiresAt: result.expiresAt,
                 stepToken: result.stepToken,
             });
-            pfetch('st', { stepToken: result.stepToken }).catch(() => {});
+            void api.session.saveStepToken({ stepToken: result.stepToken });
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);

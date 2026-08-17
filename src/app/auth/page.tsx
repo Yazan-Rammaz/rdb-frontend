@@ -19,7 +19,7 @@ import {
     getCachedAuthFlowState,
 } from '@/lib/authFlowCookie';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth, type LoginApiResponse } from '@/context/AuthContext';
 import { usePasskey } from '@/context/PasskeyContext';
 import { api } from '@/api';
 import { useToast } from '@/context/ToastContext';
@@ -29,7 +29,7 @@ import { setupPin, unlockWithPin, getDeviceId } from '@/services/passkeyApi';
 import { ResetPasscodeProvider, useResetPasscode } from '@/context/ResetPasscodeContext';
 import ResetPasscodeOverlay from '@/components/resetPasscode/ResetPasscodeOverlay';
 import { Page } from '@/scaling';
-import { pfetch } from '@/lib/p';
+import { passcodeEnabled } from '@/api/helpers/session';
 
 type AuthStep =
     | 'get-started'
@@ -170,11 +170,9 @@ function AuthPageInner() {
         let cancelled = false;
         (async () => {
             try {
-                const res = await pfetch('ps');
+                const res = await api.session.passcodeStatus();
                 if (!res.ok) return;
-                const body = await res.json().catch(() => ({}) as any);
-                const enabled = body?.data?.enabled ?? body?.enabled ?? false;
-                if (!cancelled && enabled) {
+                if (!cancelled && passcodeEnabled(res.data)) {
                     goTo('enter-passcode');
                 }
             } catch {
@@ -271,11 +269,11 @@ function AuthPageInner() {
         if (loginStep?.status !== 'requires_approval') return;
         const { requestId } = loginStep;
         const interval = setInterval(async () => {
-            const res = await pfetch('sa', { id: requestId }, {
+            const res = await api.session.stepApproval(requestId, {
                 headers: loginStep.stepToken ? { 'X-Step-Token': loginStep.stepToken } : {},
-            }).catch(() => null);
-            if (!res) return;
-            const data = await res.json().catch(() => ({}));
+            });
+            if (!res.ok) return;
+            const data = res.data;
             if (data.status === 'approved' || (data.sessionToken && data.status === 'active')) {
                 clearInterval(interval);
                 // The login was approved from the app — that approval IS the
@@ -283,7 +281,9 @@ function AuthPageInner() {
                 // Set the skip flag (via confirmUnlock) BEFORE handleLoginResponse
                 // so the userId-change effect's initialize() is skipped (no race).
                 confirmUnlock();
-                await handleLoginResponse(data);
+                // Narrowed by the status check above: an approved/active poll
+                // result carries the full login payload.
+                await handleLoginResponse(data as unknown as LoginApiResponse);
                 goHome();
             } else if (data.status === 'rejected' || data.status === 'expired') {
                 clearInterval(interval);
@@ -321,7 +321,7 @@ function AuthPageInner() {
     const saveSessionTokenIfPresent = async (data: any) => {
         const st = data?.sessionToken;
         if (st) {
-            await pfetch('ss', { sessionToken: st });
+            await api.session.saveSessionToken({ sessionToken: st });
         }
     };
 
@@ -570,7 +570,7 @@ function AuthPageInner() {
     // flow state, and return to the auth start screen (a clean slate).
     const handleApprovalCancel = () => {
         setLoginStep(null);
-        pfetch('st', { stepToken: '' }).catch(() => {});
+        void api.session.saveStepToken({ stepToken: '' });
         clearAuthFlowState();
         setPhone('');
         setPin('');
@@ -661,30 +661,29 @@ function AuthPageInner() {
         // await it — returning true here fires the green success animation immediately,
         // and handlePasscodeSuccess awaits the in-flight promise before navigating.
         if (loginStep?.status === 'requires_passcode') {
-            let res: Response;
-            try {
-                res = await pfetch('sv', { passcode }, {
-                    headers: { 'X-Step-Token': loginStep.stepToken },
-                });
-            } catch {
-                res = new Response(null, { status: 502 });
-            }
+            // A network failure arrives as status 0, so it lands on the same
+            // "not ok, not 401" path the synthesised 502 Response used to take.
+            const res = await api.session.verifyStepPasscode(
+                { passcode },
+                { headers: { 'X-Step-Token': loginStep.stepToken } },
+            );
 
             // 401 = step token missing/expired (not a wrong passcode) → restart login.
-            if (res.status === 401) {
+            if (!res.ok && res.error.status === 401) {
                 setLoginStep(null);
                 toast.error('Session expired. Please log in again.');
                 return false;
             }
 
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok || data.valid === false) return false; // wrong passcode → red shake
+            if (!res.ok || res.data.valid === false) return false; // wrong passcode → red shake
 
             // confirmUnlock sets skipNextInitializeRef=true BEFORE handleLoginResponse
             // calls setUserDataState — so the userId-change effect that triggers
             // initialize() sees the flag and skips, keeping lockStatus UNLOCKED.
             confirmUnlock();
-            pendingSessionCompleteRef.current = handleLoginResponse(data);
+            pendingSessionCompleteRef.current = handleLoginResponse(
+                res.data as unknown as LoginApiResponse,
+            );
             return true;
         }
 
@@ -692,27 +691,27 @@ function AuthPageInner() {
         // may still exist. Try the step endpoint first; fall back to regular unlock
         // only if the backend says there is no step token (STEP_TOKEN_MISSING).
         if (step === 'enter-passcode') {
-            let stepRes: Response;
-            try {
-                stepRes = await pfetch('sv', { passcode });
-            } catch {
-                stepRes = new Response(null, { status: 502 });
-            }
-
-            const stepData = await stepRes.json().catch(() => ({}));
+            const stepRes = await api.session.verifyStepPasscode({ passcode });
 
             if (stepRes.ok) {
                 // Same non-blocking handoff as the in-memory branch above: start
                 // session/complete now, await it in handlePasscodeSuccess.
                 confirmUnlock();
-                pendingSessionCompleteRef.current = handleLoginResponse(stepData);
+                pendingSessionCompleteRef.current = handleLoginResponse(
+                    stepRes.data as unknown as LoginApiResponse,
+                );
                 return true;
             }
 
             // Step endpoint rejected with STEP_TOKEN_MISSING → no step in progress,
-            // fall through to regular unlock (normal passcode entry from home-lock)
+            // fall through to regular unlock (normal passcode entry from home-lock).
+            //
+            // The handler sends this discriminator in `error` alongside a prose
+            // `message`; ApiError.code carries it. Reading `message` here instead
+            // would silently never match and strand the user on a failed unlock.
             const noStepToken =
-                stepData?.error === 'STEP_TOKEN_MISSING' || stepData?.error === 'NO_SESSION';
+                stepRes.error.code === 'STEP_TOKEN_MISSING' ||
+                stepRes.error.code === 'NO_SESSION';
             if (!noStepToken) {
                 // Token existed but passcode was wrong (or expired step)
                 return false;
