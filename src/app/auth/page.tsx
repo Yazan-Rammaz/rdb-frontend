@@ -411,23 +411,6 @@ function AuthPageInner() {
         goTo('select-method');
     };
 
-    /**
-     * Set when a sign-in found no account and the user chose to create one, so
-     * terms can skip the phone and channel screens it already has answers for.
-     */
-    const [resumeSignupFromSignIn, setResumeSignupFromSignIn] = useState(false);
-
-    const handleAgreeTerms = async () => {
-        if (!resumeSignupFromSignIn || !phone || !method) {
-            goTo('enter-phone');
-            return;
-        }
-        setResumeSignupFromSignIn(false);
-        // Falls back to the normal path if the send fails, so a failure can never
-        // strand the user on the terms screen with nowhere to go.
-        if (!(await handleSelectMethod(method))) goTo('enter-phone');
-    };
-
     const changeNumber = () => {
         setMethod('');
         goTo('enter-phone', -1);
@@ -437,8 +420,7 @@ function AuthPageInner() {
         goTo('select-method', -1);
     };
 
-    /** Sends the OTP and advances to enter-pin. Returns false if the send failed. */
-    const handleSelectMethod = async (selectedMethod: 'sms' | 'whatsapp'): Promise<boolean> => {
+    const handleSelectMethod = async (selectedMethod: 'sms' | 'whatsapp') => {
         setMethod(selectedMethod);
         setLoading('send-pin');
         // `type` is dropped: the old action accepted it but never put it in the
@@ -450,7 +432,7 @@ function AuthPageInner() {
         setLoading('');
         if (!sendOtpRes.ok) {
             toast.error(tr('auth.otp.sendError', { error: sendOtpRes.error.message }));
-            return false;
+            return;
         }
         if (sendOtpRes.data.sessionInfo) {
             setSessionInfo(sendOtpRes.data.sessionInfo);
@@ -461,10 +443,9 @@ function AuthPageInner() {
                     method: selectedMethod === 'sms' ? 'SMS' : 'WhatsApp',
                 }),
             );
-            return true;
+        } else {
+            toast.warn(t.auth.otp.unexpectedError);
         }
-        toast.warn(t.auth.otp.unexpectedError);
-        return false;
     };
 
     const handleVerifyPin = async (pinValue: string) => {
@@ -686,23 +667,10 @@ function AuthPageInner() {
     };
 
     // Flow 2: Not registered → go to terms to create account
-    /**
-     * "No account for this number → create one".
-     *
-     * The phone and the channel the user picked are still in state and still
-     * correct, so signing up re-asks for neither: terms hands off straight to a
-     * fresh OTP on the same channel (see handleAgreeTerms).
-     *
-     * The code they just typed is NOT reused. On this path verifyOtp *failed* —
-     * the backend rejected the request as "not registered" — so nothing was
-     * verified, and whether that code is still redeemable is a backend question.
-     * Re-submitting it blind risks burning an OTP attempt if it was consumed.
-     */
     const handleNotRegisteredCreate = () => {
         setAuthType('signUp');
         setPin('');
         setIsValidPin('');
-        setResumeSignupFromSignIn(!!(phone && method));
         goTo('terms', -1);
     };
 
@@ -884,7 +852,7 @@ function AuthPageInner() {
 
                             {step === 'terms' && (
                                 <TermsScreen
-                                    onAgree={handleAgreeTerms}
+                                    onAgree={() => goTo('enter-phone')}
                                     onLater={() => router.push('/home')}
                                 />
                             )}
