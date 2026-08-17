@@ -1,5 +1,6 @@
 import { auth } from './endpoints/auth';
 import { banking } from './endpoints/banking';
+import { kyc } from './endpoints/kyc';
 import { paymentRequests } from './endpoints/paymentRequests';
 import { profile } from './endpoints/profile';
 import { transactions } from './endpoints/transactions';
@@ -21,6 +22,7 @@ import { transfers } from './endpoints/transfers';
 export const api = {
     auth,
     banking,
+    kyc,
     paymentRequests,
     profile,
     transactions,
@@ -31,6 +33,7 @@ export type { ApiError, ApiResult, Paginated, PageParams, RequestOptions } from 
 
 export type * from './types/auth';
 export type * from './types/banking';
+export type * from './types/kyc';
 export type * from './types/paymentRequests';
 export type * from './types/profile';
 export type * from './types/transactions';

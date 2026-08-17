@@ -27,6 +27,19 @@ export interface ApiError {
     code?: string;
     /** Field-level validation errors, keyed by field name. */
     fields?: Record<string, string[]>;
+    /**
+     * The parsed error payload, verbatim.
+     *
+     * `status`/`message`/`code`/`fields` cover almost every caller. This is the
+     * escape hatch for the few endpoints that return a *structured domain
+     * result* on a non-2xx — KYC re-verify answers with a full
+     * `{ status, reason, faceMatchScore, … }` object and a 4xx, and treating
+     * that as an opaque failure would throw away the reason the check failed.
+     *
+     * Reach for `message` first. If you find yourself casting this, the
+     * endpoint probably wants a typed response instead.
+     */
+    body?: unknown;
 }
 
 /** Standard cursor/offset pagination accepted by list endpoints. */

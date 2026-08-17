@@ -11,27 +11,46 @@ import type {
     ReverifyResult,
 } from './kycService.interface';
 import type { LivenessResult, IDDocument, MatchResult } from '@/core/types/verification';
-import { apiFetch, apiFetchOp } from '@/core/utils';
+import { api } from '@/api';
+import type { ApiResult } from '@/api';
+
+/**
+ * IKycService over the HTTP API.
+ *
+ * Transport lives in `@/api` (`api.kyc.*`); this class is the domain layer on
+ * top — it maps `ApiResult` onto the throwing contract that IKycService's
+ * callers and its mock implementation share, and normalises a few response
+ * shapes (see matchFaceToID and captureID).
+ *
+ * Five of these calls used raw `fetch`, so an access token expiring mid-flow
+ * failed the step outright instead of refreshing. Going through the api client
+ * gives every one of them refresh-on-401.
+ */
+
+/**
+ * Unwrap a result or throw, preserving the previous error text.
+ *
+ * The old code threw `` `${label}: ${res.status}` `` for most calls and the
+ * body's `error` field for a few. `ApiError.message` already carries the
+ * server's message when there is one and falls back to a status-derived string,
+ * so both cases collapse into this.
+ */
+function unwrap<T>(res: ApiResult<T>, label: string): T {
+    if (res.ok) return res.data;
+    throw new Error(`${label}: ${res.error.message}`);
+}
 
 export class HttpKycService implements IKycService {
-    private baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-
     async detectFace(
         faceImageData: string,
         challengeStep: LivenessChallenge = 'look_straight',
         options: { crop?: boolean } = {},
     ): Promise<LivenessResult> {
-        const res = await fetch(`${this.baseUrl}/api/kyc/liveness`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ faceImageData, challengeStep, crop: options.crop }),
-        });
+        const data = unwrap(
+            await api.kyc.liveness({ faceImageData, challengeStep, crop: options.crop }),
+            'Liveness API error',
+        );
 
-        if (!res.ok) {
-            throw new Error(`Liveness API error: ${res.status}`);
-        }
-
-        const data = await res.json();
         // Always preserve a usable image for downstream face-match: fall back to
         // the original frame when the server didn't return a crop.
         return {
@@ -45,17 +64,10 @@ export class HttpKycService implements IKycService {
         side: 'front' | 'back',
         sessionHint = 'default',
     ): Promise<AnalyzeIdResult> {
-        const res = await fetch(`${this.baseUrl}/api/kyc/analyze-id`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ imageData, side, sessionHint }),
-        });
-
-        if (!res.ok) {
-            throw new Error(`Analyze ID API error: ${res.status}`);
-        }
-
-        return res.json();
+        return unwrap(
+            await api.kyc.analyzeId({ imageData, side, sessionHint }),
+            'Analyze ID API error',
+        );
     }
 
     async captureID(imageData: string, side: 'front' | 'back'): Promise<Partial<IDDocument>> {
@@ -95,26 +107,10 @@ export class HttpKycService implements IKycService {
      * hood we map them to the API's named fields so there's no ambiguity.
      */
     async matchFaceToID(faceData: string, idData: string): Promise<MatchResult> {
-        const res = await fetch(`${this.baseUrl}/api/kyc/face-match`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                idFaceImageData: idData,
-                liveFaceImageData: faceData,
-            }),
-        });
-
-        if (!res.ok) {
-            throw new Error(`Face match API error: ${res.status}`);
-        }
-
-        const data = (await res.json()) as {
-            isMatch: boolean;
-            similarity?: number;
-            confidence?: number;
-            verdict?: 'pass' | 'review' | 'fail';
-            errorMessage: string | null;
-        };
+        const data = unwrap(
+            await api.kyc.faceMatch({ idFaceImageData: idData, liveFaceImageData: faceData }),
+            'Face match API error',
+        );
 
         return {
             isMatch: data.isMatch,
@@ -143,40 +139,20 @@ export class HttpKycService implements IKycService {
         status: 'verified' | 'rejected',
         extractedData: Record<string, unknown>,
     ): Promise<{ success: boolean }> {
-        const res = await fetch(`${this.baseUrl}/api/kyc/webhook-nestjs`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId, status, extractedData }),
-        });
-
-        if (!res.ok) {
-            throw new Error(`Webhook API error: ${res.status}`);
-        }
-
-        return res.json();
+        return unwrap(
+            await api.kyc.webhookNestjs({ userId, status, extractedData }),
+            'Webhook API error',
+        );
     }
 
     async startSession(): Promise<{ sessionId: string; expiresAt: string }> {
-        const res = await apiFetch(`${this.baseUrl}/api/kyc/session`, { method: 'POST' });
-        if (!res.ok) throw new Error(`Session start failed: ${res.status}`);
-        return res.json();
+        return unwrap(await api.kyc.startSession(), 'Session start failed');
     }
 
     async submitVerification(
         payload: SubmitVerificationPayload,
     ): Promise<{ success: boolean; kycRequest?: KycRequest }> {
-        const res = await apiFetch(`${this.baseUrl}/api/kyc/submit`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-        });
-
-        if (!res.ok) {
-            const body = await res.json().catch(() => ({}));
-            throw new Error((body as { error?: string }).error ?? `Submit failed: ${res.status}`);
-        }
-
-        return res.json();
+        return unwrap(await api.kyc.submit(payload), 'Submit failed');
     }
 
     async completeVideo(payload: {
@@ -185,46 +161,27 @@ export class HttpKycService implements IKycService {
         livenessConfidence: number;
         videoVsIdScore: number;
     }): Promise<{ success: boolean; kycRequest?: KycRequest }> {
-        const res = await apiFetch(`${this.baseUrl}/api/kyc/complete`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-        });
-
-        if (!res.ok) {
-            const body = await res.json().catch(() => ({}));
-            throw new Error(
-                (body as { error?: string }).error ?? `Complete video failed: ${res.status}`,
-            );
-        }
-
-        return res.json();
+        return unwrap(await api.kyc.completeVideo(payload), 'Complete video failed');
     }
 
     async startReverify(challengeId: string): Promise<ReverifySession> {
-        // Opcode via the random-hash gateway — hides the endpoint name (PROXY_OPS
-        // 'vs' → /api/kyc/reverify/start in app/api/[...path]/route.ts).
-        const res = await apiFetchOp('vs', { challengeId });
-        if (!res.ok) {
-            const body = await res.json().catch(() => ({}));
-            throw new Error(
-                (body as { error?: string }).error ?? `Re-verify start failed: ${res.status}`,
-            );
-        }
-        return res.json();
+        return unwrap(await api.kyc.reverifyStart({ challengeId }), 'Re-verify start failed');
     }
 
     async submitReverify(payload: ReverifyPayload): Promise<ReverifyResult> {
-        // Opcode 'vv' → /api/kyc/reverify/verify (see PROXY_OPS).
-        const res = await apiFetchOp('vv', payload);
-        // The Worker returns a structured result even on a logical failure; only a
-        // transport/5xx error throws. Parse and normalise here.
-        const data = (await res.json().catch(() => ({}))) as Partial<ReverifyResult> & {
-            error?: string;
-        };
+        const res = await api.kyc.reverifyVerify(payload);
+
+        // This endpoint answers with a full verdict even on a non-2xx, so a
+        // failure body is domain data rather than an error — `error.body` is
+        // read instead of discarded. Only a response with no `status` at all
+        // (a genuine transport/5xx failure) throws.
+        const data = (res.ok ? res.data : ((res.error.body ?? {}) as Record<string, unknown>)) as
+            Partial<ReverifyResult> & { error?: string };
+
         if (!res.ok && !data.status) {
-            throw new Error(data.error ?? `Re-verify failed: ${res.status}`);
+            throw new Error(data.error ?? `Re-verify failed: ${res.error.message}`);
         }
+
         return {
             status: data.status ?? 'error',
             reason: data.reason,
@@ -237,19 +194,6 @@ export class HttpKycService implements IKycService {
     }
 
     async verifyVideo(payload: VerifyVideoPayload): Promise<VerifyVideoResult> {
-        const res = await fetch(`${this.baseUrl}/api/kyc/verify-video`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-        });
-
-        if (!res.ok) {
-            const body = await res.json().catch(() => ({}));
-            throw new Error(
-                (body as { error?: string }).error ?? `Verify video failed: ${res.status}`,
-            );
-        }
-
-        return res.json();
+        return unwrap(await api.kyc.verifyVideo(payload), 'Verify video failed');
     }
 }

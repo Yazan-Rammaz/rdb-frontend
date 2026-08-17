@@ -7,7 +7,7 @@ import verifiedBigIcon from '@/assets/icons/verification/verified-big.svg';
 import warnSvg from '@/assets/icons/profile/warn.svg';
 import infoSvg from '@/assets/icons/profile/info.svg';
 import { useToast } from '@/context/ToastContext';
-import { apiFetch } from '@/core/utils';
+import { unwrapKycRequest } from '@/api/helpers/kyc';
 import { api } from '@/api';
 
 interface ClientNameScreenProps {
@@ -38,17 +38,18 @@ export default function ClientNameScreen({
 
     useEffect(() => {
         if (isVerified) {
-            apiFetch('/api/kyc/current')
-                .then((r) => r.json())
-                .then((d) => {
-                    const req = d.kycRequest ?? d;
-                    setDocs({
-                        documentFrontImageUrl: req?.documentFrontImageUrl,
-                        documentBackImageUrl: req?.documentBackImageUrl,
-                        documentFaceImageUrl: req?.documentFaceImageUrl ?? req?.faceImageUrl,
-                    });
-                })
-                .catch(() => {});
+            api.kyc.current().then((res) => {
+                if (!res.ok) return;
+                // Was `d.kycRequest ?? d`, which stops one layer short of the
+                // record — the payload is double-wrapped, so every URL below
+                // read undefined off the inner wrapper.
+                const req = (unwrapKycRequest(res.data) ?? {}) as Record<string, string>;
+                setDocs({
+                    documentFrontImageUrl: req.documentFrontImageUrl,
+                    documentBackImageUrl: req.documentBackImageUrl,
+                    documentFaceImageUrl: req.documentFaceImageUrl ?? req.faceImageUrl,
+                });
+            });
         }
     }, [isVerified]);
 

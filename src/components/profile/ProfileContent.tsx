@@ -37,7 +37,6 @@ import LoginHistoryScreen from './LoginHistoryScreen';
 import { QRCodeDisplay } from '../QR/send/shared/QRCodeDisplay';
 
 import { KycVerificationStatus, type KycStatusResponse } from '@/core/types/auth';
-import { apiFetch } from '@/core/utils';
 import { api } from '@/api';
 
 const ProfileContent = () => {
@@ -60,10 +59,7 @@ const ProfileContent = () => {
     const [showLoginHistory, setShowLoginHistory] = useState(false);
 
     useEffect(() => {
-        apiFetch('/api/kyc/status')
-            .then((r) => r.json())
-            .then((d: KycStatusResponse) => setKycStatus(d))
-            .catch(() => setKycStatus(null));
+        api.kyc.status().then((res) => setKycStatus(res.ok ? res.data : null));
     }, []);
 
     useEffect(() => {

@@ -153,7 +153,7 @@ function toError(status: number, body: unknown): ApiError {
         ? b.error
         : undefined);
 
-    return { status, message, code, fields: b.errors };
+    return { status, message, code, fields: b.errors, body };
 }
 
 function defaultMessage(status: number): string {

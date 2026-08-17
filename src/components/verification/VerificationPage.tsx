@@ -4,8 +4,8 @@ import React, { useEffect, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useVerification } from '@/context/VerificationContext';
 import { useRouter } from 'next/navigation';
-import { apiFetch } from '@/core/utils';
-import { KycVerificationStatus, type KycStatusResponse } from '@/core/types/auth';
+import { api } from '@/api';
+import { KycVerificationStatus } from '@/core/types/auth';
 import { Page } from '@/scaling';
 import IntroScreen from './screens/IntroScreen';
 import IDCaptureScreen from './screens/IDCaptureScreen';
@@ -29,33 +29,34 @@ export default function VerificationPage() {
 
         (async () => {
             try {
-                // 1. Check existing KYC status (apiFetch → silent token refresh on 401)
-                const statusRes = await apiFetch('/api/kyc/status');
-                const data: KycStatusResponse | null = statusRes.ok ? await statusRes.json() : null;
-                const status = data?.status;
+                // 1. Check existing KYC status.
+                const statusRes = await api.kyc.status();
+                const status = statusRes.ok ? statusRes.data.status : undefined;
 
                 if (status === KycVerificationStatus.VERIFIED) {
                     router.push('/home');
                     return;
                 }
 
-                // 2. Fetch a fresh kycSessionId. MUST use apiFetch: an expired access
-                // token here would otherwise 401 silently, leave kycSessionId null, and
+                // 2. Fetch a fresh kycSessionId. Refresh-on-401 matters here: an
+                // expired access token would otherwise leave kycSessionId null and
                 // the flow would later skip submit ("Missing verification data").
-                const sessionRes = await apiFetch('/api/kyc/session', { method: 'POST' });
+                const sessionRes = await api.kyc.startSession();
                 if (sessionRes.ok) {
-                    const sessionData = await sessionRes.json();
-                    const sessionId = sessionData.sessionId;
+                    const sessionId = sessionRes.data.sessionId;
                     if (sessionId) {
                         setKycSessionId(sessionId);
                     } else {
                         console.error(
                             '[VerificationPage] session response had no sessionId:',
-                            sessionData,
+                            sessionRes.data,
                         );
                     }
                 } else {
-                    console.warn('[VerificationPage] session fetch failed:', sessionRes.status);
+                    console.warn(
+                        '[VerificationPage] session fetch failed:',
+                        sessionRes.error.message,
+                    );
                 }
 
                 // 3. Route based on status already fetched in step 1.

@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft } from 'lucide-react';
 import { QRCodeDisplay } from '../QR/send/shared/QRCodeDisplay';
-import { apiFetch } from '@/core/utils';
+import { api } from '@/api';
+import { unwrapKycRequest } from '@/api/helpers/kyc';
 import verifiedBigIcon from '@/assets/icons/verification/verified-big.svg';
 import ClientInfoSvg from '@/assets/icons/profile/clientinfo.svg';
 import notVerifiedIcon from '@/assets/icons/verification/not-verified.svg';
@@ -59,25 +60,11 @@ export default function ClientInformationScreen({
 
     useEffect(() => {
         let active = true;
-        apiFetch('/api/kyc/current')
-            .then((r) => r.json())
-            .then((d: Record<string, unknown>) => {
-                // NestJS returns { kycRequest: {...} } and the worker wraps it AGAIN,
-                // so the payload is double-nested: { kycRequest: { kycRequest: {...} } }.
-                // Unwrap however many `kycRequest` layers down to the real record.
-                let rec: Record<string, unknown> | null = d ?? null;
-                while (
-                    rec &&
-                    typeof rec.kycRequest === 'object' &&
-                    rec.kycRequest !== null
-                ) {
-                    rec = rec.kycRequest as Record<string, unknown>;
-                }
-                if (active) setKyc((rec as typeof kyc) ?? null);
-            })
-            .catch(() => {
-                if (active) setKyc(null);
-            });
+        api.kyc.current().then((res) => {
+            if (!active) return;
+            // The payload is double-nested; unwrapKycRequest peels the layers.
+            setKyc(res.ok ? ((unwrapKycRequest(res.data) as typeof kyc) ?? null) : null);
+        });
         return () => {
             active = false;
         };
