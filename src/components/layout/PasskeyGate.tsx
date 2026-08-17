@@ -8,7 +8,6 @@ import { useRouter } from 'next/navigation';
 import { useIdleTimer } from '@/hooks/useIdleTimer';
 import { useToast } from '@/context/ToastContext';
 import PasscodeScreen from '@/components/auth/screens/PasscodeScreen';
-import BiometricEnrollScreen from '@/components/auth/screens/BiometricEnrollScreen';
 import SessionTakeoverOverlay from '@/components/layout/SessionTakeoverOverlay';
 import { Page } from '@/scaling';
 
@@ -29,9 +28,15 @@ const IDLE_TIMEOUT_MS = process.env.NEXT_PUBLIC_IDLE_TIMEOUT_MS
  * PasskeyGate — full-screen auth gate driven by PasskeyContext's lockStatus state machine.
  *
  * BOOTING          → null (SplashScreen above is still visible)
- * SETUP_REQUIRED   → one-time PIN creation then optional biometric enrollment
+ * SETUP_REQUIRED   → one-time PIN creation
  * LOCKED           → full-screen unlock overlay (PIN first, biometric via icon)
  * UNLOCKED         → render children; idle timer is active
+ *
+ * Biometrics are never offered as a setup step. There used to be a second
+ * SETUP_REQUIRED phase — a "Set Up Face ID / Skip for now" screen — shown right
+ * after the PIN was created. Enrollment now happens the first time the user taps
+ * the biometric icon on the LOCKED screen, which already enrolls on demand when
+ * none is registered. One prompt, at the moment the user asks for it.
  */
 export default function PasskeyGate({ children }: PasskeyGateProps) {
     const router = useRouter();
@@ -51,11 +56,6 @@ export default function PasskeyGate({ children }: PasskeyGateProps) {
         triggerLock,
         confirmUnlock,
     } = usePasskey();
-
-    // ── Setup flow state ─────────────────────────────────────────────────
-    const [setupPhase, setSetupPhase] = useState<'pin' | 'biometric'>('pin');
-    const [enrollLoading, setEnrollLoading] = useState(false);
-    const [enrollError, setEnrollError] = useState<string | null>(null);
 
     // ── LOCKED overlay state ─────────────────────────────────────────────
     const [biometricLoading, setBiometricLoading] = useState(false);
@@ -201,50 +201,18 @@ export default function PasskeyGate({ children }: PasskeyGateProps) {
         return null;
     }
 
-    // ── SETUP_REQUIRED: one-time PIN creation → optional biometric enroll ──
+    // ── SETUP_REQUIRED: one-time PIN creation ────────────────────────────
     if (lockStatus === 'SETUP_REQUIRED') {
-        if (setupPhase === 'pin') {
-            return (
-                <div className="fixed inset-0 z-9999 w-full h-svh">
-                    <PasscodeScreen
-                        mode="set"
-                        onSavePasscode={async (pin: string) => {
-                            await setupPin(pin);
-                            return true;
-                        }}
-                        onDone={() => {
-                            if (biometricAvailable) {
-                                setSetupPhase('biometric');
-                            } else {
-                                skipBiometricEnrollment();
-                            }
-                        }}
-                    />
-                </div>
-            );
-        }
-
-        // setupPhase === 'biometric'
         return (
             <div className="fixed inset-0 z-9999 w-full h-svh">
-                <BiometricEnrollScreen
-                    onEnroll={async () => {
-                        setEnrollLoading(true);
-                        setEnrollError(null);
-                        const result = await enrollBiometric();
-                        setEnrollLoading(false);
-                        if (result.success) {
-                            skipBiometricEnrollment();
-                        } else if (result.error === 'WEBAUTHN_CANCELLED') {
-                            // User dismissed the OS prompt — stay on screen
-                        } else {
-                            setEnrollError('Biometric setup is not available on this device.');
-                            setTimeout(() => skipBiometricEnrollment(), 2000);
-                        }
+                <PasscodeScreen
+                    mode="set"
+                    onSavePasscode={async (pin: string) => {
+                        await setupPin(pin);
+                        return true;
                     }}
-                    onSkip={skipBiometricEnrollment}
-                    isLoading={enrollLoading}
-                    error={enrollError}
+                    // Setup is complete once the PIN exists — no biometric step.
+                    onDone={skipBiometricEnrollment}
                 />
             </div>
         );

@@ -143,9 +143,24 @@ function AuthPageInner() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [step, phone]);
 
+    /**
+     * True from the moment an OTP verifies until the queued step transition lands.
+     *
+     * handleVerifyOtp exchanges the sessionToken immediately (so authenticated
+     * endpoints work) but defers goTo() by 1s for the success animation. In that
+     * gap userData is set while `step` is still 'enter-pin' — not a POST_AUTH_STEP
+     * — so the redirect below fired and sent every freshly verified user straight
+     * to /home. A new account never reached 'signup-success', and therefore never
+     * reached the name screen; the passcode screen still appeared, but only because
+     * PasskeyGate demands one on /home, which is why this looked like "the name
+     * page is missing" rather than "the flow is being skipped".
+     */
+    const postOtpPendingRef = useRef(false);
+
     // If authenticated and not in a post-auth step, redirect to /home.
     useEffect(() => {
         if (!hydrated) return;
+        if (postOtpPendingRef.current) return;
         if (!isAuthLoading && userData && !POST_AUTH_STEPS.includes(step)) {
             router.replace('/home');
         }
@@ -509,6 +524,9 @@ function AuthPageInner() {
             setIsValidPin('valid');
             setLoading('');
             verifiedUserRef.current = res;
+            // Hold the /home redirect until the queued goTo below decides where
+            // this user belongs — see postOtpPendingRef.
+            postOtpPendingRef.current = true;
 
             // Exchange sessionToken for rdb_at/rdb_rt cookies so authenticated
             // endpoints (e.g. /sessions/passcode/set) work immediately.
@@ -530,6 +548,9 @@ function AuthPageInner() {
                 } else {
                     goTo('login-success');
                 }
+                // Every branch lands on a POST_AUTH_STEP, so the redirect guard
+                // can be released now that `step` says where we are.
+                postOtpPendingRef.current = false;
             }, 1000);
         } else {
             setLoading('');
