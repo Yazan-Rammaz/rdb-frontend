@@ -1,6 +1,7 @@
 import { auth } from './endpoints/auth';
 import { banking } from './endpoints/banking';
 import { paymentRequests } from './endpoints/paymentRequests';
+import { profile } from './endpoints/profile';
 import { transactions } from './endpoints/transactions';
 import { transfers } from './endpoints/transfers';
 
@@ -21,6 +22,7 @@ export const api = {
     auth,
     banking,
     paymentRequests,
+    profile,
     transactions,
     transfers,
 };
@@ -30,5 +32,6 @@ export type { ApiError, ApiResult, Paginated, PageParams, RequestOptions } from 
 export type * from './types/auth';
 export type * from './types/banking';
 export type * from './types/paymentRequests';
+export type * from './types/profile';
 export type * from './types/transactions';
 export type * from './types/transfers';

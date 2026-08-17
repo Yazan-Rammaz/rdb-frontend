@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { useVerification } from '@/context/VerificationContext';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { apiFetchOp } from '@/core/utils';
+import { api } from '@/api';
 import { KycVerificationStatus } from '@/core/types/auth';
 import verifiedBigSvg from '@/assets/icons/verification/verified-big.svg';
 
@@ -51,15 +51,16 @@ export default function SuccessScreen() {
                 const parts = verifiedName.split(/\s+/);
                 firstName = parts[0] ?? '';
                 lastName = parts.length > 1 ? parts.slice(1).join(' ') : '';
-                try {
-                    // Gateway opcode, not the named route — see the note in
-                    // ClientNameScreen: notGateway() 404s direct hits in
-                    // production. This one failed silently (the catch below is
-                    // deliberately non-fatal), so the verified name never
-                    // reached the backend even though the UI showed it.
-                    await apiFetchOp('pu', lastName ? { firstName, lastName } : { firstName });
-                } catch {
-                    // non-fatal — the optimistic update + reconcile below still apply
+                // Non-fatal: the optimistic update + reconcile below still apply.
+                // api calls never throw, so the failure shows up as !ok rather
+                // than needing a try/catch. Worth logging — this used to fail
+                // silently in production and the verified name never reached the
+                // backend while the UI showed it as saved.
+                const res = await api.profile.update(
+                    lastName ? { firstName, lastName } : { firstName },
+                );
+                if (!res.ok) {
+                    console.warn('[SuccessScreen] name write failed:', res.error.message);
                 }
             }
             if (cancelled) return;

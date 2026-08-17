@@ -373,7 +373,7 @@ function AuthPageInner() {
             const parts = name.trim().split(/\s+/);
             const firstName = parts[0];
             const lastName = parts.length > 1 ? parts.slice(1).join(' ') : undefined;
-            await pfetch('pu', lastName ? { firstName, lastName } : { firstName });
+            await api.profile.update(lastName ? { firstName, lastName } : { firstName });
             // Reflect the new name locally so the welcome screen greets the user
             // by name instead of falling back to "User".
             const currentUser = userData?.user ?? userData;

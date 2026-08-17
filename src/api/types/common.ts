@@ -49,4 +49,15 @@ export interface RequestOptions {
     signal?: AbortSignal;
     /** Extra headers. Content-Type and auth are handled for you. */
     headers?: Record<string, string>;
+    /**
+     * Skip the built-in refresh-on-401 retry and report the 401 as-is.
+     *
+     * Almost nothing wants this. The one caller that does is AuthContext's
+     * bootstrap, which runs its own refresh so it can tell a dead refresh token
+     * ('unauthenticated' → log out) from an unreachable backend ('transient' →
+     * keep the session and retry when the network returns). The built-in retry
+     * collapses those two into a bare 401, and treating a transient 401 as a
+     * logout is the exact regression the retry loop was written to fix.
+     */
+    skipRefresh?: boolean;
 }

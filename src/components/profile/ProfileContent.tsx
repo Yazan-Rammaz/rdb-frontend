@@ -37,7 +37,8 @@ import LoginHistoryScreen from './LoginHistoryScreen';
 import { QRCodeDisplay } from '../QR/send/shared/QRCodeDisplay';
 
 import { KycVerificationStatus, type KycStatusResponse } from '@/core/types/auth';
-import { apiFetch, apiFetchOp } from '@/core/utils';
+import { apiFetch } from '@/core/utils';
+import { api } from '@/api';
 
 const ProfileContent = () => {
     const { userData, removeAuthCookies, refreshUser, isLoading } = useAuth();
@@ -87,44 +88,37 @@ const ProfileContent = () => {
         if (!dataUrl) {
             setLocalPhotoUrl(undefined);
             setImgError(false);
-            // Gateway opcode, not the named route — see the note in
-            // ClientNameScreen: notGateway() 404s direct hits in production.
-            const delRes = await apiFetchOp('pu', { profilePictureURL: '' });
+            // Empty string clears it — undefined would be dropped from the JSON
+            // and leave the existing photo in place.
+            const delRes = await api.profile.update({ profilePictureURL: '' });
             if (delRes.ok) {
                 toast.success('Photo removed successfully');
             } else {
-                toast.error('Failed to remove photo');
+                toast.error(delRes.error.message);
             }
             return;
         }
 
-        // Convert dataUrl to File and upload via API route (no server actions)
+        // Convert the cropper's dataUrl back into a File for the multipart upload.
         const blobRes = await fetch(dataUrl);
         const blob = await blobRes.blob();
         const file = new File([blob], 'profile.jpg', { type: 'image/jpeg' });
 
-        const uploadForm = new FormData();
-        uploadForm.append('file', file);
-        const uploadRes = await apiFetch('/api/profile/upload-photo', {
-            method: 'POST',
-            body: uploadForm,
-        });
+        const uploadRes = await api.profile.uploadPhoto(file);
         if (!uploadRes.ok) {
-            toast.error('Failed to upload photo');
+            toast.error(uploadRes.error.message);
             return;
         }
-        const uploaded = await uploadRes.json();
-        const imageUrl = uploaded.url;
+        const imageUrl = uploadRes.data.url;
 
-        // Update profile via API route
-        const updateRes = await apiFetchOp('pu', {
+        const updateRes = await api.profile.update({
             firstName: user.firstName,
             lastName: user.lastName,
             profilePictureURL: imageUrl,
             language: user.language,
         });
         if (!updateRes.ok) {
-            toast.error('Failed to update photo');
+            toast.error(updateRes.error.message);
             return;
         }
 

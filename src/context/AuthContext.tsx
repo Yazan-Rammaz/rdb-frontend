@@ -8,6 +8,7 @@ import {
 import { clearAuthFlowState } from '@/lib/authFlowCookie';
 import { refreshAccessToken } from '@/core/utils';
 import { pfetch } from '@/lib/p';
+import { api } from '@/api';
 import { useRouter } from 'next/navigation';
 
 // Shapes the NestJS session login/step endpoints can return
@@ -122,14 +123,15 @@ export function AuthProvider({
 
         let cancelled = false;
 
-        const fetchMe = async (): Promise<Response | null> => {
-            try {
-                return await pfetch('me');
-            } catch {
-                // Network error (offline, dropped connection) → transient, not a logout.
-                return null;
-            }
-        };
+        // skipRefresh: this loop runs its own refresh below so it can tell a dead
+        // refresh token from an unreachable backend. The client's built-in retry
+        // reports both as a bare 401, and treating a transient 401 as a logout is
+        // the regression the retry loop exists to prevent.
+        //
+        // No try/catch: api calls never throw. A network error (offline, dropped
+        // connection) arrives as status 0, which falls through to 'transient'
+        // below — same outcome the old `return null` produced.
+        const fetchMe = () => api.profile.me({ skipRefresh: true });
 
         // Backoff cap for the transient-retry loop. We never *give up* on a transient
         // failure — instead we wait for the network to return (the `online` event) and
@@ -163,7 +165,7 @@ export function AuthProvider({
             // Access token may have expired (~15 min). Try ONE silent refresh, then
             // re-fetch. The refresh result is itself tri-state.
             let refreshTransient = false;
-            if (res && res.status === 401) {
+            if (!res.ok && res.error.status === 401) {
                 const refreshed = await refreshAccessToken();
                 if (refreshed === 'refreshed') {
                     res = await fetchMe();
@@ -174,10 +176,9 @@ export function AuthProvider({
                 }
             }
 
-            if (res && res.ok) {
-                const freshUser = await res.json();
+            if (res.ok) {
                 setUserDataState({
-                    user: freshUser,
+                    user: res.data,
                     accessToken: { token: '', expiresAt: '' },
                     refreshToken: { token: '', expiresAt: '' },
                 } as UserData);
@@ -186,9 +187,9 @@ export function AuthProvider({
 
             // A 401 that survived a *successful* refresh = truly unauthenticated.
             // (A 401 after a transient refresh is NOT definitive — retry instead.)
-            if (res && res.status === 401 && !refreshTransient) return 'unauthenticated';
+            if (res.error.status === 401 && !refreshTransient) return 'unauthenticated';
 
-            // network null, 5xx, or refresh 'transient'
+            // status 0 (network), 5xx, or refresh 'transient'
             return 'transient';
         };
 
@@ -294,13 +295,11 @@ export function AuthProvider({
 
     const refreshUser = async (): Promise<void> => {
         try {
-            let res = await pfetch('me');
-            // Silent token refresh on an expired access token, then retry once.
-            if (res.status === 401 && (await refreshAccessToken()) === 'refreshed') {
-                res = await pfetch('me');
-            }
+            // The manual 401-refresh-retry this used to do is now built into the
+            // api client, so it is gone from here rather than run twice.
+            const res = await api.profile.me();
             if (res.ok) {
-                const freshUser = await res.json();
+                const freshUser = res.data;
                 setUserDataState((prev) =>
                     prev
                         ? { ...prev, user: freshUser }

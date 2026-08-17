@@ -1,4 +1,5 @@
 import { apiFetch, apiFetchOp } from '@/core/utils';
+import { pfetch } from '@/lib/p';
 import type { ApiError, ApiResult, RequestOptions } from './types/common';
 
 /**
@@ -31,29 +32,47 @@ export async function request<T>(spec: {
     method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
     /** JSON body. Omit for GET. */
     body?: unknown;
+    /**
+     * Multipart body. Mutually exclusive with `body`, and cannot be combined
+     * with `op`: the opcode gateway's envelope is JSON `{o, d}`, so a file has
+     * no way through it. Content-Type is left unset so fetch writes the
+     * boundary itself.
+     */
+    formData?: FormData;
     /** Query params. Undefined and null values are dropped. */
     query?: Record<string, string | number | boolean | undefined | null>;
     /** Opcode — routes through the opaque gateway instead of `path`. */
     op?: string;
     options?: RequestOptions;
 }): Promise<ApiResult<T>> {
-    const { path, method = 'GET', body, query, op, options } = spec;
+    const { path, method = 'GET', body, formData, query, op, options } = spec;
 
     try {
-        const res = op
-            ? await apiFetchOp(op, body, {
-                  headers: options?.headers,
-                  signal: options?.signal,
-              })
-            : await apiFetch(buildUrl(path, query), {
-                  method,
-                  headers: {
-                      ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
-                      ...options?.headers,
-                  },
-                  ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-                  signal: options?.signal,
-              });
+        let res: Response;
+        if (op) {
+            // pfetch is the same transport apiFetchOp uses, minus the retry —
+            // see RequestOptions.skipRefresh for the one case that needs it.
+            res = options?.skipRefresh
+                ? await pfetch(op, body, { headers: options.headers, signal: options.signal })
+                : await apiFetchOp(op, body, {
+                      headers: options?.headers,
+                      signal: options?.signal,
+                  });
+        } else {
+            const hasJsonBody = body !== undefined;
+            res = await apiFetch(buildUrl(path, query), {
+                method,
+                headers: {
+                    // Never set Content-Type for FormData — the browser must
+                    // append its own multipart boundary.
+                    ...(hasJsonBody ? { 'Content-Type': 'application/json' } : {}),
+                    ...options?.headers,
+                },
+                ...(hasJsonBody ? { body: JSON.stringify(body) } : {}),
+                ...(formData ? { body: formData } : {}),
+                signal: options?.signal,
+            });
+        }
 
         return await toResult<T>(res);
     } catch (err) {
