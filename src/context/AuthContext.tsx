@@ -1,10 +1,6 @@
 'use client';
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { User, UserData } from '@/core/types/auth';
-import {
-    setAuthCookies,
-    updateUserDataCookie,
-} from '@/core/auth/secure-cookies';
 import { clearAuthFlowState } from '@/lib/authFlowCookie';
 import { refreshAccessToken } from '@/core/utils';
 import { api } from '@/api';
@@ -244,18 +240,11 @@ export function AuthProvider({
 
     const saveAuthCookies = async (fullUserData: UserData): Promise<boolean> => {
         setIsUnlocked(true);
-
-        if (useCookies) {
-            try {
-                // Best-effort server-side cookie write — only works in Server Action context.
-                // The Worker already sets rdb_at / rdb_rt / rdb_user in session-complete,
-                // so this is intentionally non-blocking: we never gate on its success.
-                setAuthCookies(fullUserData).catch(() => {});
-            } catch {
-                // ignore — cookies were set by the Worker
-            }
-        }
-
+        // No cookie write here. This called setAuthCookies(), which uses
+        // cookies() from next/headers — server-only, so from this client
+        // component the dynamic import failed and every call was a silent no-op.
+        // The real write happens in the /auth/session-complete route handler,
+        // which is where it has to happen for an httpOnly cookie anyway.
         setUserDataState(fullUserData);
         return true;
     };
@@ -274,19 +263,18 @@ export function AuthProvider({
         await api.session.logout();
     };
 
+    /**
+     * In-memory only. This used to also call updateUserDataCookie() to refresh
+     * the rdb_user cookie — which nothing read, and which could not have been
+     * written from here regardless (next/headers is server-only, so the call
+     * returned success:false and this returned FALSE on every invocation).
+     * Neither caller checked the result, so nothing observed it.
+     */
     const updateUser = async (user: User): Promise<boolean> => {
         if (userData) {
             setUserDataState({ ...userData, user });
         }
-        if (!useCookies) return true;
-
-        try {
-            const result = await updateUserDataCookie(user);
-            return result.success;
-        } catch (error) {
-            console.error('updateUser error:', error);
-            return false;
-        }
+        return true;
     };
 
     const refreshUser = async (): Promise<void> => {

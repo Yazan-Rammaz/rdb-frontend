@@ -15,6 +15,9 @@ import type { ProfileResponse, UpdateProfileBody, UploadPhotoResponse } from '..
  * nothing the proxy does not already do and were deleted.
  *
  * The response shaping they also did now lives in `helpers/profile.ts`.
+ *
+ * With uploadPhoto pointed at its real endpoint too, app/api/profile is gone
+ * entirely — profile owns no server routes.
  */
 export const profile = {
     me: async (o?: RequestOptions): Promise<ApiResult<ProfileResponse>> => {
@@ -40,16 +43,22 @@ export const profile = {
     },
 
     /**
-     * Keeps its own route handler, and needs to: it is a genuine remap to a
-     * different NestJS endpoint (`/media/upload/direct`) plus a rebuilt
-     * multipart body with a `type` field derived from the file's MIME. That is
-     * work the path-stripping proxy cannot do.
+     * Photo upload, straight to NestJS `/media/upload/direct` by its real name.
      *
-     * Multipart also cannot ride the opcode gateway, whose envelope is JSON.
+     * The multipart body survives the generic proxy untouched: it forwards the
+     * raw arrayBuffer and copies Content-Type verbatim, so the boundary the
+     * browser generated still matches. Content-Type is deliberately not set
+     * here — FormData must generate it.
+     *
+     * `type` is the media kind the endpoint expects ('image', 'video', …),
+     * derived from the file's MIME. This was built server-side purely because
+     * the request had to pass through a handler anyway; it is a one-line
+     * transform of an argument the caller already holds.
      */
     uploadPhoto: (file: File, o?: RequestOptions): Promise<ApiResult<UploadPhotoResponse>> => {
         const formData = new FormData();
         formData.append('file', file);
-        return request({ path: '/profile/upload-photo', method: 'POST', formData, options: o });
+        formData.append('type', file.type?.split('/')[0] || 'image');
+        return request({ path: '/media/upload/direct', method: 'POST', formData, options: o });
     },
 };

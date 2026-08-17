@@ -1,11 +1,9 @@
 /**
  * Request bodies and responses for `endpoints/profile.ts`.
  *
- * These three do not hit NestJS paths directly. They go to Next route handlers
- * under `app/api/profile/`, which proxy to NestJS *and* keep the `rdb_user`
- * cookie in sync — re-reading `/users/me` after a PATCH and preserving the
- * locally-tracked `kycRequest` field. That bookkeeping is why profile has its
- * own handlers instead of falling through the generic `[...path]` proxy.
+ * All three call NestJS by its real route names — `/users/me` for the read and
+ * the write, `/media/upload/direct` for the photo — so the generic `[...path]`
+ * proxy carries them and profile owns no server routes of its own.
  */
 
 // Re-exported, not redeclared — core/types/auth.ts already defines User and the

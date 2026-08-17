@@ -55,12 +55,10 @@ export async function POST(req: NextRequest) {
                 `rdb_at_exp=${atExpMs}; Path=/; SameSite=Strict; Max-Age=${rtMaxAge}${secure ? '; Secure' : ''}`,
             );
         }
-        if (user) {
-            const userJson = encodeURIComponent(JSON.stringify(user));
-            // User cookie lives as long as the session can be refreshed (refresh-token life)
-            // so the app can render the user while the access token silently rotates.
-            res.headers.append('Set-Cookie', `rdb_user=${userJson}; ${cookieOpts(rtMaxAge, secure)}`);
-        }
+        // No rdb_user cookie. It was meant to let the app render the user while
+        // the access token rotated, but nothing ever read it — the app gets the
+        // user from GET /users/me on boot. It is still cleared on logout and on
+        // a failed refresh so any cookie already in a browser goes away.
         // Readable (non-httpOnly) session id so the client can tell THIS session apart
         // from a newer login: on `session:revoked_by_new_login` (broadcast to every
         // socket the user holds) only the session matching `revokedSessionId` reacts.

@@ -75,10 +75,15 @@ export async function backendFetch(
     return fetch(url, fetchInit);
 }
 
-/** Auth cookie names — kept in sync with secure-cookies.ts and the (legacy) Worker. */
+/** Auth cookie names — kept in sync with the (legacy) Worker. */
 export const COOKIES = {
     access: 'rdb_at',
     refresh: 'rdb_rt',
+    /**
+     * Legacy. Nothing writes this any more and nothing ever read it; it is
+     * retained only so logout and a failed refresh keep clearing whatever is
+     * still sitting in an existing browser. Safe to drop once those have aged out.
+     */
     user: 'rdb_user',
     session: 'rdb_st',
     step: 'rdb_step',
