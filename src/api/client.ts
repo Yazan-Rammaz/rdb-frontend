@@ -143,7 +143,17 @@ function toError(status: number, body: unknown): ApiError {
         ? b.message.join(', ')
         : (b.message ?? b.error ?? defaultMessage(status));
 
-    return { status, message, code: b.code, fields: b.errors };
+    // Our own route handlers put a machine-readable discriminator in `error`
+    // alongside a human `message` — STEP_TOKEN_MISSING and NO_SESSION from
+    // sessions/[...path] are branched on by the login flow. Without this they
+    // would be dropped (b.message wins for `message`, and `code` only ever read
+    // b.code), so a caller could not tell the two apart. Only SCREAMING_SNAKE is
+    // taken as a code; a prose `error` string is left to `message`.
+    const code = b.code ?? (typeof b.error === 'string' && /^[A-Z][A-Z0-9_]*$/.test(b.error)
+        ? b.error
+        : undefined);
+
+    return { status, message, code, fields: b.errors };
 }
 
 function defaultMessage(status: number): string {
