@@ -65,7 +65,49 @@ export const PROXY_OP_ROUTES: Record<string, OpRoute> = {
     sp: { method: 'POST', path: () => '/api/auth/reset-passcode/step/complete' },
     vs: { method: 'POST', path: () => '/api/kyc/reverify/start' },
     vv: { method: 'POST', path: () => '/api/kyc/reverify/verify' },
+
+    // ─── Money ───────────────────────────────────────────────────────────────
+    // Transfers and balances. These were the last endpoints whose real names
+    // travelled openly while auth and session names were hidden — a split that
+    // followed the old Cloudflare Worker boundary rather than any policy.
+    //
+    // Unlike every op above, some of these carry data in the path: a query
+    // string, or an account number. `d` is the opcode payload, so the path
+    // function builds them. Called with no argument (as the catch-all does when
+    // enumerating paths to hide) each must still yield a usable base — hence the
+    // `?? ''` and the empty-object defaults.
+    tp: { method: 'GET', path: () => '/api/transfer-purpose?type=ALL' },
+    // Account number is encoded, so one containing a slash cannot alter the path.
+    // Keep the literal directly after `=>`: check-bundle-opacity.mjs scrapes these
+    // paths, and anything between the arrow and the quote hides the route from it.
+    tl: {
+        method: 'GET',
+        path: (d) =>
+            `/api/transfers/lookup-account/${encodeURIComponent(
+                (d as { accountNumber?: string })?.accountNumber ?? '',
+            )}`,
+    },
+    tv: { method: 'POST', path: () => '/api/transfers/verify' },
+    ts: { method: 'POST', path: () => '/api/transfers/send' },
+    wb: { method: 'GET', path: (d) => `/api/wallets/myAcounts${queryString(d)}` },
+    fl: { method: 'GET', path: (d) => `/api/financial-ledger${queryString(d)}` },
 };
+
+/**
+ * Serialise an opcode payload into a query string.
+ *
+ * Undefined and null are dropped, matching the api client's own `buildUrl`, so
+ * an omitted filter means "unset" rather than the literal string "undefined".
+ */
+function queryString(d: unknown): string {
+    const params = new URLSearchParams();
+    for (const [k, v] of Object.entries((d ?? {}) as Record<string, unknown>)) {
+        if (v === undefined || v === null) continue;
+        params.append(k, String(v));
+    }
+    const s = params.toString();
+    return s ? `?${s}` : '';
+}
 
 /** Full client-side table: every opcode with its real route. */
 export const OP_ROUTES: Record<string, OpRoute> = { ...GATEWAY_OP_ROUTES, ...PROXY_OP_ROUTES };

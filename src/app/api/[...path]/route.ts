@@ -24,9 +24,20 @@ const GATEWAY_PATH = /^\/api\/[0-9a-f]{24}$/;
  * Real paths of the proxied opcodes. In opaque mode these are reachable ONLY
  * via the random-hash gateway; a direct external hit to the descriptive name
  * gets 404 (mirrors notGateway() for the gateway handlers) so scanners can't
- * confirm the endpoint exists. All PROXY_OP_ROUTES paths are static.
+ * confirm the endpoint exists.
+ *
+ * Not all of these paths are static any more: the money opcodes carry a query
+ * string or an account number. Each path is reduced to the part before any `?`,
+ * and one that ends in `/` (a stripped path parameter) matches by prefix — so
+ * /api/transfers/lookup-account/0000-0016 is hidden, not just the bare stem.
  */
-const PROXY_OP_PATHS = new Set(Object.values(PROXY_OP_ROUTES).map((r) => r.path()));
+const PROXY_OP_PATHS = Object.values(PROXY_OP_ROUTES).map((r) => r.path().split('?')[0]);
+
+function isHiddenProxyPath(pathname: string): boolean {
+    return PROXY_OP_PATHS.some(
+        (base) => pathname === base || (base.endsWith('/') && pathname.startsWith(base)),
+    );
+}
 
 /**
  * Service binding to the KYC Worker. Same-account Worker→Worker fetches over
@@ -85,7 +96,7 @@ async function proxy(req: NextRequest): Promise<NextResponse> {
         // path (not arriving via the hash gateway) is hidden — 404, so scanners
         // can't confirm the endpoint exists. Legitimate traffic always rewrites
         // in through the gateway branch above (viaGateway = true).
-        if (OPAQUE_API && PROXY_OP_PATHS.has(pathname)) {
+        if (OPAQUE_API && isHiddenProxyPath(pathname)) {
             return NextResponse.json({ error: 'Not found' }, { status: 404 });
         }
         body = method === 'GET' || method === 'HEAD' ? undefined : await req.arrayBuffer();

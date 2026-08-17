@@ -77,9 +77,16 @@ function opcodePaths(source) {
     let m;
     while ((m = re.exec(source)) !== null) {
         const raw = (m[1] ?? m[2]).trim();
-        // Strip /api so both the prefixed and unprefixed spellings are caught,
-        // and drop any trailing slash left by a template prefix.
-        const needle = raw.replace(/^\/api\//, '').replace(/\/+$/, '');
+        // Reduce to the bare route stem:
+        //  - drop any query string, or the needle would only match a leak that
+        //    happened to carry the same params ('transfer-purpose?type=ALL'
+        //    would sail past a bundled '/transfer-purpose');
+        //  - drop /api so both the prefixed and unprefixed spellings match;
+        //  - drop a trailing slash left where a path parameter was interpolated.
+        const needle = raw
+            .split('?')[0]
+            .replace(/^\/api\//, '')
+            .replace(/\/+$/, '');
         if (needle) paths.add(needle);
     }
     return [...paths];
@@ -117,11 +124,35 @@ if (!existsSync(STATIC_DIR)) {
     process.exit(1);
 }
 
-const needles = opcodePaths(readFileSync(OPCODE_MAP, 'utf8'));
+const mapSource = readFileSync(OPCODE_MAP, 'utf8');
+const needles = opcodePaths(mapSource);
 if (needles.length === 0) {
     // An empty list would pass silently and prove nothing — that is a broken
     // check, not a clean bundle.
     console.error(red('[bundle-opacity] parsed 0 paths from opcodeMap.ts — the check is broken.'));
+    process.exit(1);
+}
+
+/**
+ * Every declared opcode must have yielded a needle.
+ *
+ * Scraping source with a regex fails quietly: anything between `=>` and the
+ * quote — a comment, an unusual line break — hides that route, and the check
+ * then reports success while never having looked for it. That happened: a
+ * comment above the `tl` template dropped /transfers/lookup-account from the
+ * scan silently. Comparing counts turns a blind spot into a failure.
+ */
+const declaredOps = (mapSource.match(/^\s{4}[a-z]{2}: [{(]/gm) ?? []).length;
+if (needles.length < declaredOps) {
+    console.error(
+        red(
+            `[bundle-opacity] parsed ${needles.length} path(s) but opcodeMap declares ${declaredOps} opcode(s).`,
+        ),
+    );
+    console.error(
+        'Some route was not scraped, so it is not being checked. Keep the path\n' +
+            'literal directly after `=>` with nothing in between.\n',
+    );
     process.exit(1);
 }
 
