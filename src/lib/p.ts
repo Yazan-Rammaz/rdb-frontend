@@ -8,7 +8,7 @@
  * The path is a FRESH random 24-hex segment per request (`/api/<hash>`), so
  * even the gateway itself doesn't appear as a constant, fingerprintable name.
  * The catch-all route (src/app/api/[...path]/route.ts) recognizes the shape
- * and dispatches to the gateway (src/app/api/p/route.ts), which maps the
+ * and dispatches to the gateway (src/lib/opcodeGateway.ts), which maps the
  * opcode back onto the original route handler — behavior (cookies, status
  * codes, bodies) is IDENTICAL to calling the named route directly.
  *

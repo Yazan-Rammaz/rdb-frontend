@@ -139,7 +139,7 @@ const SKIP_REFRESH_OPS = new Set([
 
 /**
  * Gateway-aware apiFetch: same silent-refresh contract, but routes through the
- * opaque /api/p gateway (pfetch) instead of a named URL. Used by the passcode /
+ * opaque opcode gateway (pfetch) instead of a named URL. Used by the passcode /
  * passkey / device-status call sites so their endpoint names never appear in the
  * Network tab.
  */

@@ -1,6 +1,7 @@
 /**
  * Single source of truth for the opaque-gateway opcode table, shared by the
- * client (src/lib/p.ts) and the server (api/p + the /api/[...path] catch-all).
+ * client (src/lib/p.ts) and the server (lib/opcodeGateway, reached through the
+ * /api/[...path] catch-all).
  *
  * Toggled by `NEXT_PUBLIC_OPAQUE_API` (build-time inlined, default ON):
  *   - ON  → clients POST each opcode to a random-hash path (`/api/<24 hex>`);
@@ -20,7 +21,7 @@ export interface OpRoute {
     path: (d?: unknown) => string;
 }
 
-/** Ops handled by dedicated Next route handlers (dispatched via api/p). */
+/** Ops handled by dedicated Next route handlers (dispatched via lib/opcodeGateway). */
 export const GATEWAY_OP_ROUTES: Record<string, OpRoute> = {
     sc: { method: 'POST', path: () => '/api/auth/session-complete' },
     st: { method: 'POST', path: () => '/api/auth/save-step-token' },

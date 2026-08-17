@@ -1,22 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GATEWAY_OP_ROUTES } from '@/lib/opcodeMap';
-import { POST as sessionComplete } from '../auth/session-complete/route';
-import { POST as saveStepToken } from '../auth/save-step-token/route';
-import { POST as saveSessionToken } from '../auth/save-session-token/route';
-import { POST as refresh } from '../auth/refresh/route';
-import { POST as logout } from '../auth/logout/route';
-import { GET as wsToken } from '../auth/token/route';
-import { GET as sessionsGet, POST as sessionsPost, DELETE as sessionsDelete } from '../sessions/[...path]/route';
+import { PG_HEADER } from '@/lib/edgeProxy';
+import { POST as sessionComplete } from '@/app/api/auth/session-complete/route';
+import { POST as saveStepToken } from '@/app/api/auth/save-step-token/route';
+import { POST as saveSessionToken } from '@/app/api/auth/save-session-token/route';
+import { POST as refresh } from '@/app/api/auth/refresh/route';
+import { POST as logout } from '@/app/api/auth/logout/route';
+import { GET as wsToken } from '@/app/api/auth/token/route';
+import {
+    GET as sessionsGet,
+    POST as sessionsPost,
+    DELETE as sessionsDelete,
+} from '@/app/api/sessions/[...path]/route';
 
 /**
- * Opaque API gateway ("p" = proxy). Single public endpoint: POST /api/p.
+ * Opaque API gateway.
  *
- * The operation is a short opcode in the JSON body ({ o, d }), mapped here back
+ * The operation is a short opcode in the JSON body (`{ o, d }`), mapped back
  * onto the ORIGINAL route handlers — invoked directly as functions with a
  * synthesized NextRequest, so cookies / Set-Cookie / status codes behave
- * exactly as before. The original named routes are gated behind the internal
- * X-PG marker header (set only here) and answer 404 to direct external hits,
- * so neither the Network tab nor an endpoint scanner sees descriptive names.
+ * exactly as if the client had called the named route. Those named routes are
+ * gated behind the internal X-PG marker (set only here) and answer 404 to
+ * direct external hits, so neither the Network tab nor an endpoint scanner sees
+ * descriptive names.
+ *
+ * ─── Why this is a lib module and not a route ───────────────────────────────
+ * This used to be `app/api/p/route.ts`, which made POST /api/p a real, public
+ * endpoint. Nothing ever called it: with OPAQUE_API on the client posts to a
+ * random `/api/<24-hex>` path that the catch-all recognises, and with it off
+ * the client calls the descriptive routes directly. So the URL existed purely
+ * as a side effect of where the code lived — a fixed, guessable name that
+ * accepted any opcode, in a layer whose entire job is hiding endpoint names.
+ * It was also the one gateway file that could not carry notGateway(), since it
+ * is what stamps the marker that check looks for.
+ *
+ * Living in lib/ there is no route, nothing to guess, and nothing to guard.
+ * It also lifts the Next constraint that a route module may only export HTTP
+ * method handlers, which is why the marker header had to be duplicated before.
  *
  * Opcode table:
  *   sc → POST   /api/auth/session-complete
@@ -62,12 +82,19 @@ const HANDLERS: Record<string, Handler> = {
     dc: sessionsDelete,
 };
 
-/** Marker header proving a request was synthesized by this gateway.
- * Kept in sync with notGateway() in edgeProxy.ts. Not exported: Next route
- * modules may only export HTTP-method handlers + route config. */
-const PG_HEADER = 'x-pg';
+// PG_HEADER is imported rather than declared here so it cannot drift from the
+// notGateway() check that reads it. It lives in edgeProxy because the dependency
+// has to run that way: this module imports the route handlers, and those import
+// edgeProxy — declaring it here and importing it there would close the cycle.
 
-export async function POST(req: NextRequest): Promise<NextResponse> {
+/**
+ * Dispatch an opcode payload to its real handler.
+ *
+ * Called only by the `/api/[...path]` catch-all, after it recognises a
+ * random-hash gateway request. An unknown opcode answers 404, matching what a
+ * request to any other nonexistent path would return.
+ */
+export async function dispatchOpcode(req: NextRequest): Promise<NextResponse> {
     let payload: { o?: string; d?: unknown } = {};
     try {
         payload = await req.json();

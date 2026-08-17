@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { NEST_BASE, WORKER_BASE, COOKIES, backendFetch, safeJson } from '@/lib/edgeProxy';
 import { OPAQUE_API, PROXY_OP_ROUTES } from '@/lib/opcodeMap';
-import { POST as gatewayPost } from '../p/route';
+import { dispatchOpcode } from '@/lib/opcodeGateway';
 
 /**
  * Per-request random gateway paths (see src/lib/p.ts): the client posts each
@@ -18,12 +18,12 @@ const GATEWAY_PATH = /^\/api\/[0-9a-f]{24}$/;
 // NEXT_PUBLIC_OPAQUE_API=false. A random-hash gateway request whose `o`
 // matches rewrites to the real path/method and falls through to the normal
 // proxy flow (auth injection, step-token rewrite, KYC service binding all
-// apply); any other opcode dispatches to the opcode gateway (api/p).
+// apply); any other opcode dispatches to the opcode gateway (lib/opcodeGateway).
 
 /**
  * Real paths of the proxied opcodes. In opaque mode these are reachable ONLY
  * via the random-hash gateway; a direct external hit to the descriptive name
- * gets 404 (mirrors notGateway() for the api/p handlers) so scanners can't
+ * gets 404 (mirrors notGateway() for the gateway handlers) so scanners can't
  * confirm the endpoint exists. All PROXY_OP_ROUTES paths are static.
  */
 const PROXY_OP_PATHS = new Set(Object.values(PROXY_OP_ROUTES).map((r) => r.path()));
@@ -63,7 +63,7 @@ async function proxy(req: NextRequest): Promise<NextResponse> {
     if (req.method === 'POST' && GATEWAY_PATH.test(pathname)) {
         // Random-hash gateway call ({o, d} body). Proxied-path opcodes rewrite
         // to their real endpoint and continue through the proxy flow below;
-        // every other opcode dispatches to the opcode gateway (api/p).
+        // every other opcode dispatches to the opcode gateway.
         const raw = await req.text();
         let op: { o?: string; d?: unknown } = {};
         try {
@@ -73,7 +73,7 @@ async function proxy(req: NextRequest): Promise<NextResponse> {
         }
         const def = PROXY_OP_ROUTES[op.o ?? ''];
         if (!def) {
-            return gatewayPost(
+            return dispatchOpcode(
                 new NextRequest(req.nextUrl, { method: 'POST', headers: req.headers, body: raw }),
             );
         }
