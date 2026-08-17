@@ -25,27 +25,56 @@ import type { ApiError, ApiResult, RequestOptions } from './types/common';
  * about: pass `op` and the client handles it.
  */
 
-/** Never throws. Failures come back as `{ ok: false }` so callers must handle them. */
-export async function request<T>(spec: {
-    /** Path under /api, e.g. '/users/me'. Ignored when `op` is set. */
-    path: string;
+interface CommonSpec {
     method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
     /** JSON body. Omit for GET. */
     body?: unknown;
+    options?: RequestOptions;
+}
+
+interface PathSpec extends CommonSpec {
+    /** Path under /api, e.g. '/users/me'. */
+    path: string;
+    op?: never;
     /**
-     * Multipart body. Mutually exclusive with `body`, and cannot be combined
-     * with `op`: the opcode gateway's envelope is JSON `{o, d}`, so a file has
-     * no way through it. Content-Type is left unset so fetch writes the
-     * boundary itself.
+     * Multipart body. Mutually exclusive with `body`. Path-routed only: the
+     * opcode gateway's envelope is JSON `{o, d}`, so a file has no way through
+     * it. Content-Type is left unset so fetch writes the boundary itself.
      */
     formData?: FormData;
     /** Query params. Undefined and null values are dropped. */
     query?: Record<string, string | number | boolean | undefined | null>;
-    /** Opcode — routes through the opaque gateway instead of `path`. */
-    op?: string;
-    options?: RequestOptions;
-}): Promise<ApiResult<T>> {
-    const { path, method = 'GET', body, formData, query, op, options } = spec;
+}
+
+interface OpSpec extends CommonSpec {
+    /** Opcode — routes through the opaque gateway. */
+    op: string;
+    /**
+     * Forbidden alongside `op`, and the reason is not style.
+     *
+     * `path` used to be accepted here and ignored, declared next to the opcode
+     * as documentation of where the call lands. It is a string literal in a
+     * client module, so it shipped: the production bundle carried
+     * `{path:"/auth/reset-passcode/init",op:"ri"}` and friends — handing a
+     * reader the complete opcode-to-endpoint mapping in one place, which is
+     * precisely what routing through the gateway exists to withhold.
+     * (`lib/opcodeMap.ts` holds the same table but is tree-shaken out of the
+     * client build, so it does not leak.)
+     *
+     * `never` makes the leak a compile error rather than a habit.
+     */
+    path?: never;
+    formData?: never;
+    query?: never;
+}
+
+/** Never throws. Failures come back as `{ ok: false }` so callers must handle them. */
+export async function request<T>(spec: PathSpec | OpSpec): Promise<ApiResult<T>> {
+    const { method = 'GET', body, options } = spec;
+    const op = 'op' in spec ? spec.op : undefined;
+    const path = 'path' in spec ? spec.path : undefined;
+    const formData = 'formData' in spec ? spec.formData : undefined;
+    const query = 'query' in spec ? spec.query : undefined;
 
     try {
         let res: Response;
@@ -60,7 +89,8 @@ export async function request<T>(spec: {
                   });
         } else {
             const hasJsonBody = body !== undefined;
-            res = await apiFetch(buildUrl(path, query), {
+            // Non-null: the union guarantees a path whenever `op` is absent.
+            res = await apiFetch(buildUrl(path!, query), {
                 method,
                 headers: {
                     // Never set Content-Type for FormData — the browser must

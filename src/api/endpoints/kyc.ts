@@ -91,7 +91,7 @@ export const kyc = {
         body: ReverifyStartBody,
         o?: RequestOptions,
     ): Promise<ApiResult<ReverifySession>> =>
-        request({ path: '/kyc/reverify/start', method: 'POST', op: 'vs', body, options: o }),
+        request({ method: 'POST', op: 'vs', body, options: o }),
 
     /**
      * Returns a structured verdict even when it answers 4xx, so callers should
@@ -102,5 +102,5 @@ export const kyc = {
         body: ReverifyPayload,
         o?: RequestOptions,
     ): Promise<ApiResult<Record<string, unknown>>> =>
-        request({ path: '/kyc/reverify/verify', method: 'POST', op: 'vv', body, options: o }),
+        request({ method: 'POST', op: 'vv', body, options: o }),
 };

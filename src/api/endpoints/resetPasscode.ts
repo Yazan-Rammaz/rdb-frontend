@@ -38,7 +38,7 @@ export const resetPasscode = {
      * JSON content-type cannot trip NestJS's body parser.
      */
     init: (set: ResetSet, o?: RequestOptions): Promise<ApiResult<ResetInitResponse>> =>
-        request({ path: '/auth/reset-passcode/init', method: 'POST', op: OPS[set].init, body: {}, options: o }),
+        request({ method: 'POST', op: OPS[set].init, body: {}, options: o }),
 
     /**
      * Exists on the step set too, but is unnecessary there — the login OTP has
@@ -49,28 +49,28 @@ export const resetPasscode = {
         body: { phoneNumber: string; channel?: string },
         o?: RequestOptions,
     ): Promise<ApiResult<ResetSendOtpResponse>> =>
-        request({ path: '/auth/reset-passcode/send-otp', method: 'POST', op: OPS[set].sendOtp, body, options: o }),
+        request({ method: 'POST', op: OPS[set].sendOtp, body, options: o }),
 
     verifyOtp: (
         set: ResetSet,
         body: { phoneNumber: string; otpCode: string },
         o?: RequestOptions,
     ): Promise<ApiResult<ResetVerifyOtpResponse>> =>
-        request({ path: '/auth/reset-passcode/verify-otp', method: 'POST', op: OPS[set].verifyOtp, body, options: o }),
+        request({ method: 'POST', op: OPS[set].verifyOtp, body, options: o }),
 
     /** GET server-side — the opcode carries no body. */
     questions: (
         set: ResetSet,
         o?: RequestOptions,
     ): Promise<ApiResult<Partial<ResetQuestionsResponse>>> =>
-        request({ path: '/auth/reset-passcode/questions', op: OPS[set].questions, options: o }),
+        request({ op: OPS[set].questions, options: o }),
 
     answers: (
         set: ResetSet,
         body: { answers: ResetAnswer[] },
         o?: RequestOptions,
     ): Promise<ApiResult<ResetAnswersResponse>> =>
-        request({ path: '/auth/reset-passcode/answers', method: 'POST', op: OPS[set].answers, body, options: o }),
+        request({ method: 'POST', op: OPS[set].answers, body, options: o }),
 
     /**
      * Quiz branch sends `resetToken` in the body. The face branch sends neither:
@@ -83,5 +83,5 @@ export const resetPasscode = {
         body: { passcode: string; resetToken?: string },
         o?: RequestOptions,
     ): Promise<ApiResult<ResetCompleteResponse>> =>
-        request({ path: '/auth/reset-passcode/complete', method: 'POST', op: OPS[set].complete, body, options: o }),
+        request({ method: 'POST', op: OPS[set].complete, body, options: o }),
 };
