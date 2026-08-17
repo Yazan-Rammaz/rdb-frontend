@@ -29,7 +29,7 @@ export const WORKER_BASE =
     (isProduction ? 'https://ramaaz-kyc.yazan-adnof.workers.dev' : 'http://localhost:8787');
 
 /**
- * Underscore-aware fetch. `trydos_wallet_develop.ramaaz.dev` contains underscores,
+ * Underscore-aware fetch. `rdb_develop.ramaaz.dev` contains underscores,
  * which are invalid in DNS hostnames; workerd needs the Host header set explicitly
  * for these. Mirrors the Worker's backendFetch so behaviour is identical.
  */

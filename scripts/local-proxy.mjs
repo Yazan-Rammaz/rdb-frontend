@@ -11,7 +11,7 @@ import http from 'http';
 import https from 'https';
 
 const PROXY_PORT = 8789;
-const NEST_TARGET = 'https://trydos_wallet_develop.ramaaz.dev';
+const NEST_TARGET = 'https://rdb_develop.ramaaz.dev';
 const target = new URL(NEST_TARGET);
 
 const server = http.createServer((req, res) => {

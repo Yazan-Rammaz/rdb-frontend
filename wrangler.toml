@@ -19,7 +19,7 @@ enabled = true
 
 [vars]
 ENVIRONMENT = "development"
-NEXT_PUBLIC_RDB_BASE_URL = "https://trydos_wallet_develop.ramaaz.dev"
+NEXT_PUBLIC_RDB_BASE_URL = "https://rdb_develop.ramaaz.dev"
 # The KYC API now lives in its own repo (github.com/Yazan-Rammaz/ramaaz-kyc) and
 # deploys as the `ramaaz-kyc` Worker. `rdb-kyc-worker` was the old deployment
 # built from this repo's packages/kyc-server, which no longer exists here.

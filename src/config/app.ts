@@ -12,8 +12,8 @@ export const appConfig = {
     idleTimeoutMs: 180_000,
 
     /** Backend base URL */
-    baseUrl: 'https://trydos_wallet_develop.ramaaz.dev',
-    wsBaseUrl: 'https://trydos_wallet_develop.ramaaz.dev',
+    baseUrl: 'https://rdb_develop.ramaaz.dev',
+    wsBaseUrl: 'https://rdb_develop.ramaaz.dev',
 
     /** Default locale */
     locale: 'en-gb',
