@@ -68,7 +68,7 @@ export const transfers = {
         accountNumber: string,
         o?: RequestOptions,
     ): Promise<ApiResult<LookupAccountResponse>> =>
-        request({ op: 'tl', body: { accountNumber }, options: o }),
+        request({ op: 'tl', params: { accountNumber }, options: o }),
 
     /** → POST /transfers/verify (op 'tv') */
     verify: (

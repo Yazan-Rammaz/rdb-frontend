@@ -95,7 +95,7 @@ export const session = {
 
     /** Polled while a login waits for approval from the phone app. */
     stepApproval: (id: string, o?: RequestOptions): Promise<ApiResult<StepApprovalResponse>> =>
-        request({ op: 'sa', body: { id }, options: o }),
+        request({ op: 'sa', params: { id }, options: o }),
 
     // ─── Passkey / WebAuthn ──────────────────────────────────────────────────
 

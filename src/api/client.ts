@@ -46,9 +46,25 @@ interface PathSpec extends CommonSpec {
     query?: Record<string, string | number | boolean | undefined | null>;
 }
 
+/**
+ * Opcode-routed call.
+ *
+ * On the wire everything is one payload — the `d` in `{o, d}` — but which part
+ * of the request it becomes is decided server-side by the opcode's entry in
+ * `lib/opcodeMap.ts`: a JSON body, a query string, or a path segment. Naming all
+ * three `body` made GET calls read as though they were sending one, and made an
+ * opcode call look nothing like the path-routed call beside it.
+ *
+ * So the three are named for what they become. `request()` folds whichever is
+ * set into `d`; they are alternatives, not combinable.
+ */
 interface OpSpec extends CommonSpec {
     /** Opcode — routes through the opaque gateway. */
     op: string;
+    /** Becomes a query string, e.g. `?page=0&limit=10`. */
+    query?: Record<string, string | number | boolean | undefined | null>;
+    /** Interpolated into the path, e.g. an account number or an id. */
+    params?: Record<string, string | number>;
     /**
      * Forbidden alongside `op`, and the reason is not style.
      *
@@ -65,7 +81,6 @@ interface OpSpec extends CommonSpec {
      */
     path?: never;
     formData?: never;
-    query?: never;
 }
 
 /** Never throws. Failures come back as `{ ok: false }` so callers must handle them. */
@@ -79,11 +94,15 @@ export async function request<T>(spec: PathSpec | OpSpec): Promise<ApiResult<T>>
     try {
         let res: Response;
         if (op) {
+            // body / query / params are three names for one wire field: the `d`
+            // of `{o, d}`. Which one a call uses says what the opcode's route
+            // does with it — the gateway decides that, not the client.
+            const payload = body ?? query ?? ('params' in spec ? spec.params : undefined);
             // pfetch is the same transport apiFetchOp uses, minus the retry —
             // see RequestOptions.skipRefresh for the one case that needs it.
             res = options?.skipRefresh
-                ? await pfetch(op, body, { headers: options.headers, signal: options.signal })
-                : await apiFetchOp(op, body, {
+                ? await pfetch(op, payload, { headers: options.headers, signal: options.signal })
+                : await apiFetchOp(op, payload, {
                       headers: options?.headers,
                       signal: options?.signal,
                   });
