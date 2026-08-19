@@ -60,6 +60,9 @@ next-env.d.ts
 .github/*
 !.github/copilot-instructions.md
 !.github/copilot-review-instructions.md
+# Workflows must be committed or GitHub never sees them — .github/* above had
+# been hiding the deploy workflow, so no push has ever triggered a build.
+!.github/workflows/
 
 # vercel
 .vercel
