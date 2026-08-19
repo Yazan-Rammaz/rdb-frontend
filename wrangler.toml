@@ -1,7 +1,12 @@
 # Cloudflare WORKER deployment (OpenNext) — replaces the old Pages deployment.
-# Build:  npm run build   (next build + opennextjs-cloudflare build)
-# Deploy: npx wrangler deploy
-name = "rdb"
+#
+# Deployed by Cloudflare Workers Builds, connected to Yazan-Rammaz/rdb-frontend:
+#   main            → npx wrangler deploy          → rdb-ms.yazan-adnof.workers.dev
+#   other branches  → npx wrangler versions upload → <branch>-rdb-ms.…workers.dev
+#
+# `name` must match the connected Worker or every command targets the wrong one —
+# Cloudflare warns about exactly this drift in the Build settings page.
+name = "rdb-ms"
 main = ".open-next/worker.js"
 compatibility_date = "2025-09-01"
 compatibility_flags = ["nodejs_compat"]
