@@ -2,7 +2,7 @@
 
 import React, { useCallback } from 'react';
 import Image from 'next/image';
-import { MAX_ATTEMPTS, useVerification } from '@/context/VerificationContext';
+import { useVerification } from '@/context/VerificationContext';
 import { useRouter } from 'next/navigation';
 import { createKycService } from '@/services/kyc';
 import ExitConfirmDialog from '../ExitConfirmDialog';
@@ -17,8 +17,6 @@ export default function IDSummaryScreen() {
         livenessResult,
         setIdDocument,
         markCompleted,
-        attemptCounts,
-        incrementAttempt,
     } = useVerification();
     const router = useRouter();
     const [showExitDialog, setShowExitDialog] = React.useState(false);
@@ -68,15 +66,13 @@ export default function IDSummaryScreen() {
             setSubmitting(false);
         }
     }
+    // Rejecting the scanned details always returns to the front-ID capture. It
+    // never routes to contact-support on a count: the backend decides when a
+    // person has run out of attempts.
     const handleFailure = useCallback(() => {
-        // const count = incrementAttempt('id-capture-front');
-        // if (count >= MAX_ATTEMPTS) {
-        //     goTo('contact-support', 1);
-        // } else {
         setIdDocument(null);
         goTo('id-capture-front', -1);
-        // }
-    }, [incrementAttempt, goTo]);
+    }, [setIdDocument, goTo]);
     return (
         <div className="flex flex-col h-full bg-white px-xd-20">
             <ExitConfirmDialog

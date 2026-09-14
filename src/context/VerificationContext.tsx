@@ -32,7 +32,9 @@ interface VerificationContextType {
 
 const VerificationContext = createContext<VerificationContextType | undefined>(undefined);
 
-const MAX_ATTEMPTS = 10;
+// No MAX_ATTEMPTS here. `attemptCounts` still counts submits so screens can show
+// progress, but nothing in the client turns a count into a refusal — the NestJS
+// backend owns that decision and is the only party that sees every attempt.
 
 export function VerificationProvider({ children }: { children: React.ReactNode }) {
     const [currentStep, setCurrentStep] = useState<VerificationStep>('intro');
@@ -145,5 +147,3 @@ export function useVerification() {
     }
     return context;
 }
-
-export { MAX_ATTEMPTS };

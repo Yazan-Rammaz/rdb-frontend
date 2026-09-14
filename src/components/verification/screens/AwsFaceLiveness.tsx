@@ -8,9 +8,15 @@
  *      (look_straight, turn_right, turn_left) via kycService.detectFace()
  *   2. Final capture → AWS verifies → flash + sparkle animation → goTo face-match
  *
- * Attempts: each Begin/Restart click counts as one attempt. Failures inside
- * a session return the user to a "Restart" UI (no support page) until they
- * have used all MAX_ATTEMPTS Begin clicks.
+ * Attempts: this screen imposes NO cap of its own. A challenge that is rejected
+ * — or a liveness call that errors — retries indefinitely, showing the real
+ * reason each time, until the user succeeds or closes the screen. How many
+ * attempts a person is allowed is a policy decision owned solely by the NestJS
+ * backend, which sees every submit; a second cap here only ever contradicted it.
+ *
+ * The one terminal failure left is a camera that will not start (permission
+ * denied, no device, in use elsewhere, insecure origin) — retrying that in a
+ * loop cannot fix it, so it ends the session with the reason the browser gave.
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -76,8 +82,27 @@ const CHALLENGE_STEPS: { key: LivenessChallenge; label: string }[] = [
 ];
 
 const HOLD_LOCKED_MS = faceConfig.timing.holdLockedMs;
-const STRICT_RETRY_LIMIT = faceConfig.attempts.finalCaptureRetries;
-const MAX_ATTEMPTS = faceConfig.attempts.maxPerChallenge;
+
+/**
+ * Pacing for retries after a *thrown* liveness call (network down, Worker 5xx).
+ *
+ * Not a cap — the loop never gives up. This only stops a hard-failing API from
+ * being hammered in a tight loop: each consecutive throw waits a little longer,
+ * up to a ceiling, and the delay resets the moment a call succeeds.
+ */
+const ERROR_BACKOFF_STEP_MS = 800;
+const ERROR_BACKOFF_MAX_MS = 5000;
+
+function errorBackoffMs(consecutiveErrors: number): number {
+    return Math.min(consecutiveErrors * ERROR_BACKOFF_STEP_MS, ERROR_BACKOFF_MAX_MS);
+}
+
+/** The message an unknown thrown value should show the user. */
+function describeError(err: unknown, fallback: string): string {
+    if (err instanceof Error && err.message) return err.message;
+    if (typeof err === 'string' && err) return err;
+    return fallback;
+}
 
 type Tone = 'idle' | 'aligned' | 'locked' | 'red';
 type Phase = 'init' | 'ready' | 'detecting' | 'failed' | 'done';
@@ -685,7 +710,7 @@ function SparkleField({
 }
 
 export default function AwsFaceLivenessScreen() {
-    const { goTo, setLivenessResult, incrementAttempt, markCompleted } = useVerification();
+    const { goTo, setLivenessResult, markCompleted } = useVerification();
     const router = useRouter();
     const {
         videoRef,
@@ -714,26 +739,45 @@ export default function AwsFaceLivenessScreen() {
         metrics?: import('@/core/types/verification').LivenessMetrics;
     } | null>(null);
     const kycServiceRef = useRef(createKycService());
-    // In-session retries per challenge step. Resets every Begin click.
-    const stepRetriesRef = useRef<Record<number, number>>({});
-    const MAX_IN_SESSION_RETRIES = 6;
+    /**
+     * Identifies the current Begin run. The challenge loop is unbounded now, so
+     * it needs an explicit stop signal: every recursion captures the run id it
+     * started under and returns as soon as `runIdRef` moves past it. Bumped by
+     * Begin, by endSession, and on unmount — without this, closing the screen
+     * mid-check would leave a loop calling the liveness API forever.
+     */
+    const runIdRef = useRef(0);
+    /** Consecutive thrown liveness calls, for backoff only. Resets on success. */
+    const consecutiveErrorsRef = useRef(0);
+    /**
+     * Latest camera error, readable from inside the async loop. The loop closes
+     * over state from the render it started in, so it cannot see `cameraError`
+     * becoming non-null part-way through a run.
+     */
+    const cameraErrorRef = useRef<string | null>(null);
+
+    // Stop any in-flight loop when the screen goes away.
+    useEffect(() => {
+        return () => {
+            runIdRef.current += 1;
+        };
+    }, []);
+
+    useEffect(() => {
+        cameraErrorRef.current = cameraError;
+    }, [cameraError]);
 
     // Component is ready as soon as it mounts — liveness is driven by DetectFaces.
     useEffect(() => {
         setPhase('ready');
     }, []);
 
-    useEffect(() => {
-        if (phase !== 'detecting') return;
-        startCamera();
-        return () => stopCamera();
-    }, [phase, startCamera, stopCamera]);
-
-    // Stops the current session (Begin run) and returns the user to the "ready"
-    // state so they can tap Begin again. Does NOT increment attempt counts —
-    // attempts are counted per Begin click in handleBegin.
+    // Stops the current session (Begin run) and returns the user to the "Restart"
+    // state. Reserved for failures that retrying cannot fix — the challenge loop
+    // itself never ends a session, it just keeps retrying with the reason shown.
     const endSession = useCallback(
         (msg: string) => {
+            runIdRef.current += 1;
             stopCamera();
             setStageProgress(0);
             setCurrentChallengeIdx(-1);
@@ -744,11 +788,28 @@ export default function AwsFaceLivenessScreen() {
         [stopCamera],
     );
 
-    const runFinalCapture = useCallback(async () => {
+    // Start the camera for this run. The rejection used to be dropped on the
+    // floor, so a denied permission left the screen spinning on a black box and
+    // eventually died with a generic message. Now the browser's reason IS the
+    // failure message.
+    useEffect(() => {
+        if (phase !== 'detecting') return;
+        let superseded = false;
+        void startCamera().then((cameraFailure) => {
+            if (superseded || !cameraFailure) return;
+            endSession(cameraFailure);
+        });
+        return () => {
+            superseded = true;
+            stopCamera();
+        };
+    }, [phase, startCamera, stopCamera, endSession]);
+
+    const runFinalCapture = useCallback(async (runId: number) => {
         setTone('idle');
         setInstruction('Hold Still — AI is verifying...');
 
-        for (let attempt = 0; attempt < STRICT_RETRY_LIMIT; attempt++) {
+        for (let attempt = 0; ; attempt++) {
             await new Promise((r) =>
                 setTimeout(
                     r,
@@ -757,6 +818,7 @@ export default function AwsFaceLivenessScreen() {
                         : faceConfig.timing.captureRetryDelayMs,
                 ),
             );
+            if (runIdRef.current !== runId) return;
 
             const frame = captureFrame();
             if (!frame) continue;
@@ -765,6 +827,8 @@ export default function AwsFaceLivenessScreen() {
                 const result = await kycServiceRef.current.detectFace(frame, 'look_straight', {
                     crop: true,
                 });
+                if (runIdRef.current !== runId) return;
+                consecutiveErrorsRef.current = 0;
                 if (result.isLive) {
                     const rawFace = result.faceImageData || frame;
                     // Mask onto the #E9EEEE background — keeps the centred face,
@@ -807,24 +871,31 @@ export default function AwsFaceLivenessScreen() {
                     return;
                 }
                 setTone('red');
-                setInstruction(
-                    phase === 'failed'
-                        ? 'Try Again'
-                        : reasonToHint(result.reason ?? '', 'look_straight'),
+                setInstruction(reasonToHint(result.reason ?? '', 'look_straight'));
+            } catch (err) {
+                // The liveness call itself failed (network, Worker 5xx, expired
+                // token). This used to be swallowed by a bare `catch {}` and
+                // masked as "Hold Still", so an API outage was indistinguishable
+                // from a slow verification. Show what actually broke.
+                console.error('[AwsFaceLiveness] final capture detectFace failed:', err);
+                if (runIdRef.current !== runId) return;
+                consecutiveErrorsRef.current += 1;
+                setTone('red');
+                setInstruction(describeError(err, 'Face check failed — retrying...'));
+                await new Promise((r) =>
+                    setTimeout(r, errorBackoffMs(consecutiveErrorsRef.current)),
                 );
-            } catch {
-                setInstruction('Hold Still — AI is verifying...');
+                if (runIdRef.current !== runId) return;
             }
         }
-
-        endSession('Face check failed — please try again');
-    }, [captureFrame, setLivenessResult, markCompleted, stopCamera, goTo, endSession]);
+    }, [captureFrame, setLivenessResult, markCompleted, stopCamera, goTo]);
 
     const runChallengeStep = useCallback(
-        async (idx: number) => {
+        async (idx: number, runId: number) => {
+            if (runIdRef.current !== runId) return;
             if (idx >= CHALLENGE_STEPS.length) {
                 setCurrentChallengeIdx(-1);
-                runFinalCapture();
+                runFinalCapture(runId);
                 return;
             }
 
@@ -834,18 +905,20 @@ export default function AwsFaceLivenessScreen() {
             setInstruction(reasonToHint('', step.key));
 
             await new Promise((r) => setTimeout(r, faceConfig.timing.stepDelayMs));
+            if (runIdRef.current !== runId) return;
 
             const frame = captureFrame();
             if (!frame) {
-                // Camera not ready yet — give it a moment and retry the same step.
-                const tries = (stepRetriesRef.current[idx] ?? 0) + 1;
-                stepRetriesRef.current[idx] = tries;
-                if (tries > MAX_IN_SESSION_RETRIES) {
-                    endSession('Camera frame unavailable — please try again');
+                // No frame yet. If the camera reported a hard failure this is
+                // terminal — say so instead of retrying something that cannot
+                // recover. Otherwise it is just warm-up: wait and retry, forever
+                // if need be.
+                if (cameraErrorRef.current) {
+                    endSession(cameraErrorRef.current);
                     return;
                 }
                 await new Promise((r) => setTimeout(r, 600));
-                runChallengeStep(idx);
+                runChallengeStep(idx, runId);
                 return;
             }
 
@@ -853,6 +926,8 @@ export default function AwsFaceLivenessScreen() {
                 const result = await kycServiceRef.current.detectFace(frame, step.key, {
                     crop: false,
                 });
+                if (runIdRef.current !== runId) return;
+                consecutiveErrorsRef.current = 0;
                 if (result.isLive) {
                     // First successful detection — fire the sparkle burst on the user's face.
                     if (!hasDetectedOnceRef.current) {
@@ -871,7 +946,7 @@ export default function AwsFaceLivenessScreen() {
                             await new Promise((r) =>
                                 setTimeout(r, faceConfig.timing.centeringRetryMs),
                             );
-                            runChallengeStep(0);
+                            runChallengeStep(0, runId);
                             return;
                         }
                     }
@@ -894,35 +969,35 @@ export default function AwsFaceLivenessScreen() {
                     setInstruction('Perfect!');
                     setStageProgress(idx + 1);
                     await new Promise((r) => setTimeout(r, faceConfig.timing.postStepMs));
-                    runChallengeStep(idx + 1);
+                    runChallengeStep(idx + 1, runId);
                 } else {
-                    // Soft rejection — show the hint, then retry the SAME step.
-                    // Only end the whole session after MAX_IN_SESSION_RETRIES.
+                    // Soft rejection — show the hint and retry the SAME step, with
+                    // no cap. A person who needs twenty tries to get the lighting
+                    // right is not a failed verification; whether they are allowed
+                    // to keep going is NestJS's call, made at submit time.
                     setTone('red');
                     if (result.reason) setInstruction(reasonToHint(result.reason, step.key));
                     await new Promise((r) => setTimeout(r, faceConfig.timing.rejectionPauseMs));
-                    const tries = (stepRetriesRef.current[idx] ?? 0) + 1;
-                    stepRetriesRef.current[idx] = tries;
-                    if (tries > MAX_IN_SESSION_RETRIES) {
-                        endSession(
-                            result.reason
-                                ? reasonToHint(result.reason, step.key)
-                                : 'Face check failed — please try again',
-                        );
-                        return;
-                    }
-                    runChallengeStep(idx);
+                    runChallengeStep(idx, runId);
                 }
-            } catch {
-                // Network / SDK error — retry the step a few times before giving up.
-                const tries = (stepRetriesRef.current[idx] ?? 0) + 1;
-                stepRetriesRef.current[idx] = tries;
-                if (tries > MAX_IN_SESSION_RETRIES) {
-                    endSession('Face check failed — please try again');
-                    return;
-                }
-                await new Promise((r) => setTimeout(r, 800));
-                runChallengeStep(idx);
+            } catch (err) {
+                // The liveness call threw — network down, Worker 5xx, expired
+                // token. Previously a bare `catch {}`: the reason was discarded
+                // and six of these ended the session with "Face check failed",
+                // which named neither the step nor the cause. Now it is logged,
+                // shown, and retried indefinitely on a backoff.
+                console.error(
+                    `[AwsFaceLiveness] detectFace failed on step "${step.key}":`,
+                    err,
+                );
+                if (runIdRef.current !== runId) return;
+                consecutiveErrorsRef.current += 1;
+                setTone('red');
+                setInstruction(describeError(err, 'Face check failed — retrying...'));
+                await new Promise((r) =>
+                    setTimeout(r, errorBackoffMs(consecutiveErrorsRef.current)),
+                );
+                runChallengeStep(idx, runId);
             }
         },
         [captureFrame, endSession, runFinalCapture],
@@ -932,26 +1007,24 @@ export default function AwsFaceLivenessScreen() {
     useEffect(() => {
         if (phase !== 'detecting' || !isActive || currentChallengeIdx !== -1) return;
         if (lastLivenessRef.current) return;
+        const runId = runIdRef.current;
         const timer = setTimeout(
-            () => runChallengeStep(0),
+            () => runChallengeStep(0, runId),
             faceConfig.timing.challengeStartDelayMs,
         );
         return () => clearTimeout(timer);
     }, [phase, isActive, currentChallengeIdx, runChallengeStep]);
 
     const handleBegin = () => {
-        // Each Begin/Restart click = one attempt. Once the user has used all
-        // attempts, route to contact-support instead of starting another run.
-        // const count = incrementAttempt('face-detection');
-        // if (count > MAX_ATTEMPTS) {
-        //     stopCamera();
-        //     goTo('contact-support', 1);
-        //     return;
-        // }
+        // Begin/Restart is unlimited: the backend decides when someone has had
+        // enough attempts, and it can only do that from the submits it receives.
+        // Invalidate any loop still running from a previous click.
+        runIdRef.current += 1;
         // Reset transient session state for the new run.
         hasDetectedOnceRef.current = false;
         lastLivenessRef.current = null;
-        stepRetriesRef.current = {};
+        consecutiveErrorsRef.current = 0;
+        cameraErrorRef.current = null;
         setStageProgress(0);
         setCurrentChallengeIdx(-1);
         setTone('idle');
