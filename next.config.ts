@@ -76,7 +76,11 @@ const nextConfig: NextConfig = {
             // an embedded data: URI. Without it the fetch is blocked, OpenCV
             // never initialises, and ID capture silently stops finding document
             // corners — the failure surfaces as a frame that scans forever.
-            "connect-src 'self' data: https: wss:",
+            //
+            // The Observe collector origin is already covered by `https:`, but
+            // is named so that tightening this list later cannot silently kill
+            // error reporting — a blocked send produces no logs and no error.
+            "connect-src 'self' data: https: wss: https://ramaaz-observe.yazan-adnof.workers.dev",
             "frame-src 'self' https:",
             "worker-src 'self' blob:",
             "child-src 'self' blob:",
