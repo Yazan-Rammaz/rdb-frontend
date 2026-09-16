@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useCallback, useRef, useMemo } from 'react';
+import { screenMessage } from '@/lib/observe';
 
 export type ToastType = 'success' | 'error' | 'warn' | 'info';
 export type ToastTheme = 'dark' | 'light';
@@ -110,6 +111,13 @@ export const ToastProvider: React.FC<{ children: React.ReactNode; theme?: ToastT
             };
             setToasts((prev) => [...prev, newToast]);
             startTimer(id, duration);
+
+            // Every error toast is, by definition, a sentence a user read. The
+            // collector only sees status codes, so without this a handled 400 —
+            // or a 200 carrying a refusal — records as an uneventful session.
+            // Inline errors that never become a toast still need an explicit
+            // reportUserError() call at the point they are rendered.
+            if (type === 'error' || type === 'warn') screenMessage(message);
         },
         [startTimer],
     );

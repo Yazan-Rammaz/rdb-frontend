@@ -13,6 +13,7 @@ import React from 'react';
 import { PasskeyProvider } from '@/context/PasskeyContext';
 import { Quicksand } from 'next/font/google';
 import ProcessEnvLogger from '@/components/debug/ProcessEnvLogger';
+import { Observe, ObserveCorrelation } from '@/components/observe/Observe';
 
 /**
  * Global viewport configuration
@@ -56,11 +57,16 @@ export default function RootLayout({
     return (
         <html className={`h-full ${quicksand.variable}`} lang="en" style={themeVariables}>
             <body className="h-full antialiased">
+                {/* 0. Observe: installs the error/fetch hooks first, so they are
+                    in place before any provider below can throw or call the API */}
+                <Observe />
                 <ProcessEnvLogger />
                 {/* 1. i18n Provider: Language from localStorage (standalone mode) */}
                 <I18nProvider>
                     {/* 2. Global Auth State */}
                     <AuthProvider>
+                        {/* Labels the Observe session with the user id NestJS also logs */}
+                        <ObserveCorrelation />
                         {/* 2b. Passkey Provider: device recognition + lock state machine */}
                         <PasskeyProvider>
                             <StoreProvider>
