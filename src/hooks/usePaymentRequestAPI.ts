@@ -4,12 +4,15 @@ import { useCallback, useState } from 'react';
 import { useToast } from '@/context/ToastContext';
 import { api } from '@/api';
 import type { ApiResult } from '@/api';
+import { resolvePaymentRequestLookup } from '@/api/helpers/paymentRequests';
 import type {
     CreatePaymentRequestInput,
     FulfillPaymentRequestInput,
     CancelPaymentRequestInput,
+    MerchantPayInput,
+    MerchantPayResponse,
     PaymentRequest,
-    PaymentRequestLookup,
+    ResolvedPaymentRequest,
 } from '@/core/types';
 
 const RETRY_CONFIG = {
@@ -89,14 +92,44 @@ export function usePaymentRequestAPI() {
             input: CreatePaymentRequestInput,
         ): Promise<PaymentRequest | { error: string }> =>
             withRetry(() => api.paymentRequests.create(input), 'Create payment request'),
-        lookupPaymentRequest: (
+        /**
+         * Looks a code up and says which kind of thing it turned out to be —
+         * a person's request or a merchant order. Callers must branch on
+         * `kind` before paying: the two settle through different endpoints.
+         *
+         * A body that resolves to neither is reported as an error rather than
+         * returned half-formed, so no caller can pay against a missing id.
+         */
+        lookupPaymentRequest: async (
             code: string,
-        ): Promise<PaymentRequestLookup | { error: string }> =>
-            withRetry(() => api.paymentRequests.lookup(code), 'Lookup payment request'),
+        ): Promise<ResolvedPaymentRequest | { error: string }> => {
+            const res = await withRetry(
+                () => api.paymentRequests.lookup(code),
+                'Lookup payment request',
+            );
+            if ('error' in res) return res;
+
+            const resolved = resolvePaymentRequestLookup(res);
+            if (!resolved) {
+                const message = 'Could not read this payment request.';
+                toast.error(message);
+                return { error: message };
+            }
+            return resolved;
+        },
         fulfillPaymentRequest: (
             input: FulfillPaymentRequestInput,
         ): Promise<PaymentRequest | { error: string }> =>
             withRetry(() => api.paymentRequests.fulfill(input), 'Fulfill payment'),
+        /**
+         * Pays a merchant order. Retries carry the caller's idempotencyKey
+         * unchanged — that is what makes repeating a 5xx safe rather than a
+         * second charge.
+         */
+        payMerchantPayment: (
+            input: MerchantPayInput,
+        ): Promise<MerchantPayResponse | { error: string }> =>
+            withRetry(() => api.merchant.pay(input), 'Merchant payment'),
         cancelPaymentRequest: (
             input: CancelPaymentRequestInput,
         ): Promise<PaymentRequest | { error: string }> =>

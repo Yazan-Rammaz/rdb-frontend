@@ -10,7 +10,7 @@ import { BalancesMap } from '@/context/StoreContext';
 import { useTranslation } from '@/context/I18nContext';
 import { useTransferPurposes } from '@/hooks/useTransferPurposes';
 import { usePaymentRequestAPI } from '@/hooks/usePaymentRequestAPI';
-import { usePaymentRequestEncryption } from '@/hooks/usePaymentRequestEncryption';
+import { buildPaymentRequestQr } from '@/lib/paymentRequestQr';
 import { RequestView } from './views/RequestView';
 import { type FieldValidationConfig, validateField } from '@/components/ui/field-error';
 import { ReviewView } from './views/ReviewView';
@@ -66,7 +66,6 @@ const CreatePaymentRequest = ({
         lookupPaymentRequest,
         isLoading: isApiLoading,
     } = usePaymentRequestAPI();
-    const { encrypt } = usePaymentRequestEncryption(accountNumber);
 
     const [mode, setMode] = useState<Mode>('address');
     const [qrValue, setQrValue] = useState<string | null>(null);
@@ -190,9 +189,7 @@ const CreatePaymentRequest = ({
                     return false;
                 }
 
-                // Encrypt the requestCode — result is the full PAYREQ: QR string
-                const qrString = await encrypt(result.requestCode);
-                setQrValue(qrString);
+                setQrValue(buildPaymentRequestQr(result.requestCode, aNu));
                 setHideQR(false);
                 setRequestCode(result.requestCode);
                 setRequestExpiresAt(result.isPermanent ? null : (result.expiresAt ?? null));
@@ -211,7 +208,7 @@ const CreatePaymentRequest = ({
             setHideQR(false);
             return true;
         },
-        [formData, mode, accountName, accountNumber, createPaymentRequest, encrypt, toast],
+        [formData, mode, accountName, accountNumber, createPaymentRequest, toast],
     );
 
     const handleRequest = useCallback(

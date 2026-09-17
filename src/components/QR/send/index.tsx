@@ -6,11 +6,19 @@ import QrScannerContent from './Scan';
 import SendChoose from './SendChoose';
 import TransferSend from './transfer';
 import PaymentRequestReview from './payment-request/PaymentRequestReview';
+import MerchantPaymentReview from './merchant/MerchantPaymentReview';
 import type { ParsedQR } from './types';
+import type { MerchantPaymentLookup } from '@/core/types';
 import { useScanner } from '@/context/ScannerContext';
 import { useTranslation } from '@/context/I18nContext';
 
-type Page = 'scan' | 'sendChoose' | 'transferSend' | 'paymentRequest' | 'paymentRequestView';
+type Page =
+    | 'scan'
+    | 'sendChoose'
+    | 'transferSend'
+    | 'paymentRequest'
+    | 'paymentRequestView'
+    | 'merchantPayment';
 
 interface QrScannerProps {
     open: boolean;
@@ -19,6 +27,8 @@ interface QrScannerProps {
     parsedQR?: ParsedQR | null;
     /** For requester mode: open directly to payment request review with this code */
     paymentRequestCode?: string | null;
+    /** Deep link (/home?mrcpay=…): open directly to the merchant order with this code */
+    merchantCode?: string | null;
 }
 
 const PAGES: Page[] = [
@@ -27,6 +37,7 @@ const PAGES: Page[] = [
     'transferSend',
     'paymentRequest',
     'paymentRequestView',
+    'merchantPayment',
 ];
 const SLIDE_TRANSITION = 'transform 0.38s cubic-bezier(0.33, 1, 0.68, 1)';
 
@@ -36,9 +47,14 @@ const QrScanner: React.FC<QrScannerProps> = ({
     onScan,
     parsedQR,
     paymentRequestCode,
+    merchantCode,
 }) => {
     const [page, setPage] = useState<Page>('scan');
     const [qrPrefilledTransfer, setQrPrefilledTransfer] = useState(false);
+    // Set when a PAYREQ code turns out to be a merchant order: the review
+    // screen has already fetched it, so hand the result over rather than
+    // making the merchant screen look the same code up again.
+    const [handedOffMerchant, setHandedOffMerchant] = useState<MerchantPaymentLookup | null>(null);
     const { setScannerNav, isTransferScan } = useScanner();
     const { t } = useTranslation();
 
@@ -53,13 +69,21 @@ const QrScanner: React.FC<QrScannerProps> = ({
     }, [setScannerNav]);
 
     React.useEffect(() => {
-        if (paymentRequestCode) {
+        if (merchantCode) {
+            // Deep link: the customer arrived on /home?mrcpay=… rather than scanning
+            setQrPrefilledTransfer(false);
+            setPage('merchantPayment');
+        } else if (paymentRequestCode) {
             // Requester mode: opened from pending transaction tap
             setQrPrefilledTransfer(false);
             setPage('paymentRequestView');
+        } else if (parsedQR?.merchantCode) {
+            // Scanned a shop's QR
+            setQrPrefilledTransfer(false);
+            setPage('merchantPayment');
         } else if (parsedQR) {
-            // Payment request QR detected by PAYREQ: prefix — contains encryptedRequestCode + requesterAccount
-            const isPaymentRequest = !!parsedQR.encryptedRequestCode && !!parsedQR.requesterAccount;
+            // Payment request QR detected by PAYREQ: prefix — carries requestCode + requesterAccount
+            const isPaymentRequest = !!parsedQR.requestCode && !!parsedQR.requesterAccount;
             if (isPaymentRequest) {
                 setQrPrefilledTransfer(false);
                 setPage('paymentRequest');
@@ -71,7 +95,7 @@ const QrScanner: React.FC<QrScannerProps> = ({
             setQrPrefilledTransfer(false);
             setPage('scan');
         }
-    }, [parsedQR, paymentRequestCode, open]);
+    }, [parsedQR, paymentRequestCode, merchantCode, open]);
 
     const pageIndex = PAGES.indexOf(page);
     const navigate = (to: Page) => setPage(to);
@@ -81,6 +105,7 @@ const QrScanner: React.FC<QrScannerProps> = ({
         setTimeout(() => {
             setPage('scan');
             setQrPrefilledTransfer(false);
+            setHandedOffMerchant(null);
         }, 400);
     };
 
@@ -172,24 +197,40 @@ const QrScanner: React.FC<QrScannerProps> = ({
                         />
                     </div>
 
-                    {/* Page 4 — Payment Request Review (payer mode via QR scan) */}
+                    {/* Page 3 — Payment Request Review (payer mode via QR scan) */}
                     <div className="w-full shrink-0 h-full">
                         {parsedQR && (
                             <PaymentRequestReview
                                 parsedQR={parsedQR}
+                                onMerchant={(merchant) => {
+                                    setHandedOffMerchant(merchant);
+                                    setPage('merchantPayment');
+                                }}
                                 onDone={handleClose}
                                 onBack={() => setPage('scan')}
                             />
                         )}
                     </div>
 
-                    {/* Page 5 — Payment Request View (requester mode via pending transaction) */}
+                    {/* Page 4 — Payment Request View (requester mode via pending transaction) */}
                     <div className="w-full shrink-0 h-full">
                         {paymentRequestCode && (
                             <PaymentRequestReview
                                 requestCode={paymentRequestCode}
                                 onDone={handleClose}
                                 onBack={handleClose}
+                            />
+                        )}
+                    </div>
+
+                    {/* Page 5 — Merchant order (scanned shop QR, or an mrcpay deep link) */}
+                    <div className="w-full shrink-0 h-full">
+                        {(merchantCode || parsedQR?.merchantCode || handedOffMerchant) && (
+                            <MerchantPaymentReview
+                                code={merchantCode || parsedQR?.merchantCode || undefined}
+                                merchant={handedOffMerchant ?? undefined}
+                                onDone={handleClose}
+                                onBack={merchantCode ? handleClose : () => setPage('scan')}
                             />
                         )}
                     </div>

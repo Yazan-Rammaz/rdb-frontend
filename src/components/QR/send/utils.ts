@@ -1,14 +1,15 @@
 import type { ParsedQR, QRValidationResult } from './types';
-
-const PAYREQ_PREFIX = 'PAYREQ:';
+import { PAYREQ_PREFIX } from '@/lib/paymentRequestQr';
+import { extractMerchantCode } from '@/lib/merchantPayment';
 
 /**
  * Parse a scanned QR string into structured data.
  *
- * Supports three formats:
- *  1. Payment request: PAYREQ:{base64}|{accountNumber}
- *  2. Full URL:        https://example.com?ana=xxx&anu=xxx&cu=USD
- *  3. Query-only:      ana=xxx&anu=xxx&cu=USD
+ * Supports four formats:
+ *  1. Merchant order:  mp.{code}, or any URL carrying ?mrcpay={code}
+ *  2. Payment request: PAYREQ:{requestCode}|{accountNumber}
+ *  3. Full URL:        https://example.com?ana=xxx&anu=xxx&cu=USD
+ *  4. Query-only:      ana=xxx&anu=xxx&cu=USD
  */
 function extractParams(raw: string): URLSearchParams | null {
     // Try as a full URL first
@@ -42,9 +43,27 @@ export function validateQR(raw: string): QRValidationResult {
         return { valid: false, error: 'invalid_format' };
     }
 
-    // --- Payment Request QR: PAYREQ:{base64}|{accountNumber} ---
+    // --- Merchant order: mp.{code}, or a URL carrying ?mrcpay={code} ---
+    // Checked before the account-QR branch: a merchant link is a URL with query
+    // params, so the address parser below would otherwise claim it and reject it
+    // for missing ana/anu/cu.
+    const merchantCode = extractMerchantCode(raw);
+    if (merchantCode) {
+        const parsed: ParsedQR = {
+            raw,
+            accountName: '',
+            accountNumber: '',
+            currency: '',
+            merchantCode,
+        };
+        return { valid: true, data: parsed };
+    }
+
+    // --- Payment Request QR: PAYREQ:{requestCode}|{accountNumber} ---
     if (raw.startsWith(PAYREQ_PREFIX)) {
         const payload = raw.slice(PAYREQ_PREFIX.length);
+        // Split on the LAST pipe: the account number is the tail, and this
+        // survives a request code that ever contains one.
         const pipeIdx = payload.lastIndexOf('|');
 
         if (pipeIdx < 0) {
@@ -52,10 +71,10 @@ export function validateQR(raw: string): QRValidationResult {
             return { valid: false, error: 'invalid_format' };
         }
 
-        const encryptedRequestCode = payload.slice(0, pipeIdx);
+        const requestCode = payload.slice(0, pipeIdx);
         const requesterAccount = payload.slice(pipeIdx + 1);
 
-        if (!encryptedRequestCode || !requesterAccount) {
+        if (!requestCode || !requesterAccount) {
             return { valid: false, error: 'invalid_format' };
         }
 
@@ -64,7 +83,7 @@ export function validateQR(raw: string): QRValidationResult {
             accountName: '',
             accountNumber: '',
             currency: '',
-            encryptedRequestCode,
+            requestCode,
             requesterAccount,
         };
         return { valid: true, data: parsed };

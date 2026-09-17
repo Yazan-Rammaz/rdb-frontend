@@ -1,5 +1,6 @@
 'use client';
 import { api } from '@/api';
+import { resolvePaymentRequestLookup } from '@/api/helpers/paymentRequests';
 
 import React, { useEffect, useRef, useState } from 'react';
 import CountdownTimer from '@/components/QR/send/payment-request/CountdownTimer';
@@ -31,8 +32,13 @@ const PendingPaymentTimer: React.FC<PendingPaymentTimerProps> = ({ requestCode, 
             .lookup(requestCode)
             .then((res) => {
                 if (!res.ok) return;
-                setIsPermanent(!!res.data.isPermanent);
-                setExpiresAt(res.data.expiresAt ?? null);
+                // Rows in this list are the user's own requests, so a MERCHANT
+                // result would mean the code belongs to something else entirely
+                // — leave the timer unset rather than reading fields off it.
+                const resolved = resolvePaymentRequestLookup(res.data);
+                if (resolved?.kind !== 'USER') return;
+                setIsPermanent(!!resolved.request.isPermanent);
+                setExpiresAt(resolved.request.expiresAt ?? null);
             })
             // Redundant now — the API layer does not throw — but kept as a guard
             // against anything unexpected inside .then.
@@ -49,7 +55,9 @@ const PendingPaymentTimer: React.FC<PendingPaymentTimerProps> = ({ requestCode, 
                 // the mock getPaymentRequest returns. Off an `any` it was always
                 // undefined, so every expired-timer check marked the row EXPIRED
                 // even when the request had actually been paid.
-                const status = res.data.status === 'FULFILLED' ? 'COMPLETED' : 'EXPIRED';
+                const resolved = resolvePaymentRequestLookup(res.data);
+                if (resolved?.kind !== 'USER') return;
+                const status = resolved.request.status === 'FULFILLED' ? 'COMPLETED' : 'EXPIRED';
                 setTransactions((prev: FinancialLedgerItem[]) =>
                     prev.map((t) =>
                         t.id === ledgerId ? { ...t, status } : t,

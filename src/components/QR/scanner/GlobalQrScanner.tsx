@@ -14,7 +14,7 @@ import { Page } from '@/scaling';
 
 const GlobalQrScanner: React.FC = () => {
     const { t } = useTranslation();
-    const { open, setOpen, setOnQrScanned, callOnQrScanned } = useScanner();
+    const { open, setOpen, merchantCode, setOnQrScanned, callOnQrScanned } = useScanner();
     const { balances, activeAssetSymbol, account } = useStore();
     const { toast } = useToast();
     const [parsedQR, setParsedQR] = useState<ParsedQR | null>(null);
@@ -72,6 +72,18 @@ const GlobalQrScanner: React.FC = () => {
                     activeAssetSymbol={activeAssetSymbol}
                 />
             </BottomSheet>
+        );
+    }
+
+    // Deep link (/home?mrcpay=…): straight to the order, no camera page behind it.
+    if (open === 'merchantPay' && merchantCode) {
+        return (
+            <QrScanner
+                open={true}
+                onClose={handleClose}
+                onScan={handleQrScan}
+                merchantCode={merchantCode}
+            />
         );
     }
 

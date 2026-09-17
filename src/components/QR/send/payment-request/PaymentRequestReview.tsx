@@ -6,7 +6,7 @@ import { useStore } from '@/context/StoreContext';
 import { useToast } from '@/context/ToastContext';
 import { useTranslation } from '@/context/I18nContext';
 import { usePaymentRequestAPI } from '@/hooks/usePaymentRequestAPI';
-import { usePaymentRequestEncryption } from '@/hooks/usePaymentRequestEncryption';
+import { buildPaymentRequestQr } from '@/lib/paymentRequestQr';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import Input from '@/components/ui/Input';
 import DetailRow from '../../shared/DetailRow';
@@ -25,18 +25,28 @@ import DownloadSvg from '@/assets/icons/home/qr/download.svg';
 import ShareSvg from '@/assets/icons/home/qr/share.svg';
 import CancelSvg from '@/assets/icons/home/qr/cancel.svg';
 import type { ParsedQR } from '../types';
-import type { PaymentRequestLookup, PaymentRequestStatus } from '@/core/types';
+import type {
+    MerchantPaymentLookup,
+    PaymentRequestLookup,
+    PaymentRequestStatus,
+} from '@/core/types';
 import SenderCard from '../transfer/SenderCard';
 import TransferSuccess from '../transfer/TransferSuccess';
 
 /**
  * Two entry modes:
- * 1. Payer (QR scan): parsedQR with encryptedRequestCode — decrypt → lookup → show Send + Cancel
+ * 1. Payer (QR scan): parsedQR carrying requestCode — lookup → show Send + Cancel
  * 2. Requester (pending tx): requestCode directly — lookup → show QR/receipt based on status
  */
 interface PaymentRequestReviewProps {
     parsedQR?: ParsedQR;
     requestCode?: string;
+    /**
+     * Called when the looked-up code turns out to be a merchant order rather
+     * than a person's request. The parent switches to the merchant screen and
+     * passes this straight in, so the order is never fetched twice.
+     */
+    onMerchant?: (merchant: MerchantPaymentLookup) => void;
     onDone: () => void;
     onBack: () => void;
 }
@@ -46,6 +56,7 @@ const BLOCKED_STATUSES: PaymentRequestStatus[] = ['EXPIRED', 'FULFILLED', 'CANCE
 const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
     parsedQR,
     requestCode: directRequestCode,
+    onMerchant,
     onDone,
     onBack,
 }) => {
@@ -56,21 +67,18 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
     // Determine mode
     const isRequesterMode = !!directRequestCode;
     const requesterAccount = parsedQR?.requesterAccount || '';
-    const encryptedRequestCode = parsedQR?.encryptedRequestCode || '';
+    const scannedRequestCode = parsedQR?.requestCode || '';
 
-    // In requester mode, use the user's own account number for re-encrypting
-    const cryptoAccount = isRequesterMode ? account?.number || '' : requesterAccount;
+    // In requester mode the QR is rebuilt for display, against the user's own account
+    const qrAccount = isRequesterMode ? account?.number || '' : requesterAccount;
 
     const api = usePaymentRequestAPI();
-    const { encrypt, decrypt } = usePaymentRequestEncryption(cryptoAccount);
 
     // Refs for stable closure
     const apiRef = useRef(api);
     apiRef.current = api;
-    const encryptRef = useRef(encrypt);
-    encryptRef.current = encrypt;
-    const decryptRef = useRef(decrypt);
-    decryptRef.current = decrypt;
+    const onMerchantRef = useRef(onMerchant);
+    onMerchantRef.current = onMerchant;
     const toastRef = useRef(toast);
     toastRef.current = toast;
     const onBackRef = useRef(onBack);
@@ -126,14 +134,8 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
 
             if (directRequestCode) {
                 code = directRequestCode;
-            } else if (encryptedRequestCode && requesterAccount) {
-                try {
-                    code = await decryptRef.current(encryptedRequestCode);
-                } catch {
-                    toastRef.current.error('Could not read QR code. Please try again.');
-                    onBackRef.current();
-                    return;
-                }
+            } else if (scannedRequestCode && requesterAccount) {
+                code = scannedRequestCode;
             } else {
                 setFetchError('Invalid payment request data');
                 setLoading(false);
@@ -149,24 +151,32 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
                 return;
             }
 
-            setData(result);
-            setRequestId(result.id);
+            // A code can turn out to be a merchant order — the QR shape is a
+            // hint, the lookup's `kind` is the answer. Merchant orders are paid
+            // through a different endpoint and read differently, so hand the
+            // already-fetched result to the merchant screen rather than trying
+            // to render it here (and rather than looking it up a second time).
+            if (result.kind === 'MERCHANT') {
+                onMerchantRef.current?.(result.merchant);
+                setLoading(false);
+                return;
+            }
 
-            if (!result.isPermanent) {
-                const expiryTime = new Date(result.expiresAt).getTime();
+            const request = result.request;
+            setData(request);
+            setRequestId(request.id);
+
+            if (!request.isPermanent) {
+                const expiryTime = new Date(request.expiresAt).getTime();
                 if (Date.now() >= expiryTime) {
                     setIsExpired(true);
                 }
             }
 
-            // In requester mode, re-encrypt to show QR (for ACTIVE and also for display in cancelled/expired with opacity)
-            if (directRequestCode && result.requestCode) {
-                try {
-                    const qrString = await encryptRef.current(result.requestCode);
-                    setQrValue(qrString);
-                } catch {
-                    // Non-critical
-                }
+            // In requester mode, rebuild the QR for display (ACTIVE, and also
+            // cancelled/expired where it is shown dimmed)
+            if (directRequestCode && request.requestCode) {
+                setQrValue(buildPaymentRequestQr(request.requestCode, qrAccount));
             }
 
             setLoading(false);
@@ -175,7 +185,7 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
             toastRef.current.error('Failed to load payment request');
             setLoading(false);
         }
-    }, [encryptedRequestCode, requesterAccount, directRequestCode]);
+    }, [scannedRequestCode, requesterAccount, directRequestCode, qrAccount]);
 
     useEffect(() => {
         void fetchData();
@@ -186,20 +196,20 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
             let code: string | null = null;
             if (directRequestCode) {
                 code = directRequestCode;
-            } else if (encryptedRequestCode && requesterAccount) {
-                code = await decryptRef.current(encryptedRequestCode);
+            } else if (scannedRequestCode && requesterAccount) {
+                code = scannedRequestCode;
             }
             if (code) {
                 const result = await apiRef.current.lookupPaymentRequest(code);
-                if (!('error' in result)) {
-                    setData(result);
+                if (!('error' in result) && result.kind === 'USER') {
+                    setData(result.request);
                 }
             }
         } catch {
             // still mark expired locally if API fails
         }
         setIsExpired(true);
-    }, [directRequestCode, encryptedRequestCode, requesterAccount]);
+    }, [directRequestCode, scannedRequestCode, requesterAccount]);
 
     const handleSend = async () => {
         if (!data || !requestId || isSending) return;

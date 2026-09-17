@@ -13,6 +13,8 @@ const tr: TranslationSchema = {
         cancel: 'İptal',
         history: 'Geçmiş',
         retry: 'Yeniden Dene',
+        loading: 'Yükleniyor…',
+        done: 'Tamam',
         accessibility: {
             send: 'Gönder',
             receive: 'Al',
@@ -598,6 +600,15 @@ const tr: TranslationSchema = {
             unsupportedBrowser:
                 'Bu tarayıcıda ses tanıma desteklenmiyor. Lütfen Chrome, Edge veya Safari kullanın.',
         },
+    },
+    merchantPayment: {
+        orderRef: 'Sipariş',
+        receiptNumber: 'Makbuz',
+        paidAt: 'Ödendi',
+        feeLabel: 'Ücret',
+        backToStore: 'Mağazaya dön',
+        expired: 'Bu siparişin süresi doldu.',
+        notPayable: 'Bu sipariş artık ödenemez.',
     },
 };
 

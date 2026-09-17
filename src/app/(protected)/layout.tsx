@@ -7,6 +7,7 @@ import { AuthProtected, useAuth } from '../../context/AuthContext';
 import Footer from '../../components/layout/Footer';
 import Header from '../../components/layout/Header';
 import GlobalQrScanner from '../../components/QR/scanner/GlobalQrScanner';
+import MerchantPayDeepLink from '../../components/QR/merchant/MerchantPayDeepLink';
 import PasskeyGate from '../../components/layout/PasskeyGate';
 import { SessionTakeoverProvider } from '../../context/SessionTakeoverContext';
 import { WSProvider } from '../../context/WSContext';
@@ -55,6 +56,13 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
     return (
         <AuthProtected>
             <PreloadStore />
+            {/*
+              Outside PasskeyGate on purpose. It must run while the app is still
+              locked so an `mrcpay` link is rescued out of the URL before any
+              redirect drops it — but it opens nothing until the passcode is
+              cleared and /home is showing. Both halves are enforced inside.
+            */}
+            <MerchantPayDeepLink />
             <ResetPasscodeProvider>
             <SessionTakeoverProvider>
             <PasskeyGate>

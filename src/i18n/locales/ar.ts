@@ -13,6 +13,8 @@ const ar: TranslationSchema = {
         cancel: 'إلغاء',
         history: 'السجل',
         retry: 'إعادة محاولة',
+        loading: 'جارٍ التحميل…',
+        done: 'تم',
         accessibility: {
             send: 'إرسال',
             receive: 'استلام',
@@ -597,6 +599,15 @@ const ar: TranslationSchema = {
             unsupportedBrowser:
                 'التعرف الصوتي غير مدعوم في هذا المتصفح. الرجاء استخدام Chrome أو Edge أو Safari.',
         },
+    },
+    merchantPayment: {
+        orderRef: 'الطلب',
+        receiptNumber: 'الإيصال',
+        paidAt: 'تم الدفع',
+        feeLabel: 'الرسوم',
+        backToStore: 'العودة إلى المتجر',
+        expired: 'انتهت صلاحية هذا الطلب.',
+        notPayable: 'لم يعد بالإمكان دفع هذا الطلب.',
     },
 } as const;
 

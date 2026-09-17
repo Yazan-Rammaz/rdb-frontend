@@ -19,6 +19,7 @@ import {
     getCachedAuthFlowState,
 } from '@/lib/authFlowCookie';
 import { useRouter } from 'next/navigation';
+import { extractMerchantCode, stashMerchantCode } from '@/lib/merchantPayment';
 import { useAuth, type LoginApiResponse } from '@/context/AuthContext';
 import { usePasskey } from '@/context/PasskeyContext';
 import { api } from '@/api';
@@ -133,6 +134,21 @@ function AuthPageInner() {
     // post-refresh redirect already uses.
     const [navigateHome, setNavigateHome] = useState(false);
     const navigatedHomeRef = useRef(false);
+
+    /**
+     * Rescue a merchant payment link that got bounced here.
+     *
+     * Someone following `/home?mrcpay={code}` while signed out is redirected by
+     * the middleware, which clones the URL and so brings the query along to
+     * /auth. Every route out of this page then goes to a bare '/home', which
+     * would drop it — and the person came to pay a specific order, not to look
+     * at a home screen. Stash it now; MerchantPayDeepLink replays it once
+     * /home renders, after the passcode gate.
+     */
+    useEffect(() => {
+        const code = extractMerchantCode(window.location.search);
+        if (code) stashMerchantCode(code);
+    }, []);
 
     // Restore phone as display hint when enter-passcode is reached with no userData.
     // phone is recovered from the auth flow cookie, partialUserPhone is React state (lost on refresh).

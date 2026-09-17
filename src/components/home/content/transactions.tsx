@@ -8,6 +8,7 @@ import type { FinancialLedgerItem } from '@/core/types';
 import CashDepositIcon from '../../../assets/icons/home/cashdeposit.svg';
 import CashWithdrawIcon from '../../../assets/icons/home/cashwithdraw.svg';
 import RefundOrderIcon from '../../../assets/icons/home/refundorder.svg';
+import MerchantPaymentIcon from '../../../assets/icons/home/orderinvoice.svg';
 import ArrowDownIcon from '../../../assets/icons/home/arrowdown.svg';
 import ArrowUpIcon from '../../../assets/icons/home/arrwoup.svg';
 // Transfer icons
@@ -16,6 +17,27 @@ import TransferReceiveIcon from '../../../assets/icons/home/transfer/recieve.svg
 import { useStore } from '@/context/StoreContext';
 import Skeleton from 'react-loading-skeleton';
 import { useTranslation } from '@/context/I18nContext';
+
+/**
+ * Drops record ids out of a description written for support.
+ *
+ * Only 16+ character hex runs — long enough to be a generated id (a Mongo
+ * ObjectId is 24) and past anything a person would write. Account numbers
+ * (`0000-0232`), amounts and ordinary words are all far too short to match, so
+ * this cannot quietly eat something the customer needed to read.
+ *
+ * Trailing punctuation left stranded by the removal goes with it, so
+ * "Refund for transfer 6aaa82ba…." does not become "Refund for transfer ..".
+ */
+function stripRecordIds(text: string): string {
+    return text
+        .replace(/\b[0-9a-f]{16,}\b/gi, '')
+        .replace(/\(\s*\)/g, '')
+        .replace(/\s{2,}/g, ' ')
+        .replace(/\s+([.,;:])/g, '$1')
+        .replace(/[\s.,;:-]+$/, '')
+        .trim();
+}
 
 interface FormattedTransaction {
     id: string;
@@ -139,6 +161,52 @@ const TransactionsHome = ({
         return ledger.ledgerType === 'PAYMENT_REQUEST' || !!ledger.metadata?.requestCode;
     };
 
+    /**
+     * Check if ledger entry is a payment to a merchant.
+     *
+     * `MERCHANT_PAYMENT` is the ledgerType the backend sends; the title is
+     * matched too, the same way isTransferLedger does, so a row still reads
+     * correctly if the type is ever renamed or arrives unset.
+     */
+    const isMerchantPaymentLedger = (ledger: FinancialLedgerItem): boolean => {
+        const titleStr = typeof ledger.title === 'string' ? ledger.title : '';
+        return (
+            ledger.ledgerType?.toUpperCase().includes('MERCHANT') ||
+            titleStr.toLowerCase().includes('merchant')
+        );
+    };
+
+    /**
+     * The line under the title.
+     *
+     * The backend writes these for support to read, so they lead with record
+     * ids: a merchant payment has `description: null` and a note reading
+     * "Merchant payment request 6aaa7eec… (2459e20d-…)", a refund reads
+     * "Refund for transfer 6aaa82ba…. Reason: Trydos: order cancelled". None of
+     * those ids mean anything to the person holding the phone, and each is long
+     * enough on its own to overrun the row.
+     *
+     * So each type gives up its id for the part that answers "what was this?":
+     * who was paid, or why the money came back.
+     */
+    const getTransactionDescription = (ledger: FinancialLedgerItem): string => {
+        if (isMerchantPaymentLedger(ledger)) {
+            const counterparty =
+                ledger.direction === 'OUT' ? ledger.receiverAccount : ledger.senderAccount;
+            if (counterparty?.name) return counterparty.name;
+        }
+
+        const raw = ledger.description || ledger.note || '';
+
+        // "…. Reason: Trydos: order cancelled" → "Trydos: order cancelled".
+        // Non-greedy up to the FIRST "Reason:" only, so a reason that itself
+        // contains the word survives intact.
+        const reason = raw.match(/reason:\s*(.+)$/i);
+        if (reason?.[1]) return reason[1].trim();
+
+        return stripRecordIds(raw);
+    };
+
     // Check if ledger entry is a transfer
     const isTransferLedger = (ledger: FinancialLedgerItem): boolean => {
         const titleStr = typeof ledger.title === 'string' ? ledger.title : '';
@@ -183,6 +251,13 @@ const TransactionsHome = ({
     };
 
     const getTransactionIcon = (ledger: FinancialLedgerItem) => {
+        // Checked before the transfer case: a merchant payment moves money
+        // between accounts like any transfer, and would otherwise be drawn with
+        // the generic transfer arrow.
+        if (isMerchantPaymentLedger(ledger)) {
+            return MerchantPaymentIcon;
+        }
+
         if (isTransferLedger(ledger)) {
             return ledger.direction === 'OUT' ? TransferSendIcon : TransferReceiveIcon;
         }
@@ -263,7 +338,7 @@ const TransactionsHome = ({
                         ledgerId={ledger.id}
                     />
                 ) : (
-                    ledger.description || ledger.note || ''
+                    getTransactionDescription(ledger)
                 ),
                 status: formatStatus(ledger.status),
                 amount: ledger.amount.toString(),

@@ -11,6 +11,8 @@ const en = {
         cancel: 'Cancel',
         history: 'History',
         retry: 'Retry',
+        loading: 'Loading…',
+        done: 'Done',
         accessibility: {
             send: 'Send',
             receive: 'Receive',
@@ -602,6 +604,15 @@ const en = {
             unsupportedBrowser:
                 'Voice recognition is not supported in this browser. Please use Chrome, Edge, or Safari.',
         },
+    },
+    merchantPayment: {
+        orderRef: 'Order',
+        receiptNumber: 'Receipt',
+        paidAt: 'Paid',
+        feeLabel: 'Fee',
+        backToStore: 'Back to store',
+        expired: 'This order has expired.',
+        notPayable: 'This order can no longer be paid.',
     },
 };
 

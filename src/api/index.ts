@@ -2,6 +2,7 @@ import { auth } from './endpoints/auth';
 import { banking } from './endpoints/banking';
 import { kyc } from './endpoints/kyc';
 import { loginHistory } from './endpoints/loginHistory';
+import { merchant } from './endpoints/merchant';
 import { paymentRequests } from './endpoints/paymentRequests';
 import { profile } from './endpoints/profile';
 import { resetPasscode } from './endpoints/resetPasscode';
@@ -27,6 +28,7 @@ export const api = {
     banking,
     kyc,
     loginHistory,
+    merchant,
     paymentRequests,
     profile,
     resetPasscode,
