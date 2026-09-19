@@ -6,7 +6,7 @@ import { extractMerchantCode } from '@/lib/merchantPayment';
  * Parse a scanned QR string into structured data.
  *
  * Supports four formats:
- *  1. Merchant order:  mp.{code}, or any URL carrying ?mrcpay={code}
+ *  1. Merchant order:  MERPAY:mp.{code}, mp.{code}, or a URL with ?mrcpay=mp.{code}
  *  2. Payment request: PAYREQ:{requestCode}|{accountNumber}
  *  3. Full URL:        https://example.com?ana=xxx&anu=xxx&cu=USD
  *  4. Query-only:      ana=xxx&anu=xxx&cu=USD
@@ -43,7 +43,7 @@ export function validateQR(raw: string): QRValidationResult {
         return { valid: false, error: 'invalid_format' };
     }
 
-    // --- Merchant order: mp.{code}, or a URL carrying ?mrcpay={code} ---
+    // --- Merchant order: MERPAY:mp.{code}, mp.{code}, or a ?mrcpay= URL ---
     // Checked before the account-QR branch: a merchant link is a URL with query
     // params, so the address parser below would otherwise claim it and reject it
     // for missing ana/anu/cu.

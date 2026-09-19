@@ -1,9 +1,9 @@
 /**
  * Merchant payment codes — recognising them, and not losing one across a login.
  *
- * A customer reaches a merchant order two ways, and both end at the same place:
+ * A customer reaches a merchant order three ways, and all end at the same place:
  *
- *   scanning the shop's QR            →  the code, straight from the camera
+ *   scanning the shop's QR            →  MERPAY:{code}, or the bare code
  *   opening /home?mrcpay={code}       →  the shop linked them in from the web
  *
  * The second is why this file holds more than a regex. That link can land on a
@@ -18,6 +18,20 @@ export const MERCHANT_PAY_PARAM = 'mrcpay';
 
 /** Merchant codes are prefixed, which is what makes a bare scan recognisable. */
 export const MERCHANT_CODE_PREFIX = 'mp.';
+
+/**
+ * QR prefix a shop's own app prints — `MERPAY:mp.{code}` — mirroring `PAYREQ:`
+ * for person-to-person requests. It states which lookup path the code belongs
+ * to before a single request is made.
+ *
+ * Strictly speaking it is redundant: the payload is always an `mp.` code, which
+ * this app already recognises bare. It is honoured because it is what the shop
+ * prints, and a scanner that rejects the shop's own QR is the wrong end of that
+ * argument.
+ *
+ * Read-only: nothing here builds one. The shop's app is the only issuer.
+ */
+export const MERCHANT_QR_PREFIX = 'MERPAY:';
 
 const STORAGE_KEY = 'rdb_pending_mrcpay';
 
@@ -35,6 +49,15 @@ const STASH_TTL_MS = 30 * 60 * 1000;
 export function extractMerchantCode(raw: string): string | null {
     const value = raw.trim();
     if (!value) return null;
+
+    // MERPAY:mp.{code} — the shop app's QR. Unwrapping leaves exactly the code
+    // the deep link carries, so both arrive at lookup identically. Handed on
+    // untouched: a payload missing its `mp.` would be the issuer's to fix, and
+    // guessing the prefix back on here would invent a code nobody minted.
+    if (value.startsWith(MERCHANT_QR_PREFIX)) {
+        const code = value.slice(MERCHANT_QR_PREFIX.length).trim();
+        return code || null;
+    }
 
     // A bare code, scanned directly off the shop's QR.
     if (value.startsWith(MERCHANT_CODE_PREFIX)) return value;
