@@ -6,7 +6,15 @@
 #
 # `name` must match the connected Worker or every command targets the wrong one —
 # Cloudflare warns about exactly this drift in the Build settings page.
-name = "rdb-ms"
+#
+# ─── This branch (`non-ms`) targets its own Worker ───────────────────────────
+# Same app as `development`, pointed at the monolithic NestJS wallet instead of
+# the microservices backend. It deploys as `rdb-non-ms` so that both `rdb-ms`
+# (main) and `rdb` (the older August deployment) are left untouched.
+#
+# Not for merging into main: that would repoint production at this Worker name
+# and this backend.
+name = "rdb-non-ms"
 main = ".open-next/worker.js"
 compatibility_date = "2025-09-01"
 compatibility_flags = ["nodejs_compat"]
@@ -24,7 +32,27 @@ enabled = true
 
 [vars]
 ENVIRONMENT = "development"
-NEXT_PUBLIC_RDB_BASE_URL = "https://rdb-develop.ramaaz.dev"
+
+# ─── Backend origin: the monolithic NestJS wallet ────────────────────────────
+# Set here and nowhere else. `src/config/app.ts` keeps the microservices URL as
+# its literal, deliberately untouched — it is the fallback for anything running
+# without these vars, and `rdb-ms` on main still wants it.
+#
+# All THREE are required to actually move the backend, because three different
+# readers each look up a different name and fall back to that literal:
+#   NEXT_PUBLIC_RDB_BASE_URL  src/config/runtime.ts  → server actions
+#   NEXT_PUBLIC_BASE_URL      src/lib/edgeProxy.ts   → the /api/* edge proxy
+#   NEXT_PUBLIC_WS_URL        WSContext + socket hooks
+# Setting only the first leaves the proxy and every socket on the old backend.
+#
+# No trailing slash: callers build URLs as `${baseUrl}${path}` with a leading
+# slash on the path, so one here yields `//auth/login` and a 404 from Nest.
+#
+# The underscores are fine — `backendFetch` sets an explicit Host header for
+# underscore hostnames, which workerd needs in order to resolve them at all.
+NEXT_PUBLIC_RDB_BASE_URL = "https://trydos_wallet_develop.ramaaz.dev"
+NEXT_PUBLIC_BASE_URL = "https://trydos_wallet_develop.ramaaz.dev"
+NEXT_PUBLIC_WS_URL = "https://trydos_wallet_develop.ramaaz.dev"
 # The KYC API now lives in its own repo (github.com/Yazan-Rammaz/ramaaz-kyc) and
 # deploys as the `ramaaz-kyc` Worker. `rdb-kyc-worker` was the old deployment
 # built from this repo's packages/kyc-server, which no longer exists here.
