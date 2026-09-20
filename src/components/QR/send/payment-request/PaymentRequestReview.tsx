@@ -711,11 +711,15 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
 
                         {data.note && <DetailRow bg="#F7F7F7" label="Note" value={data.note} />}
 
+                        {/* Padded to line up with the filled rows above, which
+                            carry their inline padding inside the pill. */}
                         {!data.isPermanent && data.expiresAt && (
-                            <CountdownTimer
-                                expiryTimestamp={data.expiresAt}
-                                onExpired={handleExpired}
-                            />
+                            <div className="px-xd-15">
+                                <CountdownTimer
+                                    expiryTimestamp={data.expiresAt}
+                                    onExpired={handleExpired}
+                                />
+                            </div>
                         )}
 
                         {sendError && (

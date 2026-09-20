@@ -407,11 +407,16 @@ const MerchantPaymentReview: React.FC<MerchantPaymentReviewProps> = ({
                             value={order.orderRef}
                         />
 
+                        {/* Padded to match the filled rows above — it carries no
+                            pill of its own, so without this its "Valid Until"
+                            hangs 15px left of every other label. */}
                         {order.expiresAt && !isExpired && (
-                            <CountdownTimer
-                                expiryTimestamp={order.expiresAt}
-                                onExpired={() => setIsExpired(true)}
-                            />
+                            <div className="px-xd-15">
+                                <CountdownTimer
+                                    expiryTimestamp={order.expiresAt}
+                                    onExpired={() => setIsExpired(true)}
+                                />
+                            </div>
                         )}
 
                         {!payable && (
@@ -456,7 +461,12 @@ const MerchantPaymentReview: React.FC<MerchantPaymentReviewProps> = ({
 function OrderReference({ label, value, bg }: { label: string; value: string; bg?: string }) {
     if (!value) return null;
     return (
-        <div className="rounded-xd-15 py-xd-8" style={{ backgroundColor: bg || 'transparent' }}>
+        // Padding tracks DetailRow's: filled pill gets inline padding, bare row
+        // stays flush, so the two line up wherever they sit together.
+        <div
+            className={`rounded-xd-15 py-xd-8 ${bg ? 'px-xd-15' : ''}`}
+            style={{ backgroundColor: bg || 'transparent' }}
+        >
             <p className="text-xd-11 text-[#8D8D8D]">{label}</p>
             <p className="text-xd-11 text-[#8D8D8D] mt-xd-4 break-all">{value}</p>
         </div>
