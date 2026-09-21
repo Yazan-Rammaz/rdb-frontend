@@ -112,6 +112,13 @@ const tr: TranslationSchema = {
             didntReceive: 'Kod Almadınız mı?',
             codeExpired: 'Gönderilen Kodun Süresi Doldu',
         },
+        enterName: {
+            errors: {
+                invalidChars: 'Yalnızca harf, boşluk, kısa çizgi ve kesme işareti.',
+                tooShort: 'En az 2 harf girin.',
+                tooLong: '50 karakter veya daha az kullanın.',
+            },
+        },
         selectMethod: {
             chooseMethod: 'Doğrulama Yöntemi Seçin',
             info: 'Doğrulama Kodunu Şu Numaraya Göndereceğiz',
