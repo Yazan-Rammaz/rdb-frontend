@@ -111,6 +111,13 @@ const ar: TranslationSchema = {
             didntReceive: 'ألم تتلقَ رمزاً؟',
             codeExpired: 'الرمز المرسل قد انتهت صلاحيته',
         },
+        enterName: {
+            errors: {
+                invalidChars: 'الأحرف والمسافات والشرطات والفواصل العليا فقط.',
+                tooShort: 'أدخل حرفين على الأقل.',
+                tooLong: 'استخدم 50 حرفًا أو أقل.',
+            },
+        },
         selectMethod: {
             chooseMethod: 'اختر طريقة التحقق',
             info: 'سنرسل رمز التحقق إلى الرقم',

@@ -110,6 +110,13 @@ const en = {
             didntReceive: "Didn't You Receive A Code?",
             codeExpired: 'The Code Sent Has Expired',
         },
+        enterName: {
+            errors: {
+                invalidChars: 'Letters, spaces, hyphens and apostrophes only.',
+                tooShort: 'Enter at least 2 letters.',
+                tooLong: 'Use 50 characters or fewer.',
+            },
+        },
         selectMethod: {
             chooseMethod: 'Choose Verification Method',
             info: 'We Will Send A Verification Code To The Number',

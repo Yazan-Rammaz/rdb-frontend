@@ -7,8 +7,15 @@ import verifiedBigIcon from '@/assets/icons/verification/verified-big.svg';
 import warnSvg from '@/assets/icons/profile/warn.svg';
 import infoSvg from '@/assets/icons/profile/info.svg';
 import { useToast } from '@/context/ToastContext';
+import { useTranslation } from '@/context/I18nContext';
 import { unwrapKycRequest } from '@/api/helpers/kyc';
 import { api } from '@/api';
+import {
+    NAME_MAX_LENGTH,
+    type NameIssue,
+    nameIssue,
+    normalizeName,
+} from '@/lib/nameValidation';
 
 interface ClientNameScreenProps {
     onBack: () => void;
@@ -32,6 +39,13 @@ export default function ClientNameScreen({
     isVerified,
 }: ClientNameScreenProps) {
     const { toast } = useToast();
+    const { t } = useTranslation();
+    const nameErrors: Record<NameIssue, string> = {
+        empty: t.auth.enterName.errors.tooShort,
+        'invalid-chars': t.auth.enterName.errors.invalidChars,
+        'too-short': t.auth.enterName.errors.tooShort,
+        'too-long': t.auth.enterName.errors.tooLong,
+    };
     const [name, setName] = useState(fullName);
     const [saving, setSaving] = useState(false);
     const [docs, setDocs] = useState<KycDoc | null>(null);
@@ -60,9 +74,18 @@ export default function ClientNameScreen({
     ].filter(Boolean) as string[];
 
     const handleSave = async () => {
-        const trimmed = name.trim();
-        if (!trimmed) return;
-        const parts = trimmed.split(/\s+/);
+        // Same field, same endpoint as the sign-up screen — validating only
+        // there would leave the identical hole one screen away. Returns before
+        // `onBack()` below, so the user stays on the field they have to fix;
+        // an empty value used to return silently, with Save doing nothing.
+        const issue = nameIssue(name);
+        if (issue) {
+            toast.error(nameErrors[issue]);
+            return;
+        }
+
+        const trimmed = normalizeName(name);
+        const parts = trimmed.split(' ');
         const firstName = parts[0];
         const lastName = parts.length > 1 ? parts.slice(1).join(' ') : undefined;
 
@@ -114,6 +137,9 @@ export default function ClientNameScreen({
                                 type="text"
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
+                                dir="auto"
+                                autoComplete="name"
+                                maxLength={NAME_MAX_LENGTH}
                                 className="text-xd-14 text-[#1D1D1D] font-medium leading-none bg-transparent outline-none w-full"
                             />
                         )}
