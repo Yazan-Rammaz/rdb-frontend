@@ -171,8 +171,14 @@ const PinInputs: React.FC<PinInputsProps> = ({
                     }
                 }}
             >
+                {/* A passcode is digits, and digits are read left-to-right even
+                    inside RTL copy. Without this the row inherits dir=rtl from
+                    <html> and box 0 paints on the right, so the user reads their
+                    passcode reversed. The attribute stays on the row so the
+                    label below keeps the document direction. */}
                 <div
                     key={shakeNonce}
+                    dir="ltr"
                     className={`flex items-center justify-center gap-xd-5 w-full ${shake ? 'animate-shake-horizontal' : ''}`}
                 >
                     {pin.map((digit, i) => (
@@ -243,6 +249,7 @@ const PinInputs: React.FC<PinInputsProps> = ({
                 <input
                     ref={hiddenInputRef}
                     type="text"
+                    dir="ltr"
                     inputMode="numeric"
                     autoComplete="off"
                     className="sr-only"
