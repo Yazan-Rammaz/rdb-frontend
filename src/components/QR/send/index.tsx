@@ -56,7 +56,7 @@ const QrScanner: React.FC<QrScannerProps> = ({
     // making the merchant screen look the same code up again.
     const [handedOffMerchant, setHandedOffMerchant] = useState<MerchantPaymentLookup | null>(null);
     const { setScannerNav, isTransferScan } = useScanner();
-    const { t } = useTranslation();
+    const { t, rtl } = useTranslation();
 
     // Register page navigation fns so openScannerWithCallback can control this instance
     useEffect(() => {
@@ -164,7 +164,10 @@ const QrScanner: React.FC<QrScannerProps> = ({
                 <div
                     className="flex h-full w-full"
                     style={{
-                        transform: `translateX(${-pageIndex * 100}%)`,
+                        // translateX is physical, the flex row is not: under dir="rtl"
+                        // main-start is the right edge, so page n already sits at
+                        // -n*100% and the transform has to push it back the other way.
+                        transform: `translateX(${(rtl ? 1 : -1) * pageIndex * 100}%)`,
                         transition: SLIDE_TRANSITION,
                     }}
                 >
