@@ -7,6 +7,7 @@ import { useStepUp } from '@/hooks/useStepUp';
 import { usePasskey } from '@/context/PasskeyContext';
 import { useAuth } from '@/context/AuthContext';
 import { clearAuthFlowState } from '@/lib/authFlowCookie';
+import { toE164 } from '@/lib/phoneValidation';
 import { useToast } from '@/context/ToastContext';
 import { useRouter } from 'next/navigation';
 import {
@@ -175,9 +176,10 @@ export default function ResetPasscodeFlow() {
     const handleSubmitPhone = () => goTo('select-method');
 
     const handleSelectMethod = async (m: 'sms' | 'whatsapp') => {
+        if (!toE164(phone)) return;
         setMethod(m);
         setMethodLoading(true);
-        const res = await api.sendOtp(`+${phone}`, m);
+        const res = await api.sendOtp(toE164(phone), m);
         setMethodLoading(false);
         if (!res.ok) {
             toast.error(res.error ?? 'Could not send the code. Please try again.');
@@ -191,13 +193,13 @@ export default function ResetPasscodeFlow() {
     const handleResendOtp = async () => {
         if (!method) return;
         setOtpLoading('resend-pin');
-        await api.sendOtp(`+${phone}`, method);
+        await api.sendOtp(toE164(phone), method);
         setOtpLoading('');
     };
 
     const handleVerifyOtp = async (code: string) => {
         setOtpLoading('verify-pin');
-        const res = await api.verifyOtp(`+${phone}`, code);
+        const res = await api.verifyOtp(toE164(phone), code);
         if (!res.ok) {
             setOtpLoading('');
             setOtpValid('notvalid');

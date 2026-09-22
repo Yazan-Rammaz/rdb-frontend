@@ -31,6 +31,7 @@ import { ResetPasscodeProvider, useResetPasscode } from '@/context/ResetPasscode
 import ResetPasscodeOverlay from '@/components/resetPasscode/ResetPasscodeOverlay';
 import { Page } from '@/scaling';
 import { passcodeEnabled } from '@/api/helpers/session';
+import { normalizePhoneDigits, toE164 } from '@/lib/phoneValidation';
 
 type AuthStep =
     | 'get-started'
@@ -232,7 +233,7 @@ function AuthPageInner() {
             .then((saved) => {
                 if (cancelled) return;
                 if (saved && RESUMABLE_STEPS.includes(saved.step as AuthStep)) {
-                    if (saved.phone) setPhone(saved.phone);
+                    if (saved.phone) setPhone(normalizePhoneDigits(saved.phone));
                     if (saved.authType) setAuthType(saved.authType);
                     if (saved.method) setMethod(saved.method);
                     if (saved.sessionInfo) setSessionInfo(saved.sessionInfo);
@@ -437,12 +438,16 @@ function AuthPageInner() {
     };
 
     const handleSelectMethod = async (selectedMethod: 'sms' | 'whatsapp') => {
+        // Unreachable through the UI — this screen is only arrived at with a
+        // valid number. Guarded so a future caller cannot quietly ask the
+        // backend for an OTP on an empty string.
+        if (!toE164(phone)) return;
         setMethod(selectedMethod);
         setLoading('send-pin');
         // `type` is dropped: the old action accepted it but never put it in the
         // request body, so it never reached the backend.
         const sendOtpRes = await api.auth.sendOtp({
-            phoneNumber: `+${phone}`,
+            phoneNumber: toE164(phone),
             channel: selectedMethod,
         });
         setLoading('');
@@ -467,7 +472,7 @@ function AuthPageInner() {
     const handleVerifyPin = async (pinValue: string) => {
         setLoading('verify-pin');
         const verifyOtpRes = await api.auth.verifyOtp({
-            phoneNumber: `+${phone}`,
+            phoneNumber: toE164(phone),
             otpCode: pinValue,
             sessionInfo,
             type: authType,

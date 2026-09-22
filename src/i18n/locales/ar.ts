@@ -97,6 +97,12 @@ const ar: TranslationSchema = {
             privacyLine1: 'خصوصيتك آمنة تماماً، نحن لا نشارك',
             privacyLine2: 'معلوماتك مع أي شخص',
             phonePlaceholder: 'رقم الهاتف',
+            errors: {
+                // The Latin digits are wrapped in LRM marks; without them the
+                // full stop renders on the wrong side of the RTL run.
+                missingCountryCode: 'ابدأ برمز الدولة، مثل ‎963‎.',
+                unsupportedCountry: 'رمز الدولة هذا غير مدعوم.',
+            },
         },
         enterPin: {
             title: '!إنشاء حساب',
