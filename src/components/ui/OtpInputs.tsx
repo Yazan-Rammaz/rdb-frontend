@@ -142,7 +142,11 @@ const OtpInputs: React.FC<OtpInputsProps> = ({
                     }
                 }}
             >
+                {/* Same as PinInputs: the code is digits, so the row is LTR
+                    content whatever the UI language. Only the box order is at
+                    stake — a lone digit inside a box has nothing to reorder. */}
                 <div
+                    dir="ltr"
                     className={`flex items-center justify-center gap-xd-5 w-full ${shake ? 'animate-shake-horizontal' : ''}`}
                 >
                     {pin.map((digit, i) => (
@@ -183,6 +187,7 @@ const OtpInputs: React.FC<OtpInputsProps> = ({
                 <input
                     ref={hiddenInputRef}
                     type="text"
+                    dir="ltr"
                     inputMode="numeric"
                     autoComplete="off"
                     className="sr-only"
