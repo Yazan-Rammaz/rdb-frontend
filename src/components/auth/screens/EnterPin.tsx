@@ -10,6 +10,7 @@ import simSvg from '@/assets/icons/auth/sim.svg';
 import shieldSvg from '@/assets/icons/auth/shield.svg';
 import InfoSvg from '@/assets/icons/auth/info.svg';
 import closeSvg from '@/assets/icons/auth/close.svg';
+import { toE164 } from '@/lib/phoneValidation';
 
 interface EnterPinScreenProps {
     onSubmit: (pin: string) => void;
@@ -84,9 +85,14 @@ export default function EnterPin({
             setPin('');
             return;
         }
+        // `phone` is optional on this screen — the non-phone OTP flows pass an
+        // `onResend` instead and returned above. Reaching here without one was
+        // previously a request for `+undefined`.
+        const phoneNumber = toE164(phone ?? '');
+        if (!phoneNumber) return;
         setLoading?.('resend-pin');
         const res = await api.auth.resendOtp({
-            phoneNumber: `+${phone}`,
+            phoneNumber,
             channel: method === 'whatsapp' ? 'whatsapp' : 'sms',
         });
         setLoading?.('');

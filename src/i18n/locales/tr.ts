@@ -98,6 +98,10 @@ const tr: TranslationSchema = {
             privacyLine1: 'Gizliliğiniz Tamamen Güvende, Bilgilerinizi',
             privacyLine2: 'Kimseyle Paylaşmıyoruz',
             phonePlaceholder: 'Telefon Numarası',
+            errors: {
+                missingCountryCode: 'Numarayı ülke koduyla girin, örn. 90.',
+                unsupportedCountry: 'Bu ülke kodu desteklenmiyor.',
+            },
         },
         enterPin: {
             title: 'Kayıt Ol !',

@@ -9,66 +9,21 @@ import Image from 'next/image';
 import { NumericKeypad } from './NumericKeypad';
 import { useIsTouchDevice } from '@/hooks/useIsTouchDevice';
 import { appConfig } from '@/config/app';
+import {
+    E164_MAX_DIGITS,
+    findCountry,
+    normalizePhoneDigits,
+    phoneIssue,
+} from '@/lib/phoneValidation';
 
-interface CountryData {
-    code: string;
-    flag: string;
-    name: string;
-    dialCode: string;
-    maxLocal: number; // max local digits (excluding dial code)
-}
+/**
+ * The longest dial code is three digits, so three is the first point at which
+ * "this matches no country" is a final verdict rather than a half-typed one.
+ * Below it the customer is still typing and nothing is said.
+ */
+const MIN_DIGITS_TO_JUDGE = 3;
 
-const COUNTRIES: CountryData[] = [
-    { code: 'SY', flag: '\u{1F1F8}\u{1F1FE}', name: 'Syria', dialCode: '963', maxLocal: 9 },
-    { code: 'TR', flag: '\u{1F1F9}\u{1F1F7}', name: 'Turkey', dialCode: '90', maxLocal: 10 },
-    { code: 'IQ', flag: '\u{1F1EE}\u{1F1F6}', name: 'Iraq', dialCode: '964', maxLocal: 10 },
-    { code: 'JO', flag: '\u{1F1EF}\u{1F1F4}', name: 'Jordan', dialCode: '962', maxLocal: 9 },
-    { code: 'LB', flag: '\u{1F1F1}\u{1F1E7}', name: 'Lebanon', dialCode: '961', maxLocal: 8 },
-    { code: 'SA', flag: '\u{1F1F8}\u{1F1E6}', name: 'Saudi Arabia', dialCode: '966', maxLocal: 9 },
-    { code: 'AE', flag: '\u{1F1E6}\u{1F1EA}', name: 'UAE', dialCode: '971', maxLocal: 9 },
-    { code: 'EG', flag: '\u{1F1EA}\u{1F1EC}', name: 'Egypt', dialCode: '20', maxLocal: 10 },
-    { code: 'US', flag: '\u{1F1FA}\u{1F1F8}', name: 'United States', dialCode: '1', maxLocal: 10 },
-    {
-        code: 'GB',
-        flag: '\u{1F1EC}\u{1F1E7}',
-        name: 'United Kingdom',
-        dialCode: '44',
-        maxLocal: 10,
-    },
-    { code: 'DE', flag: '\u{1F1E9}\u{1F1EA}', name: 'Germany', dialCode: '49', maxLocal: 11 },
-    { code: 'FR', flag: '\u{1F1EB}\u{1F1F7}', name: 'France', dialCode: '33', maxLocal: 9 },
-    { code: 'IT', flag: '\u{1F1EE}\u{1F1F9}', name: 'Italy', dialCode: '39', maxLocal: 10 },
-    { code: 'ES', flag: '\u{1F1EA}\u{1F1F8}', name: 'Spain', dialCode: '34', maxLocal: 9 },
-    { code: 'NL', flag: '\u{1F1F3}\u{1F1F1}', name: 'Netherlands', dialCode: '31', maxLocal: 9 },
-    { code: 'SE', flag: '\u{1F1F8}\u{1F1EA}', name: 'Sweden', dialCode: '46', maxLocal: 9 },
-    { code: 'KW', flag: '\u{1F1F0}\u{1F1FC}', name: 'Kuwait', dialCode: '965', maxLocal: 8 },
-    { code: 'QA', flag: '\u{1F1F6}\u{1F1E6}', name: 'Qatar', dialCode: '974', maxLocal: 8 },
-    { code: 'BH', flag: '\u{1F1E7}\u{1F1ED}', name: 'Bahrain', dialCode: '973', maxLocal: 8 },
-    { code: 'OM', flag: '\u{1F1F4}\u{1F1F2}', name: 'Oman', dialCode: '968', maxLocal: 8 },
-    { code: 'PS', flag: '\u{1F1F5}\u{1F1F8}', name: 'Palestine', dialCode: '970', maxLocal: 9 },
-    { code: 'YE', flag: '\u{1F1FE}\u{1F1EA}', name: 'Yemen', dialCode: '967', maxLocal: 9 },
-    { code: 'LY', flag: '\u{1F1F1}\u{1F1FE}', name: 'Libya', dialCode: '218', maxLocal: 9 },
-    { code: 'SD', flag: '\u{1F1F8}\u{1F1E9}', name: 'Sudan', dialCode: '249', maxLocal: 9 },
-    { code: 'TN', flag: '\u{1F1F9}\u{1F1F3}', name: 'Tunisia', dialCode: '216', maxLocal: 8 },
-    { code: 'DZ', flag: '\u{1F1E9}\u{1F1FF}', name: 'Algeria', dialCode: '213', maxLocal: 9 },
-    { code: 'MA', flag: '\u{1F1F2}\u{1F1E6}', name: 'Morocco', dialCode: '212', maxLocal: 9 },
-    { code: 'IN', flag: '\u{1F1EE}\u{1F1F3}', name: 'India', dialCode: '91', maxLocal: 10 },
-    { code: 'PK', flag: '\u{1F1F5}\u{1F1F0}', name: 'Pakistan', dialCode: '92', maxLocal: 10 },
-    { code: 'BD', flag: '\u{1F1E7}\u{1F1E9}', name: 'Bangladesh', dialCode: '880', maxLocal: 10 },
-    { code: 'CN', flag: '\u{1F1E8}\u{1F1F3}', name: 'China', dialCode: '86', maxLocal: 11 },
-    { code: 'JP', flag: '\u{1F1EF}\u{1F1F5}', name: 'Japan', dialCode: '81', maxLocal: 11 },
-    { code: 'KR', flag: '\u{1F1F0}\u{1F1F7}', name: 'South Korea', dialCode: '82', maxLocal: 11 },
-    { code: 'RU', flag: '\u{1F1F7}\u{1F1FA}', name: 'Russia', dialCode: '7', maxLocal: 10 },
-    { code: 'BR', flag: '\u{1F1E7}\u{1F1F7}', name: 'Brazil', dialCode: '55', maxLocal: 11 },
-    { code: 'MX', flag: '\u{1F1F2}\u{1F1FD}', name: 'Mexico', dialCode: '52', maxLocal: 10 },
-    { code: 'CA', flag: '\u{1F1E8}\u{1F1E6}', name: 'Canada', dialCode: '1', maxLocal: 10 },
-    { code: 'AU', flag: '\u{1F1E6}\u{1F1FA}', name: 'Australia', dialCode: '61', maxLocal: 9 },
-];
-
-const SORTED_COUNTRIES = [...COUNTRIES].sort((a, b) => b.dialCode.length - a.dialCode.length);
-
-const MIN_PHONE_DIGITS = 10;
-const DEFAULT_MAX_TOTAL = 15;
+const ERROR_MESSAGE_ID = 'phone-input-error';
 
 interface PhoneInputProps {
     value: string;
@@ -77,13 +32,6 @@ interface PhoneInputProps {
     isLoading?: boolean;
     placeholder?: string;
 }
-
-export const getCountryByDialCode = (input: string): CountryData | undefined => {
-    const cleanInput = input.replace(/\D/g, '');
-    return COUNTRIES.sort((a, b) => b.dialCode.length - a.dialCode.length).find((country) =>
-        cleanInput.startsWith(country.dialCode),
-    );
-};
 
 export default function PhoneInput({
     value,
@@ -135,54 +83,70 @@ export default function PhoneInput({
         };
     }, [keypadOpen]);
 
-    const digits = value.replace(/[^\d]/g, '');
+    // `000963994277533` and `+963 994 277 533` are the same number, and this is
+    // where they become the same string. Everything below derives from `digits`.
+    const digits = normalizePhoneDigits(value);
 
-    const detectedCountry = useMemo(() => {
-        if (!digits) return null;
-        for (const country of SORTED_COUNTRIES) {
-            if (digits.startsWith(country.dialCode)) return country;
-        }
-        return null;
-    }, [digits]);
+    // The parent owns the value and hands it to the API, so it is not enough
+    // for the canonical form to exist only in here: a number restored from the
+    // auth-flow cookie would display normalised while the state behind it — and
+    // the "code sent to +…" line on the next two screens — stayed raw. One
+    // pass settles it, since normalising a normalised value changes nothing.
+    useEffect(() => {
+        if (digits !== value) onChange(digits);
+    }, [digits, value, onChange]);
+
+    const detectedCountry = useMemo(() => findCountry(digits), [digits]);
 
     const formatNumber = useCallback((d: string): string => {
         if (!d) return '';
-        let matchedDialCode = '';
-        for (const country of SORTED_COUNTRIES) {
-            if (d.startsWith(country.dialCode)) {
-                matchedDialCode = country.dialCode;
-                break;
-            }
-        }
-        if (matchedDialCode) {
-            const rest = d.slice(matchedDialCode.length);
-            const groups = rest.match(/.{1,3}/g) || [];
-            return [matchedDialCode, ...groups].join(' ');
-        }
-        const groups = d.match(/.{1,3}/g) || [];
-        return groups.join(' ');
+        const dialCode = findCountry(d)?.dialCode ?? '';
+        const rest = d.slice(dialCode.length);
+        const groups = rest.match(/.{1,3}/g) || [];
+        return (dialCode ? [dialCode, ...groups] : groups).join(' ');
     }, []);
 
     const displayValue = useMemo(() => formatNumber(digits), [digits, formatNumber]);
 
+    // Only a keypad stop. Nothing truncates on this cap any more — see the
+    // native input's onChange for why that mattered.
     const maxTotalDigits = useMemo(() => {
-        if (!detectedCountry) return DEFAULT_MAX_TOTAL;
+        if (!detectedCountry) return E164_MAX_DIGITS;
         return detectedCountry.dialCode.length + detectedCountry.maxLocal;
     }, [detectedCountry]);
 
-    const isValidPhone = detectedCountry
-        ? digits.length === maxTotalDigits
-        : digits.length >= MIN_PHONE_DIGITS;
+    const issue = useMemo(() => phoneIssue(digits), [digits]);
+    const isValidPhone = issue === null;
+
+    // A first `0` is dropped by normalisation, which on the custom keypad looks
+    // exactly like a dead key — the only feedback a press gets is a 40ms tint.
+    // Someone dialling `00963…` from memory presses it twice. Say why instead.
+    const [showedLeadingZero, setShowedLeadingZero] = useState(false);
+
+    const errorMessage = useMemo(() => {
+        const { missingCountryCode, unsupportedCountry } = t.auth.enterPhone.errors;
+        if (showedLeadingZero) return missingCountryCode;
+        // A number that is merely unfinished is not a mistake; the absent send
+        // arrow already says "not yet". Only an unmatchable prefix is final,
+        // and it is final as soon as it is three digits long.
+        if (digits.length < MIN_DIGITS_TO_JUDGE) return '';
+        if (issue === 'missing-country-code') return missingCountryCode;
+        if (issue === 'unsupported-country') return unsupportedCountry;
+        return '';
+    }, [issue, digits, showedLeadingZero, t]);
 
     const handleKeypadPress = useCallback(
         (digit: string) => {
             if (digits.length >= maxTotalDigits) return;
-            onChange(digits + digit);
+            const next = normalizePhoneDigits(digits + digit);
+            setShowedLeadingZero(next === digits);
+            if (next !== digits) onChange(next);
         },
         [digits, onChange, maxTotalDigits],
     );
 
     const handleKeypadBackspace = useCallback(() => {
+        setShowedLeadingZero(false);
         if (digits.length > 0) {
             onChange(digits.slice(0, -1));
         }
@@ -190,8 +154,10 @@ export default function PhoneInput({
 
     return (
         <div className="flex flex-col w-full items-center">
-            {/* Input display */}
-            <div className="flex w-full items-center justify-center">
+            {/* `relative` so the hint hangs below the field without taking
+                layout: both host screens pin this into a fixed w-xd-390 h-xd-60
+                box, and a flow child would push straight out of it. */}
+            <div className="relative flex w-full items-center justify-center">
                 <div
                     ref={inputRef}
                     onClick={() => {
@@ -284,6 +250,20 @@ export default function PhoneInput({
                         </button>
                     )}
                 </div>
+
+                {/* Always mounted: a live region has to exist before text is
+                    put into it. That is load-bearing rather than tidy here —
+                    on touch there is no focusable input at all, so this is the
+                    only channel an error has. */}
+                <p
+                    id={ERROR_MESSAGE_ID}
+                    role="status"
+                    aria-live="polite"
+                    dir="auto"
+                    className="absolute inset-x-0 top-full ps-xd-16 pt-xd-4 text-xd-12 leading-xd-14 font-medium text-[#B3261E]"
+                >
+                    {errorMessage}
+                </p>
             </div>
 
             {/* Custom keypad (touch devices) or hidden native input (desktop) */}
@@ -309,9 +289,19 @@ export default function PhoneInput({
                     onKeyDown={(e) => {
                         if (e.key === 'Enter' && isValidPhone && onSend) onSend();
                     }}
+                    aria-invalid={errorMessage ? true : undefined}
+                    aria-describedby={errorMessage ? ERROR_MESSAGE_ID : undefined}
                     onChange={(e) => {
-                        const d = e.target.value.replace(/\D/g, '').slice(0, maxTotalDigits);
-                        onChange(d);
+                        // Normalise before anything else, then refuse what is
+                        // too long rather than cutting it down. Truncating a
+                        // paste is how `+9639942775331234` used to turn into a
+                        // valid number belonging to somebody else — the same
+                        // "many inputs, one number" fault this file is fixing,
+                        // with a stranger receiving the OTP.
+                        const next = normalizePhoneDigits(e.target.value);
+                        if (next.length > E164_MAX_DIGITS) return;
+                        setShowedLeadingZero(false);
+                        onChange(next);
                     }}
                 />
             )}

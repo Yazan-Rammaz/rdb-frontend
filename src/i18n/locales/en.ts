@@ -96,6 +96,10 @@ const en = {
             privacyLine1: 'Your Privacy Is Completely Safe',
             privacyLine2: 'Your Information with Anyone',
             phonePlaceholder: 'ُEnter Your Phone Number',
+            errors: {
+                missingCountryCode: 'Start with the country code, like 963.',
+                unsupportedCountry: 'This country code is not supported.',
+            },
         },
         enterPin: {
             title: 'Sign Up !',
