@@ -9,6 +9,7 @@ import { useAuth } from '@/context/AuthContext';
 import { clearAuthFlowState } from '@/lib/authFlowCookie';
 import { toE164 } from '@/lib/phoneValidation';
 import { useToast } from '@/context/ToastContext';
+import { useTranslation } from '@/context/I18nContext';
 import { useRouter } from 'next/navigation';
 import {
     resetPasscodeApi,
@@ -48,6 +49,7 @@ export default function ResetPasscodeFlow() {
     const { confirmUnlock } = usePasskey();
     const { loginStep, setLoginStep } = useAuth();
     const { toast } = useToast();
+    const { t, tr } = useTranslation();
     const router = useRouter();
 
     // Pick the endpoint set by entry point (doc §0.1). The mid-login set carries
@@ -66,7 +68,7 @@ export default function ResetPasscodeFlow() {
     // the start (a fresh OTP mints a new stepToken). Counters are server-side
     // durable, so the user dodges nothing by restarting.
     const handleStepExpired = () => {
-        toast.error('Your login session expired. Please log in again.');
+        toast.error(t.resetPasscode.toasts.loginExpired);
         setLoginStep(null);
         clearAuthFlowState();
         void apiClient.session.saveStepToken({ stepToken: '' });
@@ -132,7 +134,7 @@ export default function ResetPasscodeFlow() {
                         faceTokenRef.current = outcome.stepToken;
                         goTo('set-passcode');
                     } else {
-                        toast.error('Identity verification was not completed.');
+                        toast.error(t.resetPasscode.toasts.verificationIncomplete);
                     }
                     return;
                 }
@@ -142,7 +144,7 @@ export default function ResetPasscodeFlow() {
                 if (ok) {
                     goTo('set-passcode');
                 } else {
-                    toast.error('Identity verification was not completed.');
+                    toast.error(t.resetPasscode.toasts.verificationIncomplete);
                 }
                 return;
             }
@@ -153,7 +155,7 @@ export default function ResetPasscodeFlow() {
                 // face branch above, and step/questions would 409 for them.)
                 const q = await api.getQuestions();
                 if (!q.questions.length) {
-                    toast.error('Could not load the security questions. Please try again.');
+                    toast.error(t.resetPasscode.toasts.questionsFailed);
                     return;
                 }
                 setQuestions(q.questions);
@@ -166,7 +168,7 @@ export default function ResetPasscodeFlow() {
                 handleStepExpired();
                 return;
             }
-            toast.error('Could not start passcode reset. Please try again.');
+            toast.error(t.resetPasscode.toasts.startFailed);
         } finally {
             setInitLoading(false);
         }
@@ -182,12 +184,12 @@ export default function ResetPasscodeFlow() {
         const res = await api.sendOtp(toE164(phone), m);
         setMethodLoading(false);
         if (!res.ok) {
-            toast.error(res.error ?? 'Could not send the code. Please try again.');
+            toast.error(res.error ?? t.resetPasscode.toasts.sendCodeFailed);
             return;
         }
         setOtp('');
         goTo('enter-otp');
-        toast.success(`Code sent via ${m === 'sms' ? 'SMS' : 'WhatsApp'}`);
+        toast.success(tr('resetPasscode.toasts.codeSent', { method: m === 'sms' ? 'SMS' : 'WhatsApp' }));
     };
 
     const handleResendOtp = async () => {
@@ -215,7 +217,7 @@ export default function ResetPasscodeFlow() {
         setOtpLoading('');
         if (!q.questions.length) {
             setOtpValid('');
-            toast.error('Could not load the security questions. Please try again.');
+            toast.error(t.resetPasscode.toasts.questionsFailed);
             return;
         }
         setQuestions(q.questions);
@@ -233,7 +235,7 @@ export default function ResetPasscodeFlow() {
                 handleStepExpired();
                 return;
             }
-            toast.error('Could not submit your answers. Please try again.');
+            toast.error(t.resetPasscode.toasts.submitAnswersFailed);
             return;
         }
         if (res.success) {
@@ -268,7 +270,7 @@ export default function ResetPasscodeFlow() {
         // error. Entering the quiz with no questions would render a blank screen
         // with no way out — restart from the intro instead.
         if (!q.questions.length) {
-            toast.error('Your reset session expired. Please start again.');
+            toast.error(t.resetPasscode.toasts.resetExpired);
             goTo('intro', -1);
             return;
         }
@@ -309,7 +311,7 @@ export default function ResetPasscodeFlow() {
             // user to the login passcode step — entering the NEW passcode there
             // submits to /sessions/step/passcode/verify and finishes the login.
             close();
-            toast.success('Passcode updated — enter your new passcode to continue.');
+            toast.success(t.resetPasscode.toasts.passcodeUpdated);
             return;
         }
         confirmUnlock();
@@ -404,7 +406,7 @@ export default function ResetPasscodeFlow() {
                             onSavePasscode={handleSaveNewPasscode}
                             onDone={handleNewPasscodeDone}
                             onSaveFailed={() =>
-                                toast.error('Could not set your new passcode. Please try again.')
+                                toast.error(t.resetPasscode.toasts.setPasscodeFailed)
                             }
                         />
                     )}

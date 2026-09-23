@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import PinInputs from '@/components/ui/PinInputs';
 import { FlexibleSpace } from '@/scaling';
+import { useTranslation } from '@/context/I18nContext';
 
 interface ResetSetPasscodeProps {
     onSavePasscode: (passcode: string) => Promise<boolean>;
@@ -22,6 +23,7 @@ export default function ResetSetPasscode({
     onDone,
     onSaveFailed,
 }: ResetSetPasscodeProps) {
+    const { t } = useTranslation();
     const [setStep, setSetStep] = useState<SetStep>('set');
     const [passcode, setPasscode] = useState('');
     const [setValue, setSetValue] = useState('');
@@ -81,12 +83,16 @@ export default function ResetSetPasscode({
                 <div className="w-xd-430 h-full items-start flex flex-col">
                     <div className="h-1/2 flex flex-col justify-end px-xd-40">
                         <div>
-                            <h2 className="text-xd-30 font-bold text-[#1D1D1D]">Done !</h2>
+                            <h2 className="text-xd-30 font-bold text-[#1D1D1D]">
+                                {t.resetPasscode.setPasscode.doneTitle}
+                            </h2>
                             <p className="text-xd-16 font-medium text-[#1D1D1D] mt-xd-5">
-                                Your Passcode Has Been Reset
+                                {t.resetPasscode.setPasscode.doneSubtitle}
                             </p>
                         </div>
-                        <p className="text-xd-12 text-[#1D1D1D] mt-xd-4">Enjoy With Our Services</p>
+                        <p className="text-xd-12 text-[#1D1D1D] mt-xd-4">
+                            {t.resetPasscode.setPasscode.doneNote}
+                        </p>
                         <FlexibleSpace size={80} />
                     </div>
                     <div className="h-1/2 flex flex-col items-center px-xd-40">
@@ -113,10 +119,12 @@ export default function ResetSetPasscode({
                         <div className="h-1/2 flex flex-col justify-end px-xd-35">
                             <div>
                                 <h2 className="text-xd-30 font-bold text-[#1D1D1D]">
-                                    {setStep === 'saving' ? 'New Passcode Done' : 'New Passcode'}
+                                    {setStep === 'saving'
+                                        ? t.resetPasscode.setPasscode.titleDone
+                                        : t.resetPasscode.setPasscode.title}
                                 </h2>
                                 <p className="text-xd-16 font-medium text-[#1D1D1D] mt-xd-5">
-                                    Set A New Passcode To Continue
+                                    {t.resetPasscode.setPasscode.subtitle}
                                 </p>
                             </div>
                             <FlexibleSpace size={130} share={0.2} />
@@ -130,7 +138,7 @@ export default function ResetSetPasscode({
                                         onComplete={handleSetComplete}
                                         disabled={false}
                                         isValidPin=""
-                                        label="New Passcode"
+                                        label={t.resetPasscode.setPasscode.setLabel}
                                     />
                                 )}
                                 {(setStep === 'reenter' || setStep === 'saving') && (
@@ -140,7 +148,7 @@ export default function ResetSetPasscode({
                                         onComplete={handleReenterComplete}
                                         disabled={setStep === 'saving' || setIsValid === 'valid'}
                                         isValidPin={setStep === 'saving' ? 'valid' : setIsValid}
-                                        label="Reenter New Passcode"
+                                        label={t.resetPasscode.setPasscode.reenterLabel}
                                     />
                                 )}
                             </div>

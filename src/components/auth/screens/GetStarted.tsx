@@ -27,7 +27,7 @@ export default function GetStartedScreen({
 
     return (
         <main className="w-full  bg-white flex flex-col">
-            <div className="flex absolute justify-end right-xd-30 top-xd-30">
+            <div className="flex absolute justify-end end-xd-30 top-xd-30">
                 {/* Login by scanning QR — links to the qr-login step */}
                 <button
                     onClick={onScanQr}

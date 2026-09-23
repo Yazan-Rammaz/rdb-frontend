@@ -45,11 +45,11 @@ export default function ApprovalWaitingScreen({ expiresAt, onCancel }: ApprovalW
     return (
         <div className="w-full h-full flex flex-col bg-white">
             {/* Close */}
-            <div className="flex absolute justify-end right-xd-30 top-xd-30 z-10">
+            <div className="flex absolute justify-end end-xd-30 top-xd-30 z-10">
                 {onCancel && (
                     <button
                         onClick={onCancel}
-                        aria-label="cancel"
+                        aria-label={t.common.cancel}
                         className="w-xd-24 h-xd-24 flex items-center justify-center"
                     >
                         <Image

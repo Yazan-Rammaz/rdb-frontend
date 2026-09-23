@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import Image from 'next/image';
 import verifiedBigIcon from '@/assets/icons/verification/verified-big.svg';
 import warnSvg from '@/assets/icons/profile/warn.svg';
@@ -39,7 +39,7 @@ export default function ClientNameScreen({
     isVerified,
 }: ClientNameScreenProps) {
     const { toast } = useToast();
-    const { t } = useTranslation();
+    const { t, tr, rtl } = useTranslation();
     const nameErrors: Record<NameIssue, string> = {
         empty: t.auth.enterName.errors.tooShort,
         'invalid-chars': t.auth.enterName.errors.invalidChars,
@@ -96,7 +96,7 @@ export default function ClientNameScreen({
             );
             if (res.ok) {
                 onSaved?.(trimmed);
-                toast.success('Name updated successfully');
+                toast.success(t.profile.clientName.updateSuccess);
             } else {
                 // The server's own message beats a generic string — a 429 or a
                 // validation failure now says what actually went wrong.
@@ -104,7 +104,7 @@ export default function ClientNameScreen({
             }
             onBack();
         } catch {
-            toast.error('Failed to update name');
+            toast.error(t.profile.clientName.updateFailed);
         } finally {
             setSaving(false);
         }
@@ -116,18 +116,27 @@ export default function ClientNameScreen({
             <div className="flex items-center justify-center relative px-xd-28 pt-xd-14 pb-xd-10 border-b border-[#f0f0f0]">
                 <button
                     onClick={onBack}
-                    className="absolute left-xd-20 flex items-center text-[#1D1D1D]"
+                    aria-label={t.common.accessibility.back}
+                    className="absolute start-xd-20 flex items-center text-[#1D1D1D]"
                 >
-                    <ChevronLeft className="w-xd-22 h-xd-22" />
+                    {rtl ? (
+                        <ChevronRight className="w-xd-22 h-xd-22" />
+                    ) : (
+                        <ChevronLeft className="w-xd-22 h-xd-22" />
+                    )}
                 </button>
-                <span className="text-xd-16 font-medium text-[#1D1D1D]">Client Name</span>
+                <span className="text-xd-16 font-medium text-[#1D1D1D]">
+                    {t.profile.clientName.title}
+                </span>
             </div>
 
             <div className="flex-1 overflow-y-auto px-xd-12 pt-xd-16 pb-xd-20 flex flex-col gap-xd-10 items-center">
                 {/* Name field */}
                 <div className="border border-[#C3C3C3]/50 w-xd-406 bg-[#FFFFFF] rounded-xd-15 px-xd-12 pt-xd-7 pb-xd-8 flex items-center justify-between">
                     <div className="flex flex-col gap-xd-6 flex-1">
-                        <span className="text-xd-12 text-[#8D8D8D] leading-none">Client Name</span>
+                        <span className="text-xd-12 text-[#8D8D8D] leading-none">
+                            {t.profile.clientName.label}
+                        </span>
                         {isVerified ? (
                             <span className="text-xd-14 text-[#1D1D1D] font-medium leading-none py-xd-4">
                                 {fullName}
@@ -159,10 +168,10 @@ export default function ClientNameScreen({
                         </div>
                         <div className="flex flex-col gap-xd-4">
                             <span className="font-bold text-xd-12 text-[#8D8D8D] leading-tight">
-                                Client Name Cannot Be Changed
+                                {t.profile.clientName.cannotChangeTitle}
                             </span>
                             <span className="text-xd-11 text-[#8D8D8D] leading-tight">
-                                Because It Is Linked To The Documents You Submitted
+                                {t.profile.clientName.cannotChangeDesc}
                             </span>
                         </div>
                     </div>
@@ -173,12 +182,10 @@ export default function ClientNameScreen({
                         </div>
                         <div className="flex flex-col gap-xd-4">
                             <span className="font-medium text-xd-11 text-[#8D8D8D] leading-tight">
-                                The Name Must Match The Personal Identification
+                                {t.profile.clientName.mustMatchTitle}
                             </span>
                             <span className="text-xd-11 text-[#8D8D8D] leading-tight">
-                                To Guarantee Ownership Of The Funds In The Account. Also, When
-                                Receiving Any Money From The Centers, It Will Not Be Released Except
-                                Upon Presentation Of A Matching Official Document.
+                                {t.profile.clientName.mustMatchDesc}
                             </span>
                         </div>
                     </div>
@@ -201,13 +208,13 @@ export default function ClientNameScreen({
                                             />
                                         </div>
                                         <span className="font-medium text-[#1D1D1D] text-xd-11 leading-none">
-                                            Unprotected Account | Limited Access
+                                            {t.profile.clientName.unprotectedTitle}
                                         </span>
                                     </span>
-                                    <span className="text-[#1D1D1D] pl-xd-20 font-medium text-xd-11 leading-tight truncate">
-                                        Weekly Transaction Volume{' '}
-                                        <span className="font-bold text-[#1D1D1D]">60/15 USD</span>{' '}
-                                        | Renew Fri 10:00
+                                    <span className="text-[#1D1D1D] ps-xd-20 font-medium text-xd-11 leading-tight truncate">
+                                        {tr('profile.clientName.weeklyVolume', {
+                                            amount: '60/15 USD',
+                                        })}
                                     </span>
                                 </div>
                             </div>
@@ -231,11 +238,11 @@ export default function ClientNameScreen({
                                                 />
                                             </div>
                                             <span className="font-medium text-[#1D1D1D] text-xd-11 leading-none">
-                                                Protect Your Account | Full Access
+                                                {t.profile.clientName.protectTitle}
                                             </span>
                                         </div>
-                                        <span className="text-[#1D1D1D] pl-xd-20 text-xd-11 leading-tight">
-                                            Keep Your Account Secure, Ensures Safe Transactions.
+                                        <span className="text-[#1D1D1D] ps-xd-20 text-xd-11 leading-tight">
+                                            {t.profile.clientName.protectDesc}
                                         </span>
                                     </div>
                                 </div>
@@ -257,7 +264,7 @@ export default function ClientNameScreen({
                                         className="object-contain"
                                     />
                                 </div>
-                                Protect &amp; Verify Now
+                                {t.profile.clientName.protectButton}
                             </button>
                         </div>
                     </>
@@ -267,15 +274,17 @@ export default function ClientNameScreen({
                 {isVerified && docImages.length > 0 && (
                     <div className="w-xd-406 flex flex-col gap-xd-10">
                         <span className="text-xd-13 font-medium text-[#1D1D1D]">
-                            Client Uploaded Documents
+                            {t.profile.clientName.uploadedDocuments}
                         </span>
-                        <span className="text-xd-12 text-[#8D8D8D]">Your Files</span>
+                        <span className="text-xd-12 text-[#8D8D8D]">
+                            {t.profile.clientName.yourFiles}
+                        </span>
                         <div className="flex gap-xd-8 flex-wrap">
                             {docImages.map((url, i) => (
                                 <img
                                     key={i}
                                     src={url}
-                                    alt={`Document ${i + 1}`}
+                                    alt={tr('profile.clientName.documentAlt', { number: i + 1 })}
                                     className="h-xd-80 w-xd-120 object-cover rounded-xd-10 border border-[#E5E5E5]"
                                 />
                             ))}
@@ -288,7 +297,7 @@ export default function ClientNameScreen({
             <div className="px-xd-12 pb-xd-24 flex items-center justify-center">
                 {isVerified ? (
                     <button type="button" className="text-xd-13 text-[#3066CC]">
-                        Need Help About My Name
+                        {t.profile.clientName.needHelp}
                     </button>
                 ) : (
                     <button
@@ -297,7 +306,7 @@ export default function ClientNameScreen({
                         disabled={saving}
                         className="w-xd-406 h-xd-44 rounded-xd-15 bg-[#3066CC] text-white font-medium text-xd-13 disabled:opacity-50"
                     >
-                        {saving ? 'Saving...' : 'Save'}
+                        {saving ? t.common.saving : t.common.save}
                     </button>
                 )}
             </div>

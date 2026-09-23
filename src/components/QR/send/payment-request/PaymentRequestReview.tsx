@@ -399,16 +399,16 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
             <div className="w-full h-full flex items-center justify-center">
                 <div className="flex flex-col items-center gap-3 px-6 text-center">
                     <p className="text-[13px] text-[#FF4D4D]">
-                        {fetchError || 'Failed to load request'}
+                        {fetchError || t.home.qr.loadRequestFailed}
                     </p>
                     <button
                         onClick={() => void fetchData()}
                         className="text-[13px] text-[#388CFF] font-medium underline"
                     >
-                        Retry
+                        {t.common.retry}
                     </button>
                     <button onClick={onBack} className="text-[13px] text-[#8D8D8D] mt-1">
-                        Go back
+                        {t.common.accessibility.goBack}
                     </button>
                 </div>
             </div>
@@ -558,7 +558,7 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
                                     hideRequired
                                     reviewMode
                                     disabled
-                                    label="Note"
+                                    label={t.common.note}
                                     value={data.note}
                                     className="text-[11px]!"
                                     containerClassName="bg-transparent "
@@ -635,11 +635,13 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
                     onCancel={() => setShowCancelDialog(false)}
                     onConfirm={(reason) => void handleCancelConfirm(reason)}
                     title={t.home.qr.cancel}
-                    message="Are you sure you want to cancel this payment request?"
+                    message={t.home.qr.cancelConfirm}
                     confirmLabel={t.common.cancel}
-                    cancelLabel="Keep"
+                    cancelLabel={t.common.keep}
                     inputConfig={{
-                        placeholder: 'Reason for cancellation',
+                        placeholder: t.home.qr.cancelReasonPlaceholder,
+                        // Sent to cancelPaymentRequest as the reason field — a
+                        // payload sentinel, not copy. Stays untranslated.
                         defaultValue: 'no reason',
                     }}
                 />
@@ -709,7 +711,7 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
                             />
                         )}
 
-                        {data.note && <DetailRow bg="#F7F7F7" label="Note" value={data.note} />}
+                        {data.note && <DetailRow bg="#F7F7F7" label={t.common.note} value={data.note} />}
 
                         {/* Padded to line up with the filled rows above, which
                             carry their inline padding inside the pill. */}
@@ -734,7 +736,7 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
                                     type="text"
                                     value={cancelReason}
                                     onChange={(e) => setCancelReason(e.target.value)}
-                                    placeholder="Reason for cancellation"
+                                    placeholder={t.home.qr.cancelReasonPlaceholder}
                                     className="w-full text-[13px] text-[#1D1D1D] bg-transparent border-b border-[#E0E0E0] focus:border-[#388CFF] focus:outline-0 pb-1 transition-colors"
                                 />
                                 <div className="flex gap-2">
@@ -743,7 +745,9 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
                                         disabled={!cancelReason.trim() || isCancelling}
                                         className="flex-1 py-2 rounded-lg bg-[#FF4D4D]/10 text-[#FF4D4D] text-[12px] font-medium disabled:opacity-50"
                                     >
-                                        {isCancelling ? 'Cancelling…' : 'Confirm Cancel'}
+                                        {isCancelling
+                                            ? t.home.qr.cancelling
+                                            : t.home.qr.confirmCancel}
                                     </button>
                                     <button
                                         onClick={() => {
@@ -752,7 +756,7 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
                                         }}
                                         className="flex-1 py-2 rounded-lg bg-[#F5F5F5] text-[#8D8D8D] text-[12px] font-medium"
                                     >
-                                        Keep
+                                        {t.common.keep}
                                     </button>
                                 </div>
                             </div>

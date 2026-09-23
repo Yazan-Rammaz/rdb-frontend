@@ -56,9 +56,9 @@ const TransactionDetails: React.FC<TransactionDetailsProps> = ({ ledger, onClose
             case 'PAYMENT_REQUEST':
                 return t.home.qr.paymentRequest;
             case 'DEPOSIT':
-                return 'Deposit';
+                return t.home.transactions.deposit;
             case 'WITHDRAWAL':
-                return 'Withdrawal';
+                return t.home.transactions.withdrawal;
             default:
                 return ledger.title || t.home.transactions.defaultTitle;
         }
@@ -179,7 +179,7 @@ const TransactionDetails: React.FC<TransactionDetailsProps> = ({ ledger, onClose
                                     hideRequired
                                     reviewMode
                                     disabled
-                                    label="Fee"
+                                    label={t.common.fee}
                                     value={`${ledger.feeAmount} ${ledger.assetSymbol}`}
                                     className="text-[11px]!"
                                     containerClassName="w-1/2"
@@ -190,7 +190,7 @@ const TransactionDetails: React.FC<TransactionDetailsProps> = ({ ledger, onClose
                                     hideRequired
                                     reviewMode
                                     disabled
-                                    label="Tax"
+                                    label={t.common.tax}
                                     value={`${ledger.taxAmount} ${ledger.assetSymbol}`}
                                     className="text-[11px]!"
                                     containerClassName="w-1/2"
@@ -205,7 +205,7 @@ const TransactionDetails: React.FC<TransactionDetailsProps> = ({ ledger, onClose
                             hideRequired
                             reviewMode
                             disabled
-                            label="Note"
+                            label={t.common.note}
                             value={ledger.note || ledger.metadata?.note || ''}
                             className="text-[11px]!"
                         />
@@ -217,7 +217,7 @@ const TransactionDetails: React.FC<TransactionDetailsProps> = ({ ledger, onClose
                             hideRequired
                             reviewMode
                             disabled
-                            label="Description"
+                            label={t.common.description}
                             value={ledger.description}
                             className="text-[11px]!"
                         />

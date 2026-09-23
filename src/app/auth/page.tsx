@@ -660,7 +660,7 @@ function AuthPageInner() {
     };
 
     const handleSavePasscodeFailed = () => {
-        toast.error('Failed to save passcode. Please try again.');
+        toast.error(t.auth.setPasscode.saveFailed);
     };
 
     // After set-passcode completes → save auth and go home
@@ -713,7 +713,7 @@ function AuthPageInner() {
             // 401 = step token missing/expired (not a wrong passcode) → restart login.
             if (!res.ok && res.error.status === 401) {
                 setLoginStep(null);
-                toast.error('Session expired. Please log in again.');
+                toast.error(t.common.sessionExpired);
                 return false;
             }
 

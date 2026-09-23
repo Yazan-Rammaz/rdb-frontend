@@ -44,7 +44,7 @@ const ProfileContent = () => {
     const { account } = useStore();
     const { toast } = useToast();
     const router = useRouter();
-    const { t, language, setLanguage } = useTranslation();
+    const { t, tr, language, setLanguage } = useTranslation();
     const [showLogoutDialog, setShowLogoutDialog] = useState(false);
     const [imgError, setImgError] = useState(false);
     const [kycStatus, setKycStatus] = useState<KycStatusResponse | null | undefined>(undefined);
@@ -88,7 +88,7 @@ const ProfileContent = () => {
             // and leave the existing photo in place.
             const delRes = await api.profile.update({ profilePictureURL: '' });
             if (delRes.ok) {
-                toast.success('Photo removed successfully');
+                toast.success(t.profile.photo.removed);
             } else {
                 toast.error(delRes.error.message);
             }
@@ -120,7 +120,7 @@ const ProfileContent = () => {
 
         setLocalPhotoUrl(imageUrl);
         setImgError(false);
-        toast.success('Photo updated successfully');
+        toast.success(t.profile.photo.updated);
     };
 
     if (isLoading) {
@@ -382,7 +382,7 @@ const ProfileContent = () => {
                                     className="object-contain size-xd-13"
                                 />
                                 <span className="text-[#FCFCFC] text-xd-10 leading-none">
-                                    Add Photo
+                                    {t.profile.addPhoto}
                                 </span>
                             </div>
                         )}
@@ -409,15 +409,13 @@ const ProfileContent = () => {
                                                 />
                                             </div>
                                             <span className="font-medium text-[#1D1D1D] text-xd-11 leading-none">
-                                                Unprotected Account | Limited Access
+                                                {t.profile.clientName.unprotectedTitle}
                                             </span>
                                         </span>
                                         <span className="text-[#1D1D1D] pl-xd-20 font-medium text-xd-11 leading-tight truncate">
-                                            Weekly Transaction Volume{' '}
-                                            <span className="font-bold text-[#1D1D1D]">
-                                                60/15 USD
-                                            </span>{' '}
-                                            | Renew Fri 10:00
+                                            {tr('profile.clientName.weeklyVolume', {
+                                                amount: '60/15 USD',
+                                            })}
                                         </span>
                                     </div>
                                 </div>
@@ -441,11 +439,11 @@ const ProfileContent = () => {
                                                     />
                                                 </div>
                                                 <span className="font-medium text-[#1D1D1D] text-xd-11 leading-none">
-                                                    Protect Your Account | Full Access
+                                                    {t.profile.clientName.protectTitle}
                                                 </span>
                                             </div>
                                             <span className="text-[#1D1D1D] pl-xd-20 text-xd-11 leading-tight">
-                                                Keep Your Account Secure, Ensures Safe Transactions.
+                                                {t.profile.clientName.protectDesc}
                                             </span>
                                         </div>
                                     </div>
@@ -472,7 +470,7 @@ const ProfileContent = () => {
                                             className="object-contain"
                                         />
                                     </div>
-                                    Protect &amp; Verify Now
+                                    {t.profile.clientName.protectButton}
                                 </button>
                             </div>
                         </>
@@ -497,10 +495,10 @@ const ProfileContent = () => {
                             <span className="text-[#F59E0B] text-xd-18">⏳</span>
                             <div className="flex flex-col gap-xd-2">
                                 <span className="font-bold text-[#92400E] text-xd-12">
-                                    Under Review
+                                    {t.profile.kycPending}
                                 </span>
                                 <span className="text-[#888] text-xd-10">
-                                    Your verification is being reviewed
+                                    {t.profile.kycPendingDesc}
                                 </span>
                             </div>
                         </div>
@@ -512,7 +510,7 @@ const ProfileContent = () => {
                                 <span className="text-[#EF4444] text-xd-18">✕</span>
                                 <div className="flex flex-col gap-xd-2">
                                     <span className="font-bold text-[#991B1B] text-xd-12">
-                                        Verification Rejected
+                                        {t.profile.kycRejected}
                                     </span>
                                     {kycStatus?.rejectionReason && (
                                         <span className="text-[#888] text-xd-10">
@@ -526,7 +524,7 @@ const ProfileContent = () => {
                                 onClick={() => router.push('/verification')}
                                 className="text-xd-11 font-semibold text-[#EF4444]"
                             >
-                                Try Again
+                                {t.common.tryAgain}
                             </button>
                         </div>
                     )}
@@ -600,11 +598,11 @@ const ProfileContent = () => {
                                     className="object-contain"
                                 />
                                 <span className="text-[#1D1D1D] text-xd-13 font-medium">
-                                    Login History
+                                    {t.profile.loginHistory.title}
                                 </span>
                             </div>
                             <span className="text-[#888] text-xd-11 font-normal">
-                                Active Session
+                                {t.profile.activeSession}
                             </span>
                         </button>
 

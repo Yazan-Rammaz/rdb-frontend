@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import Image from 'next/image';
 import Skeleton from 'react-loading-skeleton';
 import loginhistoryIcon from '@/assets/icons/profile/loginhistory.svg';
@@ -18,21 +18,23 @@ const cap = (s?: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : undefi
 // The backend sends the literal "unknown" for unresolved fields — treat it as missing.
 const known = (s?: string) => (s && s.toLowerCase() !== 'unknown' ? s : undefined);
 
-function deviceLabel(d?: LoginDevice): string {
-    if (!d) return 'Unknown device';
+// `fallback` is the translated "Unknown device" / "Unknown"; the device and
+// location strings themselves come from the server and stay as sent.
+function deviceLabel(d: LoginDevice | undefined, fallback: string): string {
+    if (!d) return fallback;
     const b = known(d.browser);
     const browser = b ? cap(b) + (d.browserVersion ? ` ${d.browserVersion}` : '') : undefined;
     const parts = [browser, cap(known(d.operatingSystem)), cap(known(d.device))].filter(Boolean);
-    return parts.length ? parts.join(' · ') : 'Unknown device';
+    return parts.length ? parts.join(' · ') : fallback;
 }
 
-function locationLabel(city?: string, country?: string): string {
+function locationLabel(city: string | undefined, country: string | undefined, fallback: string): string {
     const parts = [city, country].filter(Boolean);
-    return parts.length ? parts.join(', ') : 'Unknown';
+    return parts.length ? parts.join(', ') : fallback;
 }
 
 export default function LoginHistoryScreen({ onBack }: LoginHistoryScreenProps) {
-    const { language } = useTranslation();
+    const { t, rtl, language } = useTranslation();
     // `null` = still loading; `[]` = loaded but empty.
     const [items, setItems] = useState<LoginHistoryItem[] | null>(null);
     const [error, setError] = useState(false);
@@ -68,11 +70,18 @@ export default function LoginHistoryScreen({ onBack }: LoginHistoryScreenProps) 
             <div className="flex items-center justify-center relative px-xd-28 pt-xd-14 pb-xd-10">
                 <button
                     onClick={onBack}
-                    className="absolute left-xd-20 flex items-center text-[#1D1D1D]"
+                    aria-label={t.common.accessibility.back}
+                    className="absolute start-xd-20 flex items-center text-[#1D1D1D]"
                 >
-                    <ChevronLeft className="w-xd-22 h-xd-22" />
+                    {rtl ? (
+                        <ChevronRight className="w-xd-22 h-xd-22" />
+                    ) : (
+                        <ChevronLeft className="w-xd-22 h-xd-22" />
+                    )}
                 </button>
-                <span className="text-xd-16 font-medium text-[#1D1D1D]">Login History</span>
+                <span className="text-xd-16 font-medium text-[#1D1D1D]">
+                    {t.profile.loginHistory.title}
+                </span>
             </div>
 
             {/* Content */}
@@ -88,14 +97,14 @@ export default function LoginHistoryScreen({ onBack }: LoginHistoryScreenProps) 
                 {!loading && error && (
                     <div className="flex flex-1 flex-col items-center justify-center text-center px-xd-24 gap-xd-10">
                         <span className="text-[#1D1D1D] text-xd-13 font-medium">
-                            Couldn&apos;t load your login history
+                            {t.profile.loginHistory.loadError}
                         </span>
                         <button
                             type="button"
                             onClick={() => setReloadKey((k) => k + 1)}
                             className="text-xd-12 font-medium text-[#3066CC] px-xd-16 py-xd-8 rounded-xd-15 bg-[#F0F6FD]"
                         >
-                            Retry
+                            {t.common.retry}
                         </button>
                     </div>
                 )}
@@ -110,10 +119,10 @@ export default function LoginHistoryScreen({ onBack }: LoginHistoryScreenProps) 
                             className="object-contain opacity-40"
                         />
                         <span className="text-[#1D1D1D] text-xd-13 font-medium">
-                            No login activity yet
+                            {t.profile.loginHistory.empty}
                         </span>
                         <span className="text-[#888] text-xd-11 leading-tight">
-                            Your recent sign-ins will appear here.
+                            {t.profile.loginHistory.emptyDesc}
                         </span>
                     </div>
                 )}
@@ -136,12 +145,19 @@ export default function LoginHistoryScreen({ onBack }: LoginHistoryScreenProps) 
                                 />
                                 <div className="flex flex-col gap-xd-4 min-w-0">
                                     <span className="text-[#1D1D1D] text-xd-13 font-medium truncate">
-                                        {deviceLabel(e.device)}
+                                        {deviceLabel(
+                                            e.device,
+                                            t.profile.loginHistory.unknownDevice,
+                                        )}
                                     </span>
                                     <span className="text-[#888] text-xd-11 leading-none truncate">
-                                        {locationLabel(e.city, e.country) +
+                                        {locationLabel(
+                                            e.city,
+                                            e.country,
+                                            t.profile.loginHistory.unknown,
+                                        ) +
                                             ' · ' +
-                                            (e.ipAddress ?? 'Unknown')}
+                                            (e.ipAddress ?? t.profile.loginHistory.unknown)}
                                     </span>
                                     <span className="text-[#888] text-xd-11 leading-none">
                                         {formatLoginTime(e.createdAt)}
@@ -161,7 +177,9 @@ export default function LoginHistoryScreen({ onBack }: LoginHistoryScreenProps) 
                                         : 'text-[#991B1B] bg-[#FFF1F2]')
                                 }
                             >
-                                {e.status === 'success' ? 'Success' : 'Failed'}
+                                {e.status === 'success'
+                                    ? t.profile.loginHistory.success
+                                    : t.profile.loginHistory.failed}
                             </span>
                         </div>
                     ))}

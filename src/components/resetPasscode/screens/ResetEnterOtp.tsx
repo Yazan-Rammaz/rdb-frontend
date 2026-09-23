@@ -79,7 +79,7 @@ export default function ResetEnterOtp({
     return (
         <div className="w-full h-full flex flex-col bg-white">
             {/* Close button */}
-            <div className="flex absolute justify-end right-xd-30 top-xd-30">
+            <div className="flex absolute justify-end end-xd-30 top-xd-30">
                 {onClose && (
                     <button
                         onClick={onClose}
@@ -101,7 +101,7 @@ export default function ResetEnterOtp({
                 <div className="h-1/2 flex flex-col justify-end px-xd-20">
                     <div className="h-xd-138 relative">
                         <h2 className="text-trim-descend text-xd-30 px-xd-20 font-bold text-[#1D1D1D]">
-                            Reset Passcode !
+                            {t.resetPasscode.title}
                         </h2>
                         <div className="flex pl-xd-20 pt-xd-12 flex-col">
                             <p className="text-trim-descend text-xd-16 text-[#1D1D1D] font-medium">

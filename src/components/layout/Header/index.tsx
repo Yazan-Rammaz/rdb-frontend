@@ -56,7 +56,7 @@ const Header = () => {
                         >
                             <Image
                                 src={ReceiveIcon}
-                                alt="Receive"
+                                alt=""
                                 fill
                                 className="object-contain"
                             />
@@ -82,7 +82,7 @@ const Header = () => {
                             }}
                             aria-label={t.common.accessibility.send}
                         >
-                            <Image src={SendIcon} alt="Send" fill className="object-contain" />
+                            <Image src={SendIcon} alt="" fill className="object-contain" />
                         </div>
                         <span className="font-normal text-[#404040] leading-none text-xd-11">
                             {t.header.send}
@@ -99,11 +99,13 @@ const Header = () => {
                             role="button"
                             tabIndex={0}
                             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') triggerLock(); }}
-                            aria-label="Lock"
+                            aria-label={t.common.accessibility.lock}
                         >
-                            <Image src={LockIcon} alt="Lock" fill className="object-contain" />
+                            <Image src={LockIcon} alt="" fill className="object-contain" />
                         </div>
-                        <span className="font-normal text-[#1D1D1D] leading-none text-xd-10">Lock</span>
+                        <span className="font-normal text-[#1D1D1D] leading-none text-xd-10">
+                            {t.header.lock}
+                        </span>
                     </div>
                 ) : (
                     <div className="flex flex-col justify-start items-start gap-xd-8">
