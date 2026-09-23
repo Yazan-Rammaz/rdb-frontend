@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from 'react';
 import { useToast } from '@/context/ToastContext';
+import { useTranslation } from '@/context/I18nContext';
 import { api } from '@/api';
 import type { ApiResult } from '@/api';
 import { resolvePaymentRequestLookup } from '@/api/helpers/paymentRequests';
@@ -41,6 +42,7 @@ const RETRY_CONFIG = {
  */
 export function usePaymentRequestAPI() {
     const { toast } = useToast();
+    const { t, tr } = useTranslation();
     const [isLoading, setIsLoading] = useState(false);
 
     const withRetry = useCallback(
@@ -79,11 +81,12 @@ export function usePaymentRequestAPI() {
             }
 
             setIsLoading(false);
-            const message = lastMessage || `${operationName} failed. Please try again.`;
+            const message =
+                lastMessage || tr('home.qr.operations.failed', { operation: operationName });
             toast.error(message);
             return { error: message };
         },
-        [toast],
+        [toast, tr],
     );
 
     return {
@@ -91,7 +94,7 @@ export function usePaymentRequestAPI() {
         createPaymentRequest: (
             input: CreatePaymentRequestInput,
         ): Promise<PaymentRequest | { error: string }> =>
-            withRetry(() => api.paymentRequests.create(input), 'Create payment request'),
+            withRetry(() => api.paymentRequests.create(input), t.home.qr.operations.create),
         /**
          * Looks a code up and says which kind of thing it turned out to be —
          * a person's request or a merchant order. Callers must branch on
@@ -105,13 +108,13 @@ export function usePaymentRequestAPI() {
         ): Promise<ResolvedPaymentRequest | { error: string }> => {
             const res = await withRetry(
                 () => api.paymentRequests.lookup(code),
-                'Lookup payment request',
+                t.home.qr.operations.lookup,
             );
             if ('error' in res) return res;
 
             const resolved = resolvePaymentRequestLookup(res);
             if (!resolved) {
-                const message = 'Could not read this payment request.';
+                const message = t.home.qr.operations.unreadable;
                 toast.error(message);
                 return { error: message };
             }
@@ -120,7 +123,7 @@ export function usePaymentRequestAPI() {
         fulfillPaymentRequest: (
             input: FulfillPaymentRequestInput,
         ): Promise<PaymentRequest | { error: string }> =>
-            withRetry(() => api.paymentRequests.fulfill(input), 'Fulfill payment'),
+            withRetry(() => api.paymentRequests.fulfill(input), t.home.qr.operations.fulfill),
         /**
          * Pays a merchant order. Retries carry the caller's idempotencyKey
          * unchanged — that is what makes repeating a 5xx safe rather than a
@@ -129,10 +132,10 @@ export function usePaymentRequestAPI() {
         payMerchantPayment: (
             input: MerchantPayInput,
         ): Promise<MerchantPayResponse | { error: string }> =>
-            withRetry(() => api.merchant.pay(input), 'Merchant payment'),
+            withRetry(() => api.merchant.pay(input), t.home.qr.operations.merchantPay),
         cancelPaymentRequest: (
             input: CancelPaymentRequestInput,
         ): Promise<PaymentRequest | { error: string }> =>
-            withRetry(() => api.paymentRequests.cancel(input), 'Cancel payment'),
+            withRetry(() => api.paymentRequests.cancel(input), t.home.qr.operations.cancel),
     };
 }

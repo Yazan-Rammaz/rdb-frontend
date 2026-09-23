@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { QRCodeDisplay } from '../QR/send/shared/QRCodeDisplay';
 import { api } from '@/api';
 import { unwrapKycRequest } from '@/api/helpers/kyc';
 import verifiedBigIcon from '@/assets/icons/verification/verified-big.svg';
 import ClientInfoSvg from '@/assets/icons/profile/clientinfo.svg';
 import notVerifiedIcon from '@/assets/icons/verification/not-verified.svg';
+import { useTranslation } from '@/context/I18nContext';
 import Image from 'next/image';
 
 interface ClientInformationScreenProps {
@@ -27,11 +28,15 @@ interface ClientInformationScreenProps {
     displayId?: string;
 }
 
-function daysSince(dateStr?: string): string {
+type Translate = (key: string, params?: Record<string, unknown>) => string;
+
+function daysSince(dateStr: string | undefined, tr: Translate): string {
     if (!dateStr) return '—';
     const diff = Date.now() - new Date(dateStr).getTime();
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    return `${days} Day${days !== 1 ? 's' : ''}`;
+    return tr(days === 1 ? 'profile.clientInfo.day' : 'profile.clientInfo.days', {
+        count: days,
+    });
 }
 
 function formatAccountId(num?: string): string {
@@ -48,6 +53,7 @@ export default function ClientInformationScreen({
     user,
     displayId,
 }: ClientInformationScreenProps) {
+    const { t, tr, rtl } = useTranslation();
     // Pull the full KYC record (status + the uploaded ID/face images), which the
     // `user` prop doesn't carry. `/api/kyc/current` returns { kycRequest }.
     const [kyc, setKyc] = useState<{
@@ -78,11 +84,12 @@ export default function ClientInformationScreen({
 
     // Human-readable document type (e.g. "passport" → "Passport", "national_id" → "National ID").
     const docTypeLabel = (() => {
-        const t = kyc?.documentType?.toLowerCase();
-        if (!t) return undefined;
-        if (t.includes('passport')) return 'Passport';
-        if (t.includes('id') || t.includes('national')) return 'National ID';
-        return t.charAt(0).toUpperCase() + t.slice(1);
+        const docType = kyc?.documentType?.toLowerCase();
+        if (!docType) return undefined;
+        if (docType.includes('passport')) return t.profile.clientInfo.passport;
+        if (docType.includes('id') || docType.includes('national'))
+            return t.profile.clientInfo.nationalId;
+        return docType.charAt(0).toUpperCase() + docType.slice(1);
     })();
 
     const InfoRow = ({ label, value }: { label: string; value: string }) => (
@@ -98,11 +105,18 @@ export default function ClientInformationScreen({
             <div className="flex items-center justify-center relative px-xd-28 pt-xd-14 pb-xd-10">
                 <button
                     onClick={onBack}
-                    className="absolute left-xd-20 flex items-center text-[#1D1D1D]"
+                    aria-label={t.common.accessibility.back}
+                    className="absolute start-xd-20 flex items-center text-[#1D1D1D]"
                 >
-                    <ChevronLeft className="w-xd-22 h-xd-22" />
+                    {rtl ? (
+                        <ChevronRight className="w-xd-22 h-xd-22" />
+                    ) : (
+                        <ChevronLeft className="w-xd-22 h-xd-22" />
+                    )}
                 </button>
-                <span className="text-xd-16 font-medium text-[#1D1D1D]">Client Information</span>
+                <span className="text-xd-16 font-medium text-[#1D1D1D]">
+                    {t.profile.clientInfo.title}
+                </span>
             </div>
 
             {/* Content */}
@@ -110,7 +124,9 @@ export default function ClientInformationScreen({
                 {/* Client ID*/}
                 <div className="border border-[#E5E5E5]/50 w-xd-406 bg-[#FCFCFC] h-xd-55 rounded-xd-15 px-xd-12 pt-xd-7 pb-xd-8 flex items-center justify-between">
                     <div className="flex flex-col gap-xd-8">
-                        <span className="text-xd-12 text-[#8D8D8D] leading-none">Client ID</span>
+                        <span className="text-xd-12 text-[#8D8D8D] leading-none">
+                            {t.profile.clientInfo.clientId}
+                        </span>
                         <span className="text-xd-14 text-[#1D1D1D] font-medium leading-none">
                             {displayId ? `ID ${displayId}` : '—'}
                         </span>
@@ -130,10 +146,10 @@ export default function ClientInformationScreen({
                     <div className=" w-xd-201 bg-[#FCFCFC] h-xd-55 rounded-xd-15 px-xd-12 pt-xd-7 pb-xd-8 flex items-center justify-between">
                         <div className="flex flex-col gap-xd-8">
                             <span className="text-xd-12 text-[#8D8D8D] leading-none">
-                                Client Status
+                                {t.profile.clientInfo.clientStatus}
                             </span>
                             <span className="text-xd-14 text-[#1D1D1D] font-medium leading-none">
-                                Active
+                                {t.profile.clientInfo.active}
                             </span>
                         </div>
                     </div>
@@ -141,10 +157,10 @@ export default function ClientInformationScreen({
                     <div className=" w-xd-201 bg-[#FCFCFC] h-xd-55 rounded-xd-15 px-xd-12 pt-xd-7 pb-xd-8 flex items-center justify-between">
                         <div className="flex flex-col gap-xd-8">
                             <span className="text-xd-12 text-[#8D8D8D] leading-none">
-                                Client Since
+                                {t.profile.clientInfo.clientSince}
                             </span>
                             <span className="text-xd-14 text-[#1D1D1D] font-medium leading-none">
-                                {daysSince(user.createdAt)}
+                                {daysSince(user.createdAt, tr)}
                             </span>
                         </div>
                     </div>
@@ -156,12 +172,12 @@ export default function ClientInformationScreen({
                     <div className=" w-xd-201 bg-[#FCFCFC] h-xd-55 rounded-xd-15 px-xd-12 pt-xd-7 pb-xd-8 flex items-center justify-between">
                         <div className="flex flex-col gap-xd-8">
                             <span className="text-xd-12 text-[#8D8D8D] leading-none">
-                                Client Type
+                                {t.profile.clientInfo.clientType}
                             </span>
                             <span className="text-xd-14 text-[#1D1D1D] font-medium leading-none">
                                 {user.userType
                                     ? user.userType.charAt(0).toUpperCase() + user.userType.slice(1)
-                                    : 'Personal'}
+                                    : t.profile.clientInfo.personal}
                             </span>
                         </div>
                     </div>
@@ -169,10 +185,12 @@ export default function ClientInformationScreen({
                     <div className=" w-xd-201 bg-[#FCFCFC] h-xd-55 rounded-xd-15 px-xd-12 pt-xd-7 pb-xd-8 flex items-center justify-between">
                         <div className="flex flex-col gap-xd-8">
                             <span className="text-xd-12 text-[#8D8D8D] leading-none">
-                                Client Verified
+                                {t.profile.clientInfo.clientVerified}
                             </span>
                             <span className="text-xd-14 text-[#1D1D1D] font-medium leading-none">
-                                {isVerified ? 'Verified' : 'Not Verified'}
+                                {isVerified
+                                    ? t.profile.clientInfo.verified
+                                    : t.profile.clientInfo.notVerified}
                             </span>
                         </div>
                     </div>
@@ -181,7 +199,9 @@ export default function ClientInformationScreen({
                 {/* Client Name */}
                 <div className="border border-[#E5E5E5]/50 w-xd-406 bg-[#FCFCFC] h-xd-55 rounded-xd-15 px-xd-12 pt-xd-7 pb-xd-8 flex items-center justify-between">
                     <div className="flex flex-col gap-xd-8">
-                        <span className="text-xd-12 text-[#8D8D8D] leading-none">Client Name</span>
+                        <span className="text-xd-12 text-[#8D8D8D] leading-none">
+                            {t.profile.clientInfo.clientName}
+                        </span>
                         <span className="text-xd-14 text-[#1D1D1D] font-medium leading-none">
                             {fullName}
                         </span>
@@ -213,7 +233,7 @@ export default function ClientInformationScreen({
                 >
                     <div className="flex flex-col gap-xd-8">
                         <span className="text-xd-12 text-[#8D8D8D] leading-none">
-                            Client Phone Number
+                            {t.profile.clientInfo.clientPhone}
                         </span>
                         <span className="text-xd-14 text-[#1D1D1D] font-medium leading-none">
                             {user.phoneNumber ? `+${user.phoneNumber}` : '—'}
@@ -227,7 +247,8 @@ export default function ClientInformationScreen({
                     kyc?.selfieImageUrl) && (
                     <div className="w-xd-406 flex flex-col gap-xd-8 mt-xd-8">
                         <span className="text-xd-12 text-[#8D8D8D] leading-none px-xd-2">
-                            Verification Documents{docTypeLabel ? ` · ${docTypeLabel}` : ''}
+                            {t.profile.clientInfo.verificationDocuments}
+                            {docTypeLabel ? ` · ${docTypeLabel}` : ''}
                         </span>
                         <div className="flex gap-xd-8">
                             {kyc?.documentFrontImageUrl && (
@@ -236,11 +257,11 @@ export default function ClientInformationScreen({
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img
                                         src={kyc.documentFrontImageUrl}
-                                        alt={docTypeLabel ?? 'ID document'}
+                                        alt={docTypeLabel ?? t.profile.clientInfo.idDocumentAlt}
                                         className="w-xd-120 h-xd-80 rounded-xd-12 object-cover border border-[#E5E5E5]"
                                     />
                                     <span className="text-xd-10 text-[#8E8E8E] leading-none">
-                                        {docTypeLabel ?? 'ID'}
+                                        {docTypeLabel ?? t.profile.clientInfo.id}
                                     </span>
                                 </div>
                             )}
@@ -249,11 +270,11 @@ export default function ClientInformationScreen({
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img
                                         src={kyc.documentBackImageUrl}
-                                        alt="ID back"
+                                        alt={t.profile.clientInfo.back}
                                         className="w-xd-120 h-xd-80 rounded-xd-12 object-cover border border-[#E5E5E5]"
                                     />
                                     <span className="text-xd-10 text-[#8E8E8E] leading-none">
-                                        Back
+                                        {t.profile.clientInfo.back}
                                     </span>
                                 </div>
                             )}
@@ -262,11 +283,11 @@ export default function ClientInformationScreen({
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img
                                         src={kyc.selfieImageUrl}
-                                        alt="Face"
+                                        alt={t.profile.clientInfo.face}
                                         className="w-xd-80 h-xd-80 rounded-xd-12 object-cover border border-[#E5E5E5]"
                                     />
                                     <span className="text-xd-10 text-[#8E8E8E] leading-none">
-                                        Face
+                                        {t.profile.clientInfo.face}
                                     </span>
                                 </div>
                             )}
@@ -281,7 +302,7 @@ export default function ClientInformationScreen({
                     type="button"
                     className="h-xd-55 w-xd-406 bg-[#FCFCFC] border border-[#C3C3C3]/50 rounded-xd-15 flex items-center justify-center font-medium text-xd-14 text-[#1D1D1D]"
                 >
-                    Delete My Account Request
+                    {t.profile.clientInfo.deleteAccount}
                 </button>
             </div>
         </div>

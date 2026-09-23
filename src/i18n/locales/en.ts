@@ -13,6 +13,17 @@ const en = {
         retry: 'Retry',
         loading: 'Loading…',
         done: 'Done',
+        save: 'Save',
+        saving: 'Saving...',
+        keep: 'Keep',
+        confirm: 'Confirm',
+        areYouSure: 'Are you sure?',
+        alwaysValid: 'Always valid',
+        waiting: 'Waiting…',
+        fee: 'Fee',
+        tax: 'Tax',
+        note: 'Note',
+        description: 'Description',
         accessibility: {
             send: 'Send',
             receive: 'Receive',
@@ -25,6 +36,25 @@ const en = {
             sendPhoneNumber: 'Send phone number',
             showBalance: 'Show balance',
             hideBalance: 'Hide balance',
+            continue: 'Continue',
+            lock: 'Lock',
+            close: 'Close',
+            showName: 'Show account name',
+            hideName: 'Hide account name',
+        },
+        tryAgain: 'Try Again',
+        poweredBy: 'Powered by Ramaaz Digital Banking',
+        sessionExpired: 'Session expired. Please log in again.',
+        camera: {
+            startFailed: 'Could not start the camera.',
+            startFailedDetail: 'Could not start the camera: {{detail}}',
+            startFailedName: 'Could not start the camera ({{name}}).',
+            permissionDenied: 'Camera permission denied. Please allow camera access in your browser settings.',
+            notFound: 'No camera found on this device.',
+            inUse: 'The camera is already in use by another app. Close it and try again.',
+            insecure: 'Camera blocked on an insecure connection. Open this page over HTTPS.',
+            aborted: 'The camera stopped unexpectedly. Please try again.',
+            unavailable: 'Camera unavailable on this connection. Open this page over HTTPS or on localhost.',
         },
     },
 
@@ -36,6 +66,7 @@ const en = {
     header: {
         receive: 'Receive',
         send: 'Send',
+        lock: 'Lock',
     },
 
     // ─── Not Found ────────────────────────────────────────
@@ -115,6 +146,10 @@ const en = {
             codeExpired: 'The Code Sent Has Expired',
         },
         enterName: {
+            title: 'Enter Your Name !',
+            subtitle: 'Last Step And Enjoy Our Services',
+            description: 'Ensure Greater Security And Protect Your Funds',
+            placeholder: 'Enter Your Name Exact ID',
             errors: {
                 invalidChars: 'Letters, spaces, hyphens and apostrophes only.',
                 tooShort: 'Enter at least 2 letters.',
@@ -169,12 +204,21 @@ const en = {
         },
         setPasscode: {
             title: 'Set Passcode',
+            titleSet: 'Set Passcode !',
             titleDone: 'Set Passcode Done',
+            welcomeTitle: 'Welcome !',
+            welcomeSubtitle: 'Enjoy With Our Services',
             subtitle: 'Last Step And Enjoy Our Services',
             setLabel: 'Set Passcode',
             reenterLabel: 'Reenter Passcode',
             doneLabel: 'Reenter Passcode',
             mismatch: 'Passcodes must match. Please set it again.',
+            saveFailed: 'Failed to save passcode. Please try again.',
+        },
+        biometric: {
+            fingerprint: 'Use Fingerprint',
+            faceId: 'Use Face ID',
+            passkey: 'Use Biometrics',
         },
         enterPasscode: {
             title: 'Enter Passcode',
@@ -274,6 +318,7 @@ const en = {
                 failed: 'Failed',
             },
         },
+        receiveMoneyInfo: 'You Can Receive The Money Through All Our Centers, Or You Can Download Our Application, Open An Account, Use The Money, And Benefit From All The Services.',
     },
 
     // ─── Home ─────────────────────────────────────────────
@@ -297,6 +342,8 @@ const en = {
         transactions: {
             transferSend: 'Transfer | Send',
             transferReceive: 'Transfer | Receive',
+            deposit: 'Deposit',
+            withdrawal: 'Withdrawal',
             defaultTitle: 'Transaction',
         },
         deposit: {
@@ -350,6 +397,10 @@ const en = {
             share: 'Share',
             send: 'Send',
             cancel: 'Cancel',
+            cancelConfirm: 'Are you sure you want to cancel this payment request?',
+            cancelReasonPlaceholder: 'Reason for cancellation',
+            confirmCancel: 'Confirm Cancel',
+            cancelling: 'Cancelling…',
             amountToSend: 'Amount to Send',
             messages: {
                 noWalletIdAvailable: 'No Wallet ID available for this currency.',
@@ -402,6 +453,16 @@ const en = {
                 CameraNotFound: 'Camera not found. Please check your device.',
                 uploadFromGallery: 'Upload From Gallery',
                 uploadDescription: 'Choose A Saved QR Image',
+            },
+            loadRequestFailed: 'Failed to load request',
+            operations: {
+                create: 'Create payment request',
+                lookup: 'Lookup payment request',
+                fulfill: 'Fulfill payment',
+                merchantPay: 'Merchant payment',
+                cancel: 'Cancel payment',
+                unreadable: 'Could not read this payment request.',
+                failed: '{{operation}} failed. Please try again.',
             },
         },
     },
@@ -470,6 +531,291 @@ const en = {
         logout: 'Logout',
         logoutConfirmation: 'Are you sure you want to logout?',
         notProvided: 'Not provided',
+
+        // ── Client Information sub-screen ──────────────────
+        clientInfo: {
+            title: 'Client Information',
+            clientId: 'Client ID',
+            clientStatus: 'Client Status',
+            clientSince: 'Client Since',
+            clientType: 'Client Type',
+            clientVerified: 'Client Verified',
+            clientName: 'Client Name',
+            clientPhone: 'Client Phone Number',
+            active: 'Active',
+            personal: 'Personal',
+            verified: 'Verified',
+            notVerified: 'Not Verified',
+            days: '{{count}} Days',
+            day: '{{count}} Day',
+            verificationDocuments: 'Verification Documents',
+            passport: 'Passport',
+            nationalId: 'National ID',
+            idDocumentAlt: 'ID document',
+            id: 'ID',
+            back: 'Back',
+            face: 'Face',
+            deleteAccount: 'Delete My Account Request',
+        },
+
+        // ── Client Name sub-screen ────────────────────────
+        clientName: {
+            title: 'Client Name',
+            label: 'Client Name',
+            cannotChangeTitle: 'Client Name Cannot Be Changed',
+            cannotChangeDesc: 'Because It Is Linked To The Documents You Submitted',
+            mustMatchTitle: 'The Name Must Match The Personal Identification',
+            mustMatchDesc:
+                'To Guarantee Ownership Of The Funds In The Account. Also, When Receiving Any Money From The Centers, It Will Not Be Released Except Upon Presentation Of A Matching Official Document.',
+            unprotectedTitle: 'Unprotected Account | Limited Access',
+            weeklyVolume: 'Weekly Transaction Volume {{amount}} | Renew Fri 10:00',
+            protectTitle: 'Protect Your Account | Full Access',
+            protectDesc: 'Keep Your Account Secure, Ensures Safe Transactions.',
+            protectButton: 'Protect & Verify Now',
+            uploadedDocuments: 'Client Uploaded Documents',
+            yourFiles: 'Your Files',
+            documentAlt: 'Document {{number}}',
+            needHelp: 'Need Help About My Name',
+            updateSuccess: 'Name updated successfully',
+            updateFailed: 'Failed to update name',
+        },
+
+        // ── Client Phone sub-screen ───────────────────────
+        clientPhone: {
+            title: 'Client Phone Number',
+            label: 'Client Phone Number',
+            addSecond: 'Add A Second Phone Number',
+            ownTitle: 'Enter A Phone Number That You Own',
+            ownDesc:
+                'We Strongly Advise You To Enter A Phone Number That You Own And That Cannot Be Stolen, And That Your Number Is Not Accessible To Other People.',
+            importantTitle: 'Phone Number Very Important To Verify Account Ownership',
+            importantDesc:
+                'The First Phone Number Is Essential For Identity Verification And Account Ownership, Therefore It Is Under Our Strong Protection. Changing Or Adding A Phone Number Requires A Video Call To Verify Your Identity.',
+            needHelp: 'Need Help About My Number',
+        },
+
+        // ── Client QR sub-screen ──────────────────────────
+        clientQr: {
+            title: 'Client ID',
+            clientName: 'Client Name',
+            clientPhone: 'Client Phone Number',
+        },
+
+        // ── Login History sub-screen ──────────────────────
+        loginHistory: {
+            title: 'Login History',
+            loadError: "Couldn't load your login history",
+            empty: 'No login activity yet',
+            emptyDesc: 'Your recent sign-ins will appear here.',
+            success: 'Success',
+            failed: 'Failed',
+            unknownDevice: 'Unknown device',
+            unknown: 'Unknown',
+        },
+
+        // ── Profile Photo sub-screen ──────────────────────
+        photo: {
+            title: 'Profile Photo',
+            add: 'Add Profile Photo',
+            edit: 'Edit Profile Photo',
+            choose: 'Choose',
+            takePhoto: 'Take Photo',
+            remove: 'Remove',
+            removeTitle: 'Remove Photo',
+            removeMessage: 'Are you sure you want to remove your profile photo?',
+            removed: 'Photo removed successfully',
+            updated: 'Photo updated successfully',
+        },
+        addPhoto: 'Add Photo',
+        kycPending: 'Under Review',
+        kycPendingDesc: 'Your verification is being reviewed',
+        kycRejected: 'Verification Rejected',
+        activeSession: 'Active Session',
+    },
+
+    // ─── Reset Passcode ───────────────────────────────────
+    resetPasscode: {
+        intro: {
+            title: 'Forget Passcode !',
+            subtitle: 'You Can Start Reset Your Passcode',
+            description:
+                "Don't Worry, We Will Help You Reset Your Passcode By Following These Steps.",
+            securityNote1:
+                'Reset Your Passcode Is A Critically Important Security Measure To Ensure The Safety Of Your Transactions.',
+            securityNote2: 'Therefore, We Apply Strict Procedures In This Regard.',
+            securityNote3:
+                'If You Wish To Proceed With Reset Your Passcode, Please Follow The Security Instructions Below.',
+            startButton: 'Start Reset Passcode',
+        },
+        quiz: {
+            title: 'Reset Passcode !',
+            description:
+                "Don't Worry, We Will Help You Reset Your Passcode By Following These Steps.",
+            swipeHint:
+                'Not sure? Swipe left or right to review and change your earlier answers. Answering this last question submits the quiz.',
+            questionNumber: 'Question {{number}}',
+        },
+        failOnce: {
+            title: 'Reset Passcode !',
+            message:
+                '"You Have Given Incorrect Answers According To Our Security Standards. You Have Only One Attempt Left For You To Answer Correctly."',
+            retryButton: 'Try Answer Again',
+        },
+        lockout: {
+            title: 'Reset Passcode !',
+            message:
+                '"You Have Given Second Attempt Incorrect Answers According To Our Security Standards. So You Will Not Be Able To Try Again Until The Time Below."',
+            helpPrefix: '"If The Matter Is Urgent, You Can Visit One Of ',
+            ourCenters: 'Our Centers',
+            helpSuffix: ' To Be Help."',
+            tryAgainAfter: 'You Can Try Again After {{time}} Hours',
+        },
+        setPasscode: {
+            title: 'New Passcode',
+            titleDone: 'New Passcode Done',
+            subtitle: 'Set A New Passcode To Continue',
+            setLabel: 'New Passcode',
+            reenterLabel: 'Reenter New Passcode',
+            doneTitle: 'Done !',
+            doneSubtitle: 'Your Passcode Has Been Reset',
+            doneNote: 'Enjoy With Our Services',
+        },
+        title: 'Reset Passcode !',
+        toasts: {
+            loginExpired: 'Your login session expired. Please log in again.',
+            verificationIncomplete: 'Identity verification was not completed.',
+            questionsFailed: 'Could not load the security questions. Please try again.',
+            startFailed: 'Could not start passcode reset. Please try again.',
+            sendCodeFailed: 'Could not send the code. Please try again.',
+            codeSent: 'Code sent via {{method}}',
+            submitAnswersFailed: 'Could not submit your answers. Please try again.',
+            resetExpired: 'Your reset session expired. Please start again.',
+            passcodeUpdated: 'Passcode updated — enter your new passcode to continue.',
+            setPasscodeFailed: 'Could not set your new passcode. Please try again.',
+        },
+    },
+
+    // ─── KYC / Identity Verification ──────────────────────
+    verification: {
+        title: 'Identity Verification !',
+        privacySafe: 'Your Privacy Is Completely Safe',
+        liveDetection: 'Live Detection Your ID',
+        informationDetected: 'Information Detected',
+        passport: 'Passport',
+        frontSide: 'Front Side',
+        backSide: 'Back Side',
+        frontId: 'Front ID',
+        backId: 'Back ID',
+        fields: {
+            idType: 'ID Type',
+            country: 'Country',
+            name: 'Name',
+            passportNumber: 'Passport Number',
+            nationalNumber: 'National Number',
+            birthday: 'Birthday',
+        },
+        intro: {
+            title: 'Identity Verification !',
+            subtitle: 'Protect Your Account & Get Full Access',
+            description:
+                'We Need To Verify Your Identity Once To Protect Your Account From Fraud And Comply With Security Regulations One-Time Process To Confirm That You. It Helps Keep Your Account Secure, Prevents Fraud, And Ensures Safe Transactions Just Like Showing Your ID When Opening A Bank Account.',
+            startButton: 'Start Verification',
+            laterButton: 'Later, Use The Limited Version',
+        },
+        success: {
+            title: 'Success Verification !',
+            subtitle: 'You Have Enjoy With Our Full Access',
+            fallbackName: 'RDB User',
+        },
+        summary: {
+            correctNext: 'Correct, Next',
+            incorrectRetry: 'Incorrect, Try Again',
+            submitFailed: 'Submission failed. Please check your connection and try again.',
+        },
+        contactSupport: {
+            willContact: 'Will Contact With You Soon',
+            within: 'Within 2 Hour',
+        },
+        exitDialog: {
+            title: 'Exit Verification?',
+            message:
+                'Your progress will be lost. You can restart verification later from the limited version.',
+            stay: 'Stay',
+            exit: 'Exit',
+        },
+        faceMatch: {
+            facePhoto: 'Face Photo',
+            noMatch: 'Face did not match',
+            submitFailed: 'We could not submit your verification. Please try again.',
+            notApproved: 'Verification was not approved.',
+            missingData: 'Missing verification data — please start again.',
+            lowConfidence: 'Match accepted with low confidence — your verification will be reviewed by our team. Continuing to the next step…',
+            discrepancy: 'We noticed a discrepancy in the image and there is an issue with your verification.',
+            retryWithCorrection: 'Try Again With The Correction',
+            rematch: 'Rematch',
+        },
+        idCapture: {
+            // Rejection reasons returned by the analyze API
+            unsupportedId: 'This is not a supported ID. Use a passport or national ID.',
+            notReadable: 'ID not clearly readable. Hold the card flat, well-lit, and try again.',
+            wrongSideFront: 'This is the front of your ID. Flip it over and show the back.',
+            wrongSideBack: 'This is the back of your ID. Show the side with your photo.',
+            spoofing: 'Real ID required — please present your original identity document.',
+            noFaceOnFront:
+                'No face photo found on your ID. Make sure the front side with your photo is facing the camera.',
+            showPhotoSide: 'Show the side of your ID with your photo',
+            noFaceOnPassport:
+                'No face photo found on your passport. Open to the photo page and try again.',
+            notBackOfId: 'This is not the back of your ID. Please use the back of the same document.',
+            frontAgain: 'This looks like the front side again. Please flip the card.',
+            // Live frame-quality coaching
+            tooDark: 'Too dark — move to a brighter area',
+            tooBright: 'Too bright — find less direct light',
+            glare: 'Glare — tilt the card to reduce reflections',
+            blurry: 'Blurry — hold the camera steady',
+            cameraMoving: 'Camera moving — hold still',
+            noCard: 'No card detected — centre your ID in the frame',
+            moveCloser: 'Move closer and align the card inside the frame',
+            useOriginal: 'Use the original card, not a screen',
+            alignInFrame: 'Align ID within frame',
+            holdSteady: 'Hold steady…',
+            cardDetected: 'Card detected — scanning…',
+            // Capture lifecycle
+            startButton: 'Start Live Detection Your ID',
+            alignWithinFrame: 'Align ID within frame...',
+            flipToBack: 'Please flip to the BACK side...',
+            flipToBackNow: 'Now flip to the back side',
+            passportCaptured: 'Passport Captured!',
+            captureComplete: 'ID Capture Complete!',
+            documentDetected: 'Document detected',
+            processing: 'Processing…',
+            couldNotRead: 'Could not read ID — try again',
+            moveCloserShort: 'Move closer...',
+            moveCloserDocument: 'Move closer to the document',
+            holdSteadyShort: 'Hold steady...',
+            focusing: 'Hold still, focusing...',
+            // Detected-document labels
+            detectedPassport: '{{country}} Passport detected',
+            detectedDriverLicence: "{{country}} Driver's Licence detected",
+            detectedTurkishId: 'Turkish National ID detected',
+            detectedSyrianId: 'Syrian National ID detected',
+            detectedCountryId: '{{country}} ID detected',
+            detectedGeneric: 'ID Detected!',
+        },
+        faceReverify: {
+            title: "Verify it's you",
+            positionFace: 'Position your face in the frame and make sure the lighting is good.',
+            verifying: "Verifying it's you…",
+            verified: "Verified — it's you.",
+            cameraError: 'Could not read the camera. Please try again.',
+            notVerified: "We couldn't verify it's you. Please try again.",
+            genericError: 'Something went wrong. Please try again.',
+            start: 'Start Verification',
+            tryAgain: 'Try Again',
+            cancel: 'Cancel',
+            cancelAria: 'Cancel verification',
+            missingChallenge: 'Missing verification challenge.',
+        },
     },
 
     // ─── Send ────────────────────────────────────────────────
@@ -580,6 +926,27 @@ const en = {
         liveLabel: 'Live',
         privacySafe: 'Your Privacy Is Completely Safe',
         endVerification: 'End Verification',
+        // AI liveness widget
+        liveDetection: 'Live Face Detection',
+        beginButton: 'Begin AI Face Check',
+        restartButton: 'Restart AI Face Check',
+        preparingSession: 'Preparing AI session…',
+        tapBeginPrefix: 'Tap ',
+        tapBeginWord: 'Begin',
+        tapBeginSuffix: ' to start the AI liveness check',
+        hints: {
+            noFace: 'Position face within mask',
+            eyesClosed: 'Keep your eyes open',
+            sunglasses: 'Please remove your sunglasses',
+            screenDetected: 'Use your real face — a screen or phone was detected',
+            tooDark: 'Move to a brighter area',
+            tooBlurry: 'Hold steady — frame too blurry',
+            notFacingCamera: 'Face the camera straight on',
+            keepGoing: 'Keep going...',
+            lookStraight: 'Please Keep Your Face Centered On The Screen And Facing Forward',
+            turnRight: 'Slowly Turn Your Head To The Right',
+            turnLeft: 'Slowly Turn Your Head To The Left',
+        },
         aiCall: {
             greeting:
                 "Hello {name}, welcome to Ramaz Digital Bank. I am Aline from the AI world. Don't worry, this will only take a moment!",
@@ -640,6 +1007,27 @@ const en = {
         backToStore: 'Back to store',
         expired: 'This order has expired.',
         notPayable: 'This order can no longer be paid.',
+    },
+
+    passkeyGate: {
+        tooManyAttempts: 'Too many attempts',
+        tryAgainIn: 'Try again in',
+        secondsShort: 's',
+        biometricFailed: 'Biometric authentication failed. Please use your PIN.',
+        biometricSetupFailed: 'Biometric setup failed. Please use your PIN.',
+    },
+
+    sessionTakeover: {
+        fallbackName: 'User',
+        verified: 'Verified',
+        notVerified: 'Not Verified',
+        loggedInViaWeb: 'You Have Logged In Via The Web',
+        justNow: 'Just Now',
+        ago: 'Ago',
+        minute: '{{count}} Minute',
+        minutes: '{{count}} Minutes',
+        hour: '{{count}} Hour',
+        hours: '{{count}} Hours',
     },
 };
 

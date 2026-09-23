@@ -165,13 +165,15 @@ export default function PasscodeScreen(props: PasscodeScreenProps) {
                     <div className="w-xd-430 h-full items-start flex flex-col">
                         <div className="h-1/2 flex flex-col justify-end px-xd-40">
                             <div>
-                                <h2 className="text-xd-30 font-bold text-[#1D1D1D]">Welcome !</h2>
+                                <h2 className="text-xd-30 font-bold text-[#1D1D1D]">
+                                    {t.auth.setPasscode.welcomeTitle}
+                                </h2>
                                 <p className="text-xd-16 font-medium text-[#1D1D1D] mt-xd-5">
                                     {displayName}
                                 </p>
                             </div>{' '}
                             <p className="text-xd-12 text-[#1D1D1D] mt-xd-4">
-                                Enjoy With Our Services
+                                {t.auth.setPasscode.welcomeSubtitle}
                             </p>
                             <FlexibleSpace size={80} />
                         </div>
@@ -201,10 +203,10 @@ export default function PasscodeScreen(props: PasscodeScreenProps) {
                                     <h2 className="text-xd-30 font-bold text-[#1D1D1D]">
                                         {setStep === 'saving'
                                             ? t.auth.setPasscode.titleDone
-                                            : 'Set Passcode !'}
+                                            : t.auth.setPasscode.titleSet}
                                     </h2>
                                     <p className="text-xd-16 font-medium text-[#1D1D1D] mt-xd-5">
-                                        Last Step And Enjoy Our Services
+                                        {t.auth.setPasscode.subtitle}
                                     </p>
                                 </div>
                                 <FlexibleSpace size={130} share={0.2} />
@@ -298,7 +300,11 @@ export default function PasscodeScreen(props: PasscodeScreenProps) {
                     {/* Verified badge */}
                     <Image
                         src={isVerified ? verifiedIcon : notVerifiedIcon}
-                        alt={isVerified ? 'Verified' : 'Not Verified'}
+                        alt={
+                            isVerified
+                                ? t.profile.clientInfo.verified
+                                : t.profile.clientInfo.notVerified
+                        }
                         width={23}
                         height={23}
                         className="object-contain"
@@ -351,15 +357,21 @@ export default function PasscodeScreen(props: PasscodeScreenProps) {
 // Picks fingerprint (Android) or face-id (iOS/macOS/Windows) based on
 // the actual device, not CSS media queries.
 
-const BIOMETRIC_CONFIG: Record<BiometricType, { icon: typeof fingerprintIcon; label: string }> = {
-    fingerprint: { icon: fingerprintIcon, label: 'Use Fingerprint' },
-    faceid: { icon: faceidIcon, label: 'Use Face ID' },
-    passkey: { icon: passkeyIcon, label: 'Use Biometrics' },
+// Module scope, so it carries the translation KEY; the button resolves it.
+const BIOMETRIC_CONFIG: Record<
+    BiometricType,
+    { icon: typeof fingerprintIcon; labelKey: 'fingerprint' | 'faceId' | 'passkey' }
+> = {
+    fingerprint: { icon: fingerprintIcon, labelKey: 'fingerprint' },
+    faceid: { icon: faceidIcon, labelKey: 'faceId' },
+    passkey: { icon: passkeyIcon, labelKey: 'passkey' },
 };
 
 function BiometricButton({ onPress }: { onPress: () => void }) {
+    const { t } = useTranslation();
     const type = useMemo(detectBiometricType, []);
-    const { icon, label } = BIOMETRIC_CONFIG[type];
+    const { icon, labelKey } = BIOMETRIC_CONFIG[type];
+    const label = t.auth.biometric[labelKey];
 
     return (
         <button onClick={onPress} className="mt-xd-5 flex flex-col items-center gap-xd-5">

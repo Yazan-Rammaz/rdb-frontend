@@ -15,6 +15,17 @@ const tr: TranslationSchema = {
         retry: 'Yeniden Dene',
         loading: 'Yükleniyor…',
         done: 'Tamam',
+        save: 'Kaydet',
+        saving: 'Kaydediliyor...',
+        keep: 'Vazgeç',
+        confirm: 'Onayla',
+        areYouSure: 'Emin misiniz?',
+        alwaysValid: 'Her zaman geçerli',
+        waiting: 'Bekleniyor…',
+        fee: 'Ücret',
+        tax: 'Vergi',
+        note: 'Not',
+        description: 'Açıklama',
         accessibility: {
             send: 'Gönder',
             receive: 'Al',
@@ -27,6 +38,25 @@ const tr: TranslationSchema = {
             sendPhoneNumber: 'Telefon numarası gönder',
             showBalance: 'Bakiyeyi göster',
             hideBalance: 'Bakiyeyi gizle',
+            continue: 'Devam et',
+            lock: 'Kilitle',
+            close: 'Kapat',
+            showName: 'Hesap adını göster',
+            hideName: 'Hesap adını gizle',
+        },
+        tryAgain: 'Tekrar Dene',
+        poweredBy: 'Ramaaz Digital Banking tarafından desteklenmektedir',
+        sessionExpired: 'Oturumun süresi doldu. Lütfen tekrar giriş yapın.',
+        camera: {
+            startFailed: 'Kamera başlatılamadı.',
+            startFailedDetail: 'Kamera başlatılamadı: {{detail}}',
+            startFailedName: 'Kamera başlatılamadı ({{name}}).',
+            permissionDenied: 'Kamera izni reddedildi. Lütfen tarayıcı ayarlarından kamera erişimine izin verin.',
+            notFound: 'Bu cihazda kamera bulunamadı.',
+            inUse: 'Kamera başka bir uygulama tarafından kullanılıyor. Uygulamayı kapatıp tekrar deneyin.',
+            insecure: 'Güvenli olmayan bağlantıda kamera engellendi. Bu sayfayı HTTPS üzerinden açın.',
+            aborted: 'Kamera beklenmedik şekilde durdu. Lütfen tekrar deneyin.',
+            unavailable: 'Bu bağlantıda kamera kullanılamıyor. Bu sayfayı HTTPS üzerinden veya localhost üzerinde açın.',
         },
     },
 
@@ -38,6 +68,7 @@ const tr: TranslationSchema = {
     header: {
         receive: 'Al',
         send: 'Gönder',
+        lock: 'Kilitle',
     },
 
     // ─── Not Found ────────────────────────────────────────
@@ -117,6 +148,10 @@ const tr: TranslationSchema = {
             codeExpired: 'Gönderilen Kodun Süresi Doldu',
         },
         enterName: {
+            title: 'Adınızı Girin !',
+            subtitle: 'Son Adım ve Hizmetlerimizin Keyfini Çıkarın',
+            description: 'Daha Yüksek Güvenlik Sağlayın ve Paranızı Koruyun',
+            placeholder: 'Adınızı Kimliğinizdeki Gibi Girin',
             errors: {
                 invalidChars: 'Yalnızca harf, boşluk, kısa çizgi ve kesme işareti.',
                 tooShort: 'En az 2 harf girin.',
@@ -171,12 +206,21 @@ const tr: TranslationSchema = {
         },
         setPasscode: {
             title: 'Şifre Belirle',
+            titleSet: 'Şifre Belirle !',
             titleDone: 'Şifre Belirlendi',
+            welcomeTitle: 'Hoş Geldiniz !',
+            welcomeSubtitle: 'Hizmetlerimizin Keyfini Çıkarın',
             subtitle: 'Son Adım ve Hizmetlerimizin Keyfini Çıkarın',
             setLabel: 'Şifre Belirle',
             reenterLabel: 'Şifreyi Tekrar Girin',
             doneLabel: 'Şifreyi Tekrar Girin',
             mismatch: 'Şifreler eşleşmeli. Lütfen yeniden belirleyin.',
+            saveFailed: 'Şifre kaydedilemedi. Lütfen tekrar deneyin.',
+        },
+        biometric: {
+            fingerprint: 'Parmak İzi Kullan',
+            faceId: 'Face ID Kullan',
+            passkey: 'Biyometrik Kullan',
         },
         enterPasscode: {
             title: 'Şifre Girin',
@@ -275,6 +319,7 @@ const tr: TranslationSchema = {
                 failed: 'Başarısız',
             },
         },
+        receiveMoneyInfo: 'Parayı tüm merkezlerimizden alabilir ya da uygulamamızı indirip hesap açarak parayı kullanabilir ve tüm hizmetlerden yararlanabilirsiniz.',
     },
 
     // ─── Home ─────────────────────────────────────────────
@@ -298,6 +343,8 @@ const tr: TranslationSchema = {
         transactions: {
             transferSend: 'Transfer | Gönder',
             transferReceive: 'Transfer | Al',
+            deposit: 'Yatırma',
+            withdrawal: 'Çekme',
             defaultTitle: 'İşlem',
         },
         deposit: {
@@ -351,6 +398,10 @@ const tr: TranslationSchema = {
             share: 'Paylaş',
             send: 'Gönder',
             cancel: 'İptal',
+            cancelConfirm: 'Bu ödeme talebini iptal etmek istediğinize emin misiniz?',
+            cancelReasonPlaceholder: 'İptal gerekçesi',
+            confirmCancel: 'İptali Onayla',
+            cancelling: 'İptal ediliyor…',
             amountToSend: 'Gönderilecek Tutar',
             messages: {
                 noWalletIdAvailable: 'Bu para birimi için Cüzdan ID mevcut değil.',
@@ -403,6 +454,16 @@ const tr: TranslationSchema = {
                 CameraNotFound: 'Kamera bulunamadı. Lütfen cihazınızı kontrol edin.',
                 uploadFromGallery: 'Galeriden Yükle',
                 uploadDescription: 'Kayıtlı Bir QR Görseli Seçin',
+            },
+            loadRequestFailed: 'Talep yüklenemedi',
+            operations: {
+                create: 'Ödeme talebi oluşturma',
+                lookup: 'Ödeme talebi sorgulama',
+                fulfill: 'Ödemeyi tamamlama',
+                merchantPay: 'Üye işyeri ödemesi',
+                cancel: 'Ödeme iptali',
+                unreadable: 'Bu ödeme talebi okunamadı.',
+                failed: '{{operation}} başarısız oldu. Lütfen tekrar deneyin.',
             },
         },
     },
@@ -471,6 +532,293 @@ const tr: TranslationSchema = {
         logout: 'Çıkış Yap',
         logoutConfirmation: 'Çıkış yapmak istediğinize emin misiniz?',
         notProvided: 'Belirtilmedi',
+
+        // ── Müşteri Bilgileri ekranı ──────────────────────
+        clientInfo: {
+            title: 'Müşteri Bilgileri',
+            clientId: 'Müşteri ID',
+            clientStatus: 'Müşteri Durumu',
+            clientSince: 'Müşteri Olma Tarihi',
+            clientType: 'Müşteri Tipi',
+            clientVerified: 'Müşteri Doğrulaması',
+            clientName: 'Müşteri Adı',
+            clientPhone: 'Müşteri Telefon Numarası',
+            active: 'Aktif',
+            personal: 'Bireysel',
+            verified: 'Doğrulandı',
+            notVerified: 'Doğrulanmadı',
+            days: '{{count}} Gün',
+            day: '{{count}} Gün',
+            verificationDocuments: 'Doğrulama Belgeleri',
+            passport: 'Pasaport',
+            nationalId: 'Kimlik Kartı',
+            idDocumentAlt: 'Kimlik belgesi',
+            id: 'Kimlik',
+            back: 'Arka Yüz',
+            face: 'Yüz',
+            deleteAccount: 'Hesap Silme Talebi',
+        },
+
+        // ── Müşteri Adı ekranı ────────────────────────────
+        clientName: {
+            title: 'Müşteri Adı',
+            label: 'Müşteri Adı',
+            cannotChangeTitle: 'Müşteri Adı Değiştirilemez',
+            cannotChangeDesc: 'Çünkü Gönderdiğiniz Belgelere Bağlıdır',
+            mustMatchTitle: 'Ad, Kimlik Belgesiyle Eşleşmelidir',
+            mustMatchDesc:
+                'Hesaptaki paranın size ait olduğunu güvence altına almak için. Ayrıca merkezlerimizden para alırken, eşleşen resmi bir belge ibraz edilmeden ödeme yapılmaz.',
+            unprotectedTitle: 'Korumasız Hesap | Sınırlı Erişim',
+            weeklyVolume: 'Haftalık İşlem Hacmi {{amount}} | Yenileme Cuma 10:00',
+            protectTitle: 'Hesabınızı Koruyun | Tam Erişim',
+            protectDesc: 'Hesabınızı güvende tutun, güvenli işlemler sağlayın.',
+            protectButton: 'Koru ve Şimdi Doğrula',
+            uploadedDocuments: 'Müşterinin Yüklediği Belgeler',
+            yourFiles: 'Dosyalarınız',
+            documentAlt: 'Belge {{number}}',
+            needHelp: 'Adım Hakkında Yardım Gerekiyor',
+            updateSuccess: 'Ad başarıyla güncellendi',
+            updateFailed: 'Ad güncellenemedi',
+        },
+
+        // ── Müşteri Telefonu ekranı ───────────────────────
+        clientPhone: {
+            title: 'Müşteri Telefon Numarası',
+            label: 'Müşteri Telefon Numarası',
+            addSecond: 'İkinci Bir Telefon Numarası Ekle',
+            ownTitle: 'Size Ait Bir Telefon Numarası Girin',
+            ownDesc:
+                'Size ait olan, çalınamayacak ve başkalarının erişemeyeceği bir telefon numarası girmenizi önemle tavsiye ederiz.',
+            importantTitle: 'Telefon Numarası Hesap Sahipliğini Doğrulamak İçin Çok Önemlidir',
+            importantDesc:
+                'İlk telefon numarası kimlik ve hesap sahipliği doğrulaması için zorunludur, bu nedenle güçlü korumamız altındadır. Telefon numarasını değiştirmek veya yeni numara eklemek, kimliğinizi doğrulamak için görüntülü görüşme gerektirir.',
+            needHelp: 'Numaram Hakkında Yardım Gerekiyor',
+        },
+
+        // ── Müşteri QR ekranı ─────────────────────────────
+        clientQr: {
+            title: 'Müşteri ID',
+            clientName: 'Müşteri Adı',
+            clientPhone: 'Müşteri Telefon Numarası',
+        },
+
+        // ── Giriş Geçmişi ekranı ──────────────────────────
+        loginHistory: {
+            title: 'Giriş Geçmişi',
+            loadError: 'Giriş geçmişiniz yüklenemedi',
+            empty: 'Henüz giriş etkinliği yok',
+            emptyDesc: 'Son girişleriniz burada görünecek.',
+            success: 'Başarılı',
+            failed: 'Başarısız',
+            unknownDevice: 'Bilinmeyen cihaz',
+            unknown: 'Bilinmiyor',
+        },
+
+        // ── Profil Fotoğrafı ekranı ───────────────────────
+        photo: {
+            title: 'Profil Fotoğrafı',
+            add: 'Profil Fotoğrafı Ekle',
+            edit: 'Profil Fotoğrafını Düzenle',
+            choose: 'Seç',
+            takePhoto: 'Fotoğraf Çek',
+            remove: 'Kaldır',
+            removeTitle: 'Fotoğrafı Kaldır',
+            removeMessage: 'Profil fotoğrafınızı kaldırmak istediğinize emin misiniz?',
+            removed: 'Fotoğraf başarıyla kaldırıldı',
+            updated: 'Fotoğraf başarıyla güncellendi',
+        },
+        addPhoto: 'Fotoğraf Ekle',
+        kycPending: 'İnceleniyor',
+        kycPendingDesc: 'Doğrulamanız inceleniyor',
+        kycRejected: 'Doğrulama Reddedildi',
+        activeSession: 'Aktif Oturum',
+    },
+
+    // ─── Şifre Sıfırlama ──────────────────────────────────
+    resetPasscode: {
+        intro: {
+            title: 'Şifrenizi mi Unuttunuz !',
+            subtitle: 'Şifrenizi Sıfırlamaya Başlayabilirsiniz',
+            description:
+                'Endişelenmeyin, bu adımları izleyerek şifrenizi sıfırlamanıza yardımcı olacağız.',
+            securityNote1:
+                'Şifrenizi sıfırlamak, işlemlerinizin güvenliğini sağlamak için kritik öneme sahip bir güvenlik önlemidir.',
+            securityNote2: 'Bu nedenle bu konuda katı prosedürler uyguluyoruz.',
+            securityNote3:
+                'Şifre sıfırlama işlemine devam etmek istiyorsanız, lütfen aşağıdaki güvenlik talimatlarını izleyin.',
+            startButton: 'Şifre Sıfırlamayı Başlat',
+        },
+        quiz: {
+            title: 'Şifre Sıfırlama !',
+            description:
+                'Endişelenmeyin, bu adımları izleyerek şifrenizi sıfırlamanıza yardımcı olacağız.',
+            swipeHint:
+                'Emin değil misiniz? Önceki cevaplarınızı gözden geçirmek ve değiştirmek için sağa veya sola kaydırın. Bu son soruyu cevaplamak sınavı gönderir.',
+            questionNumber: 'Soru {{number}}',
+        },
+        failOnce: {
+            title: 'Şifre Sıfırlama !',
+            message:
+                '"Güvenlik standartlarımıza göre yanlış cevaplar verdiniz. Doğru cevaplamak için yalnızca bir hakkınız kaldı."',
+            retryButton: 'Tekrar Cevapla',
+        },
+        lockout: {
+            title: 'Şifre Sıfırlama !',
+            message:
+                '"İkinci denemede de güvenlik standartlarımıza göre yanlış cevaplar verdiniz. Bu nedenle aşağıdaki süre dolana kadar tekrar deneyemezsiniz."',
+            helpPrefix: '"Durum acilse, yardım almak için ',
+            ourCenters: 'Merkezlerimizden',
+            helpSuffix: ' birini ziyaret edebilirsiniz."',
+            tryAgainAfter: '{{time}} sonra tekrar deneyebilirsiniz',
+        },
+        setPasscode: {
+            title: 'Yeni Şifre',
+            titleDone: 'Yeni Şifre Belirlendi',
+            subtitle: 'Devam Etmek İçin Yeni Bir Şifre Belirleyin',
+            setLabel: 'Yeni Şifre',
+            reenterLabel: 'Yeni Şifreyi Tekrar Girin',
+            doneTitle: 'Tamam !',
+            doneSubtitle: 'Şifreniz Sıfırlandı',
+            doneNote: 'Hizmetlerimizin Keyfini Çıkarın',
+        },
+        title: 'Şifre Sıfırlama !',
+        toasts: {
+            loginExpired: 'Giriş oturumunuzun süresi doldu. Lütfen tekrar giriş yapın.',
+            verificationIncomplete: 'Kimlik doğrulama tamamlanmadı.',
+            questionsFailed: 'Güvenlik soruları yüklenemedi. Lütfen tekrar deneyin.',
+            startFailed: 'Şifre sıfırlama başlatılamadı. Lütfen tekrar deneyin.',
+            sendCodeFailed: 'Kod gönderilemedi. Lütfen tekrar deneyin.',
+            codeSent: 'Kod {{method}} ile gönderildi',
+            submitAnswersFailed: 'Cevaplarınız gönderilemedi. Lütfen tekrar deneyin.',
+            resetExpired: 'Sıfırlama oturumunuzun süresi doldu. Lütfen baştan başlayın.',
+            passcodeUpdated: 'Şifre güncellendi — devam etmek için yeni şifrenizi girin.',
+            setPasscodeFailed: 'Yeni şifreniz ayarlanamadı. Lütfen tekrar deneyin.',
+        },
+    },
+
+    // ─── Kimlik Doğrulama (KYC) ───────────────────────────
+    verification: {
+        title: 'Kimlik Doğrulama !',
+        privacySafe: 'Gizliliğiniz Tamamen Güvende',
+        liveDetection: 'Kimliğinizin Canlı Tespiti',
+        informationDetected: 'Tespit Edilen Bilgiler',
+        passport: 'Pasaport',
+        frontSide: 'Ön Yüz',
+        backSide: 'Arka Yüz',
+        frontId: 'Kimlik Ön Yüz',
+        backId: 'Kimlik Arka Yüz',
+        fields: {
+            idType: 'Belge Tipi',
+            country: 'Ülke',
+            name: 'Ad',
+            passportNumber: 'Pasaport Numarası',
+            nationalNumber: 'Kimlik Numarası',
+            birthday: 'Doğum Tarihi',
+        },
+        intro: {
+            title: 'Kimlik Doğrulama !',
+            subtitle: 'Hesabınızı Koruyun ve Tam Erişim Kazanın',
+            description:
+                'Hesabınızı dolandırıcılıktan korumak ve güvenlik düzenlemelerine uymak için kimliğinizi bir kez doğrulamamız gerekiyor. Bu, sizin siz olduğunuzu teyit eden tek seferlik bir işlemdir. Hesabınızı güvende tutar, dolandırıcılığı önler ve güvenli işlemler sağlar — tıpkı banka hesabı açarken kimliğinizi göstermeniz gibi.',
+            startButton: 'Doğrulamayı Başlat',
+            laterButton: 'Daha Sonra, Sınırlı Sürümü Kullan',
+        },
+        success: {
+            title: 'Doğrulama Başarılı !',
+            subtitle: 'Artık Tam Erişimin Keyfini Çıkarabilirsiniz',
+            fallbackName: 'RDB Kullanıcısı',
+        },
+        summary: {
+            correctNext: 'Doğru, İleri',
+            incorrectRetry: 'Yanlış, Tekrar Dene',
+            submitFailed:
+                'Gönderim başarısız oldu. Lütfen bağlantınızı kontrol edip tekrar deneyin.',
+        },
+        contactSupport: {
+            willContact: 'Sizinle Yakında İletişime Geçeceğiz',
+            within: '2 Saat İçinde',
+        },
+        exitDialog: {
+            title: 'Doğrulamadan Çıkılsın mı?',
+            message:
+                'İlerlemeniz kaybolacak. Doğrulamayı daha sonra sınırlı sürümden yeniden başlatabilirsiniz.',
+            stay: 'Kal',
+            exit: 'Çık',
+        },
+        faceMatch: {
+            facePhoto: 'Yüz Fotoğrafı',
+            noMatch: 'Yüz eşleşmedi',
+            submitFailed: 'Doğrulamanızı gönderemedik. Lütfen tekrar deneyin.',
+            notApproved: 'Doğrulama onaylanmadı.',
+            missingData: 'Doğrulama verisi eksik — lütfen baştan başlayın.',
+            lowConfidence: 'Eşleşme düşük güvenle kabul edildi — doğrulamanız ekibimiz tarafından incelenecek. Sonraki adıma geçiliyor…',
+            discrepancy: 'Görüntüde bir tutarsızlık fark ettik ve doğrulamanızda bir sorun var.',
+            retryWithCorrection: 'Düzeltme ile Tekrar Dene',
+            rematch: 'Yeniden Eşleştir',
+        },
+        idCapture: {
+            // Analiz servisinin döndürdüğü ret nedenleri
+            unsupportedId: 'Bu desteklenen bir kimlik değil. Pasaport veya kimlik kartı kullanın.',
+            notReadable:
+                'Kimlik net okunamıyor. Kartı düz tutun, iyi aydınlatın ve tekrar deneyin.',
+            wrongSideFront: 'Bu kimliğinizin ön yüzü. Çevirip arka yüzü gösterin.',
+            wrongSideBack: 'Bu kimliğinizin arka yüzü. Fotoğrafınızın olduğu yüzü gösterin.',
+            spoofing: 'Gerçek kimlik gerekli — lütfen orijinal kimlik belgenizi gösterin.',
+            noFaceOnFront:
+                'Kimliğinizde yüz fotoğrafı bulunamadı. Fotoğrafınızın olduğu ön yüzün kameraya baktığından emin olun.',
+            showPhotoSide: 'Kimliğinizin fotoğrafınız olan yüzünü gösterin',
+            noFaceOnPassport:
+                'Pasaportunuzda yüz fotoğrafı bulunamadı. Fotoğraf sayfasını açıp tekrar deneyin.',
+            notBackOfId: 'Bu kimliğinizin arka yüzü değil. Lütfen aynı belgenin arka yüzünü kullanın.',
+            frontAgain: 'Bu yine ön yüz gibi görünüyor. Lütfen kartı çevirin.',
+            // Canlı kare kalitesi yönlendirmeleri
+            tooDark: 'Çok karanlık — daha aydınlık bir yere geçin',
+            tooBright: 'Çok parlak — doğrudan ışıktan uzaklaşın',
+            glare: 'Parlama — yansımayı azaltmak için kartı eğin',
+            blurry: 'Bulanık — kamerayı sabit tutun',
+            cameraMoving: 'Kamera hareket ediyor — sabit tutun',
+            noCard: 'Kart algılanmadı — kimliğinizi çerçevenin ortasına yerleştirin',
+            moveCloser: 'Yaklaşın ve kartı çerçevenin içine hizalayın',
+            useOriginal: 'Ekran değil, orijinal kartı kullanın',
+            alignInFrame: 'Kimliği çerçeveye hizalayın',
+            holdSteady: 'Sabit tutun…',
+            cardDetected: 'Kart algılandı — taranıyor…',
+            // Yakalama aşamaları
+            startButton: 'Kimliğinizin Canlı Tespitini Başlatın',
+            alignWithinFrame: 'Kimliği çerçeveye hizalayın...',
+            flipToBack: 'Lütfen ARKA yüze çevirin...',
+            flipToBackNow: 'Şimdi arka yüze çevirin',
+            passportCaptured: 'Pasaport Yakalandı!',
+            captureComplete: 'Kimlik Yakalama Tamamlandı!',
+            documentDetected: 'Belge algılandı',
+            processing: 'İşleniyor…',
+            couldNotRead: 'Kimlik okunamadı — tekrar deneyin',
+            moveCloserShort: 'Yaklaşın...',
+            moveCloserDocument: 'Belgeye yaklaşın',
+            holdSteadyShort: 'Sabit tutun...',
+            focusing: 'Sabit durun, odaklanılıyor...',
+            // Tespit edilen belge etiketleri
+            detectedPassport: '{{country}} Pasaportu algılandı',
+            detectedDriverLicence: '{{country}} Sürücü Belgesi algılandı',
+            detectedTurkishId: 'Türkiye Cumhuriyeti Kimlik Kartı algılandı',
+            detectedSyrianId: 'Suriye Kimlik Kartı algılandı',
+            detectedCountryId: '{{country}} kimliği algılandı',
+            detectedGeneric: 'Kimlik Algılandı!',
+        },
+        faceReverify: {
+            title: 'Siz Olduğunuzu Doğrulayın',
+            positionFace: 'Yüzünüzü çerçeveye yerleştirin ve ışığın yeterli olduğundan emin olun.',
+            verifying: 'Kimliğiniz doğrulanıyor…',
+            verified: 'Doğrulandı — bu sizsiniz.',
+            cameraError: 'Kamera okunamadı. Lütfen tekrar deneyin.',
+            notVerified: 'Kimliğinizi doğrulayamadık. Lütfen tekrar deneyin.',
+            genericError: 'Bir şeyler ters gitti. Lütfen tekrar deneyin.',
+            start: 'Doğrulamayı Başlat',
+            tryAgain: 'Tekrar Dene',
+            cancel: 'İptal',
+            cancelAria: 'Doğrulamayı iptal et',
+            missingChallenge: 'Doğrulama isteği eksik.',
+        },
     },
 
     // ─── Send ────────────────────────────────────────────────
@@ -540,7 +888,7 @@ const tr: TranslationSchema = {
 
     // ─── KYC / Face Liveness ──────────────────────────────
     faceLiveness: {
-        hintMiddleOfOperation: 'Yapay Zeka ile Kimlik Doğrulama için Video Görüşmesi',
+        hintMiddleOfOperation: '%50 tamamlandı. Yaklaşmaya devam edin.',
         hintMoveFaceFrontOfCamera: 'Yüzünüzü kameranın önüne koyun',
         hintTooManyFaces: 'Yalnızca bir yüz görünür olduğundan emin olun',
         hintFaceDetected: 'Yüz algılandı — hareketsiz kalın',
@@ -576,6 +924,27 @@ const tr: TranslationSchema = {
         liveLabel: 'Canlı',
         privacySafe: 'Gizliliğiniz Tamamen Güvende',
         endVerification: 'Doğrulamayı Bitir',
+        // Yapay zeka canlılık widget'ı
+        liveDetection: 'Canlı Yüz Tespiti',
+        beginButton: 'Yapay Zeka Yüz Kontrolünü Başlat',
+        restartButton: 'Yapay Zeka Yüz Kontrolünü Yeniden Başlat',
+        preparingSession: 'Yapay zeka oturumu hazırlanıyor…',
+        tapBeginPrefix: 'Yapay zeka canlılık kontrolünü başlatmak için ',
+        tapBeginWord: 'Başlat',
+        tapBeginSuffix: " düğmesine dokunun",
+        hints: {
+            noFace: 'Yüzünüzü maskenin içine yerleştirin',
+            eyesClosed: 'Gözlerinizi açık tutun',
+            sunglasses: 'Lütfen güneş gözlüğünüzü çıkarın',
+            screenDetected: 'Gerçek yüzünüzü kullanın — bir ekran veya telefon algılandı',
+            tooDark: 'Daha aydınlık bir yere geçin',
+            tooBlurry: 'Sabit tutun — görüntü çok bulanık',
+            notFacingCamera: 'Doğrudan kameraya bakın',
+            keepGoing: 'Devam edin...',
+            lookStraight: 'Lütfen Yüzünüzü Ekranın Ortasında Ve Öne Dönük Tutun',
+            turnRight: 'Başınızı Yavaşça Sağa Çevirin',
+            turnLeft: 'Başınızı Yavaşça Sola Çevirin',
+        },
         aiCall: {
             greeting:
                 'Merhaba {name}, Ramaz Dijital Bankaya hoş geldiniz. Ben yapay zeka dünyasından Lara. Endişelenmeyin, bu sadece bir dakikanızı alacak!',
@@ -636,6 +1005,27 @@ const tr: TranslationSchema = {
         backToStore: 'Mağazaya dön',
         expired: 'Bu siparişin süresi doldu.',
         notPayable: 'Bu sipariş artık ödenemez.',
+    },
+
+    passkeyGate: {
+        tooManyAttempts: 'Çok fazla deneme',
+        tryAgainIn: 'Tekrar deneyin:',
+        secondsShort: ' sn',
+        biometricFailed: 'Biyometrik doğrulama başarısız oldu. Lütfen PIN kodunuzu kullanın.',
+        biometricSetupFailed: 'Biyometrik kurulum başarısız oldu. Lütfen PIN kodunuzu kullanın.',
+    },
+
+    sessionTakeover: {
+        fallbackName: 'Kullanıcı',
+        verified: 'Doğrulanmış',
+        notVerified: 'Doğrulanmamış',
+        loggedInViaWeb: 'Web Üzerinden Giriş Yaptınız:',
+        justNow: 'Az Önce',
+        ago: 'Önce',
+        minute: '{{count}} Dakika',
+        minutes: '{{count}} Dakika',
+        hour: '{{count}} Saat',
+        hours: '{{count}} Saat',
     },
 };
 

@@ -1,6 +1,9 @@
 'use client';
 
 import { useRef, useState, useCallback, useEffect } from 'react';
+import { useTranslation } from '@/context/I18nContext';
+
+type Translate = ReturnType<typeof useTranslation>['tr'];
 
 interface UseCameraOptions {
     /** Desired facing mode. On desktop, 'environment' is automatically overridden to 'user'. */
@@ -45,26 +48,26 @@ interface UseCameraReturn {
  * origin. The final fallback keeps the DOMException name so an unrecognised
  * failure is still identifiable from a screenshot.
  */
-function describeCameraError(err: unknown): string {
+function describeCameraError(err: unknown, tr: Translate): string {
     if (!(err instanceof DOMException)) {
         return err instanceof Error
-            ? `Could not start the camera: ${err.message}`
-            : 'Could not start the camera.';
+            ? tr('common.camera.startFailedDetail', { detail: err.message })
+            : tr('common.camera.startFailed');
     }
     switch (err.name) {
         case 'NotAllowedError':
-            return 'Camera permission denied. Please allow camera access in your browser settings.';
+            return tr('common.camera.permissionDenied');
         case 'NotFoundError':
         case 'OverconstrainedError':
-            return 'No camera found on this device.';
+            return tr('common.camera.notFound');
         case 'NotReadableError':
-            return 'The camera is already in use by another app. Close it and try again.';
+            return tr('common.camera.inUse');
         case 'SecurityError':
-            return 'Camera blocked on an insecure connection. Open this page over HTTPS.';
+            return tr('common.camera.insecure');
         case 'AbortError':
-            return 'The camera stopped unexpectedly. Please try again.';
+            return tr('common.camera.aborted');
         default:
-            return `Could not start the camera (${err.name}).`;
+            return tr('common.camera.startFailedName', { name: err.name });
     }
 }
 
@@ -89,6 +92,14 @@ export function useCamera({
     const streamRef = useRef<MediaStream | null>(null);
     const [isActive, setIsActive] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    // Read through a ref so startCamera keeps its identity across a language
+    // switch — callers list it as an effect dependency, and a new identity would
+    // restart the camera.
+    const { tr } = useTranslation();
+    const trRef = useRef(tr);
+    useEffect(() => {
+        trRef.current = tr;
+    }, [tr]);
     const isMobile = isMobileDevice();
 
     const shouldMirror = !isMobile ? true : requestedFacing === 'user';
@@ -114,8 +125,7 @@ export function useCamera({
         // .getUserMedia there throws a TypeError whose message says nothing
         // about the real cause.
         if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
-            const message =
-                'Camera unavailable on this connection. Open this page over HTTPS or on localhost.';
+            const message = trRef.current('common.camera.unavailable');
             console.error('[useCamera] mediaDevices.getUserMedia is not available');
             setError(message);
             setIsActive(false);
@@ -139,7 +149,7 @@ export function useCamera({
             setIsActive(true);
             return null;
         } catch (err) {
-            const message = describeCameraError(err);
+            const message = describeCameraError(err, trRef.current);
             console.error('[useCamera] startCamera failed:', err);
             setError(message);
             setIsActive(false);

@@ -176,7 +176,7 @@ const DownloadView = forwardRef<HTMLDivElement, DownloadViewProps>(
                             {/* Note */}
                             {formData.note && (
                                 <div style={fieldBox}>
-                                    <p style={fieldLabel}>Note</p>
+                                    <p style={fieldLabel}>{t.common.note}</p>
                                     <p style={fieldValue}>{formData.note}</p>
                                 </div>
                             )}
@@ -200,7 +200,7 @@ const DownloadView = forwardRef<HTMLDivElement, DownloadViewProps>(
                             fontFamily: 'Quicksand, sans-serif',
                         }}
                     >
-                        Powered by Ramaaz Digital Banking
+                        {t.common.poweredBy}
                     </p>
                 </div>
             </div>

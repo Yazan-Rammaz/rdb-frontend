@@ -111,7 +111,7 @@ export default function EnterPin({
     return (
         <div className="w-full h-full flex flex-col bg-white">
             {/* Close button */}
-            <div className="flex absolute justify-end right-xd-30 top-xd-30">
+            <div className="flex absolute justify-end end-xd-30 top-xd-30">
                 {onClose && (
                     <button
                         onClick={onClose}

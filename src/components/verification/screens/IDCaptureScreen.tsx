@@ -17,11 +17,29 @@ import idFrontSvg from '@/assets/icons/verification/id-front.svg';
 import idBackSvg from '@/assets/icons/verification/id-back.svg';
 import shieldSvg from '@/assets/icons/verification/shield.svg';
 import ExitConfirmDialog from '../ExitConfirmDialog';
+import { useTranslation } from '@/context/I18nContext';
+import type { TranslationSchema } from '@/i18n';
 import { FlexibleSpace } from '@/scaling';
 import { idConfig, kycConfig } from '@/config/kycConfig';
 import { FaceProgressBar } from './AwsFaceLiveness';
 
 type PollState = 'idle' | 'aligning' | 'capturing' | 'processing' | 'success' | 'done';
+
+/** The coaching copy for this screen — one object, resolved per language. */
+type IdCaptureHints = TranslationSchema['verification']['idCapture'];
+
+/**
+ * A hint is either one of our own messages, held as the KEY into
+ * `verification.idCapture`, or a sentence the backend sent, held as text.
+ * Keeping ours as a key is what lets `setCaptureHint` compare hints without
+ * ever comparing translated sentences.
+ */
+type CaptureHint =
+    | { kind: 'key'; key: keyof IdCaptureHints }
+    | { kind: 'text'; text: string };
+
+const hintText = (h: CaptureHint, hints: IdCaptureHints): string =>
+    h.kind === 'key' ? hints[h.key] : h.text;
 
 /** Shoelace formula — signed area of an arbitrary quad from ScannerCorners. */
 function getQuadArea(c: {
@@ -105,6 +123,8 @@ const areImagesTooSimilar = async (base1: string, base2: string): Promise<boolea
 const BACK_SIDE_FACE_BLOCK_MIN_AREA_RATIO = 0.08;
 
 export default function IDCaptureScreen() {
+    const { t, tr } = useTranslation();
+    const hints = t.verification.idCapture;
     const { goTo, setIdDocument, markCompleted } = useVerification();
     const router = useRouter();
     const {
@@ -123,8 +143,12 @@ export default function IDCaptureScreen() {
     const [frontImageData, setFrontImageData] = useState<string | null>(null);
     const [backImageData, setBackImageData] = useState<string | null>(null);
     const [frontPartial, setFrontPartial] = useState<Partial<IDDocument> | null>(null);
-    const [statusText, setStatusText] = useState('Press the button below to start camera');
-    const [captureHint, setCaptureHint] = useState<string | null>(null);
+    // A hint is either one of our own messages (held as a locale KEY, resolved
+    // at render) or a sentence the backend sent (held as text, shown as sent).
+    // Keys, not rendered text: comparing translated sentences would break the
+    // moment the language changes while a hint is up.
+    const [statusText, setStatusText] = useState<string>('');
+    const [captureHint, setCaptureHint] = useState<CaptureHint | null>(null);
     const [showExitDialog, setShowExitDialog] = useState(false);
     const [isPassport, setIsPassport] = useState(false);
     const [isVerifying, setIsVerifying] = useState(false);
@@ -158,30 +182,29 @@ export default function IDCaptureScreen() {
         code: string | null | undefined,
         reason: string | null | undefined,
         message?: string | null,
-    ): string | null {
+    ): CaptureHint | null {
         // Prefer the structured message from the API when available — it's
         // already a short, user-friendly global message.
-        if (message) return message;
+        if (message) return { kind: 'text', text: message };
         // Legacy reason-based fallback (older API responses without `message`).
         switch (reason ?? code) {
             case 'INVALID_ID_TYPE':
             case 'invalid_id_type':
-                return 'This is not a supported ID. Use a passport or national ID.';
+                return { kind: 'key', key: 'unsupportedId' };
             case 'MISSING_CRITICAL_DATA':
             case 'insufficient_fields':
             case 'NO_TEXT_DETECTED':
             case 'no_text_detected':
-                return 'ID not clearly readable. Hold the card flat, well-lit, and try again.';
+                return { kind: 'key', key: 'notReadable' };
             case 'WRONG_SIDE':
             case 'wrong_side':
-                return activeSide === 'back'
-                    ? 'This is the front of your ID. Flip it over and show the back.'
-                    : 'This is the back of your ID. Show the side with your photo.';
+                return {
+                    kind: 'key',
+                    key: activeSide === 'back' ? 'wrongSideFront' : 'wrongSideBack',
+                };
             case 'SPOOFING_DETECTED':
             case 'spoofing_detected':
-                return (
-                    message ?? 'Real ID required — please present your original identity document.'
-                );
+                return { kind: 'key', key: 'spoofing' };
             default:
                 return null;
         }
@@ -272,13 +295,11 @@ export default function IDCaptureScreen() {
                 setShowFlipHint(false);
                 if (hasFace && isLargeFaceOnFrame) {
                     blockBackCaptureRef.current = true;
-                    setCaptureHint('This is the front of your ID. Flip it over and show the back.');
+                    setCaptureHint({ kind: 'key', key: 'wrongSideFront' });
                 } else {
                     blockBackCaptureRef.current = false;
                     setCaptureHint((prev) =>
-                        prev === 'This is the front of your ID. Flip it over and show the back.'
-                            ? null
-                            : prev,
+                        prev?.kind === 'key' && prev.key === 'wrongSideFront' ? null : prev,
                     );
                 }
             }
@@ -309,41 +330,41 @@ export default function IDCaptureScreen() {
             debounceMs = DEBOUNCE_FAIL_MS;
             switch (checkResult.reason) {
                 case 'too_dark':
-                    newText = 'Too dark — move to a brighter area';
+                    newText = hints.tooDark;
                     break;
                 case 'too_bright':
-                    newText = 'Too bright — find less direct light';
+                    newText = hints.tooBright;
                     break;
                 case 'glare':
-                    newText = 'Glare — tilt the card to reduce reflections';
+                    newText = hints.glare;
                     break;
                 case 'too_blurry':
-                    newText = 'Blurry — hold the camera steady';
+                    newText = hints.blurry;
                     break;
                 case 'moving':
-                    newText = 'Camera moving — hold still';
+                    newText = hints.cameraMoving;
                     break;
                 case 'card_not_detected':
-                    newText = 'No card detected — centre your ID in the frame';
+                    newText = hints.noCard;
                     break;
                 case 'wrong_shape':
-                    newText = 'Move closer and align the card inside the frame';
+                    newText = hints.moveCloser;
                     break;
                 case 'screen_detected':
-                    newText = 'Use the original card, not a screen';
+                    newText = hints.useOriginal;
                     break;
                 default:
-                    newText = 'Align ID within frame';
+                    newText = hints.alignInFrame;
                     break;
             }
         } else if (!readyToCapture) {
             key = 'pass:steadying';
             debounceMs = DEBOUNCE_TRANSITION_MS;
-            newText = 'Hold steady…';
+            newText = hints.holdSteady;
         } else {
             key = 'pass:ready';
             debounceMs = DEBOUNCE_TRANSITION_MS;
-            newText = 'Card detected — scanning…';
+            newText = hints.cardDetected;
         }
 
         // Allow the same failure key to re-fire if the pass→fail→pass cycle
@@ -357,7 +378,7 @@ export default function IDCaptureScreen() {
             setStatusText(newText);
             statusDebounceRef.current = null;
         }, debounceMs);
-    }, [checkResult, readyToCapture, pollState]);
+    }, [checkResult, readyToCapture, pollState, hints]);
 
     useEffect(() => {
         return () => {
@@ -375,7 +396,7 @@ export default function IDCaptureScreen() {
         if (activeSide === 'back') {
             flipLockoutRef.current = true;
             setFlipLockout(true);
-            setStatusText('Please flip to the BACK side...');
+            setStatusText(hints.flipToBack);
             // Only ungate auto-capture after minimum wait; UI lockout stays until card detected
             const timer = setTimeout(() => {
                 flipLockoutRef.current = false;
@@ -390,20 +411,23 @@ export default function IDCaptureScreen() {
     const getDetectedDocumentLabel = useCallback(
         (result: Awaited<ReturnType<typeof kycServiceRef.current.analyzeId>>) => {
             const srcDoc = result.extracted ?? result.extractedData ?? {};
-            const t = (srcDoc.idType ?? '').toLowerCase();
+            // `idType` — NOT `t`: that name is the translator in this component.
+            const idType = (srcDoc.idType ?? '').toLowerCase();
             const c = srcDoc.country ?? '';
-            if (t.includes('passport')) return `${c} Passport detected`;
-            if (t.includes('driver')) return `${c} Driver's Licence detected`;
-            if (t.includes('turkish') || (t.includes('national_id') && c === 'Turkey')) {
-                return 'Turkish National ID detected';
+            if (idType.includes('passport'))
+                return tr('verification.idCapture.detectedPassport', { country: c });
+            if (idType.includes('driver'))
+                return tr('verification.idCapture.detectedDriverLicence', { country: c });
+            if (idType.includes('turkish') || (idType.includes('national_id') && c === 'Turkey')) {
+                return hints.detectedTurkishId;
             }
-            if (t.includes('syrian') || (t.includes('national_id') && c === 'Syria')) {
-                return 'Syrian National ID detected';
+            if (idType.includes('syrian') || (idType.includes('national_id') && c === 'Syria')) {
+                return hints.detectedSyrianId;
             }
-            if (c) return `${c} ID detected`;
-            return 'ID Detected!';
+            if (c) return tr('verification.idCapture.detectedCountryId', { country: c });
+            return hints.detectedGeneric;
         },
-        [],
+        [tr, hints],
     );
 
     const applyAnalyzeIdSuccess = useCallback(
@@ -419,10 +443,8 @@ export default function IDCaptureScreen() {
             if (result.nextStep === 'REQUIRE_BACK') {
                 if (!result.idFaceImageData) {
                     setPollState('aligning');
-                    setStatusText('Align ID within frame...');
-                    setCaptureHint(
-                        'No face photo found on your ID. Make sure the front side with your photo is facing the camera.',
-                    );
+                    setStatusText(hints.alignWithinFrame);
+                    setCaptureHint({ kind: 'key', key: 'noFaceOnFront' });
                     return;
                 }
 
@@ -445,7 +467,7 @@ export default function IDCaptureScreen() {
                 setFrontPartial(partial);
                 setActiveSide('back');
                 setPollState('aligning');
-                setStatusText('Now flip to the back side');
+                setStatusText(hints.flipToBackNow);
                 sessionHintRef.current = `session_${Date.now()}`;
                 return;
             }
@@ -453,10 +475,8 @@ export default function IDCaptureScreen() {
             if (side === 'front') {
                 if (!result.idFaceImageData) {
                     setPollState('aligning');
-                    setStatusText('Align ID within frame...');
-                    setCaptureHint(
-                        'No face photo found on your passport. Open to the photo page and try again.',
-                    );
+                    setStatusText(hints.alignWithinFrame);
+                    setCaptureHint({ kind: 'key', key: 'noFaceOnPassport' });
                     return;
                 }
 
@@ -483,7 +503,7 @@ export default function IDCaptureScreen() {
                 setIdDocument(fullDoc);
                 markCompleted('id-capture-back');
                 setPollState('done');
-                setStatusText('Passport Captured!');
+                setStatusText(hints.passportCaptured);
                 stopCamera();
                 setTimeout(() => goTo('id-summary', 1), 800);
                 return;
@@ -497,10 +517,11 @@ export default function IDCaptureScreen() {
             );
             if (!verified) {
                 setPollState('aligning');
-                setStatusText('Align ID within frame...');
+                setStatusText(hints.alignWithinFrame);
                 setCaptureHint(
-                    reason ??
-                        'This is not the back of your ID. Please use the back of the same document.',
+                    reason
+                        ? { kind: 'text', text: reason }
+                        : { kind: 'key', key: 'notBackOfId' },
                 );
                 return;
             }
@@ -527,7 +548,7 @@ export default function IDCaptureScreen() {
             setIdDocument(fullDoc);
             markCompleted('id-capture-back');
             setPollState('done');
-            setStatusText('ID Capture Complete!');
+            setStatusText(hints.captureComplete);
             stopCamera();
             setTimeout(() => goTo('id-summary', 1), 800);
         },
@@ -538,7 +559,7 @@ export default function IDCaptureScreen() {
         if (!isActive) {
             await startCamera();
             setPollState('aligning');
-            setStatusText('Align ID within frame...');
+            setStatusText(hints.alignWithinFrame);
             setCaptureHint(null);
             return;
         }
@@ -549,7 +570,7 @@ export default function IDCaptureScreen() {
 
         setIsVerifying(true);
         setPollState('capturing');
-        setStatusText('Document detected');
+        setStatusText(hints.documentDetected);
 
         try {
             // Primary path: OpenCV detected a clean 4-corner card → dewarp it.
@@ -578,7 +599,7 @@ export default function IDCaptureScreen() {
                     console.warn(
                         '🛑 Captured image is too similar to the front side. Rejecting silently.',
                     );
-                    setCaptureHint('This looks like the front side again. Please flip the card.');
+                    setCaptureHint({ kind: 'key', key: 'frontAgain' });
                     setPollState('aligning');
                     setFlipLockout(true);
                     setIsVerifying(false);
@@ -593,7 +614,7 @@ export default function IDCaptureScreen() {
             setTimeout(() => setShowFlash(false), 150);
 
             setPollState('processing');
-            setStatusText('Processing…');
+            setStatusText(hints.processing);
 
             console.log('🚀 Sending to AWS...', {
                 payloadLength: croppedBase64Card.length,
@@ -610,7 +631,7 @@ export default function IDCaptureScreen() {
                 const hint = codeToHint(result.code, result.reason, result.message);
                 setCaptureHint(hint);
                 setPollState('aligning');
-                setStatusText(hint ?? 'Could not read ID — try again');
+                setStatusText(hint ? hintText(hint, hints) : hints.couldNotRead);
                 return;
             }
 
@@ -621,7 +642,7 @@ export default function IDCaptureScreen() {
                 'AWS Error: ' + (error instanceof Error ? error.message : 'Unknown error occurred'),
             );
             setPollState('aligning');
-            setStatusText('Align ID within frame...');
+            setStatusText(hints.alignWithinFrame);
         } finally {
             setIsVerifying(false);
         }
@@ -752,7 +773,7 @@ export default function IDCaptureScreen() {
                 clearTimeout(statusDebounceRef.current);
                 statusDebounceRef.current = null;
             }
-            setStatusText('Move closer...');
+            setStatusText(hints.moveCloserShort);
         }
     }, [isCardDetected, isCardCloseEnough, pollState]);
 
@@ -783,7 +804,7 @@ export default function IDCaptureScreen() {
         }
 
         if (isCardDetected && isStable) {
-            setStatusText('Hold steady...');
+            setStatusText(hints.holdSteadyShort);
 
             const autoCaptureTimer = setTimeout(() => {
                 captureActionRef.current();
@@ -791,10 +812,10 @@ export default function IDCaptureScreen() {
 
             return () => clearTimeout(autoCaptureTimer);
         } else if (isCardDetected && !isStable) {
-            setStatusText('Move closer to the document');
+            setStatusText(hints.moveCloserDocument);
         } else if (isCardDetected && !isStable) {
             // Optional: Tell the user to stop moving
-            setStatusText('Hold still, focusing...');
+            setStatusText(hints.focusing);
         }
         // CRITICAL: handleCaptureClick is NOT in this array — the ref handles it
     }, [isCardDetected, isCardCloseEnough, isActive, isVerifying, pollState, isStable]);
@@ -828,7 +849,7 @@ export default function IDCaptureScreen() {
             />
 
             {/* Close button */}
-            <div className="flex absolute top-xd-50 right-xd-30 justify-end mb-2">
+            <div className="flex absolute top-xd-50 end-xd-30 justify-end mb-2">
                 <button
                     onClick={() => setShowExitDialog(true)}
                     className="text-red-400 hover:text-red-600"
@@ -847,16 +868,16 @@ export default function IDCaptureScreen() {
             <FlexibleSpace size={100} share={0.3} />
             {/* Header */}
             <h1 className="text-xd-30 font-bold text-center text-[#1D1D1D] mb-xd-5">
-                Identity Verification !
+                {t.verification.title}
             </h1>
             <div className="flex items-center justify-center gap-2 mb-xd-11">
                 <Image
                     src={liveDetectIdSvg}
-                    alt="live detect ID"
+                    alt=""
                     className="object-contain w-xd-20 h-xd-20"
                 />
                 <span className="text-xd-16 font-medium text-[#1D1D1D]">
-                    Live Detection Your ID
+                    {t.verification.liveDetection}
                 </span>
             </div>
 
@@ -961,7 +982,7 @@ export default function IDCaptureScreen() {
                             {/* The frozen captured card */}
                             <img
                                 src={debugPreview}
-                                alt="Processing ID"
+                                alt=""
                                 className="w-full h-auto object-contain"
                             />
 
@@ -1007,7 +1028,7 @@ export default function IDCaptureScreen() {
                 {(captureHint || showFlipHint) && pollState === 'aligning' && (
                     <div className="absolute -bottom-xd-1 left-0 right-0 px-xd-10">
                         <p className="text-xs text-[#E53E3E] bg-red-50 border border-red-200 rounded-xd-12 px-3 py-2 text-center leading-snug">
-                            {captureHint ?? 'Show the side of your ID with your photo'}
+                            {captureHint ? hintText(captureHint, hints) : hints.showPhotoSide}
                         </p>
                     </div>
                 )}
@@ -1020,12 +1041,14 @@ export default function IDCaptureScreen() {
                         <div className="inline-flex items-center justify-center gap-1 pb-2">
                             <Image
                                 src={idFrontSvg}
-                                alt="passport"
+                                alt=""
                                 width={16}
                                 height={16}
                                 className="object-contain"
                             />
-                            <span className="text-xs font-medium text-[#388CFF]">Passport</span>
+                            <span className="text-xs font-medium text-[#388CFF]">
+                                {t.verification.passport}
+                            </span>
                         </div>
                         <div className="mx-auto w-xd-306">
                             <FaceProgressBar pct={pollState === 'done' ? 100 : 0} tone="idle" />
@@ -1038,7 +1061,7 @@ export default function IDCaptureScreen() {
                         <div className={`inline-flex items-center justify-center gap-1 pb-2`}>
                             <Image
                                 src={idFrontSvg}
-                                alt="front"
+                                alt=""
                                 width={16}
                                 height={16}
                                 className="object-contain"
@@ -1052,7 +1075,7 @@ export default function IDCaptureScreen() {
                             <span
                                 className={`text-xs font-medium ${activeSide === 'front' ? 'text-[#388CFF]' : 'text-gray-400'}`}
                             >
-                                Front Side
+                                {t.verification.frontSide}
                             </span>
                         </div>
                         <div className="mx-auto w-xd-153">
@@ -1066,7 +1089,7 @@ export default function IDCaptureScreen() {
                         <div className={`inline-flex items-center justify-center gap-1 pb-2`}>
                             <Image
                                 src={idBackSvg}
-                                alt="back"
+                                alt=""
                                 width={16}
                                 height={16}
                                 className="object-contain"
@@ -1080,7 +1103,7 @@ export default function IDCaptureScreen() {
                             <span
                                 className={`text-xs font-medium ${activeSide === 'back' ? 'text-[#388CFF]' : 'text-gray-400'}`}
                             >
-                                Back Side
+                                {t.verification.backSide}
                             </span>
                         </div>
                         <div className="mx-auto w-xd-153">
@@ -1101,7 +1124,7 @@ export default function IDCaptureScreen() {
                             {frontImageData ? (
                                 <img
                                     src={frontImageData}
-                                    alt="Passport"
+                                    alt=""
                                     className="w-full h-full object-cover"
                                 />
                             ) : (
@@ -1115,7 +1138,7 @@ export default function IDCaptureScreen() {
                             {frontImageData ? (
                                 <img
                                     src={frontImageData}
-                                    alt="Front"
+                                    alt=""
                                     className="w-full h-full object-cover"
                                 />
                             ) : (
@@ -1126,7 +1149,7 @@ export default function IDCaptureScreen() {
                             {backImageData ? (
                                 <img
                                     src={backImageData}
-                                    alt="Back"
+                                    alt=""
                                     className="w-full h-full object-cover"
                                 />
                             ) : (
@@ -1145,7 +1168,7 @@ export default function IDCaptureScreen() {
                         onClick={startCamera}
                         className="text-xs text-[#388CFF] hover:underline"
                     >
-                        Try Again
+                        {t.common.tryAgain}
                     </button>
                 </div>
             )}
@@ -1154,11 +1177,11 @@ export default function IDCaptureScreen() {
                 <div className="flex items-center flex-col justify-center gap-2 mb-xd-12">
                     <Image
                         src={shieldSvg}
-                        alt="shield"
+                        alt=""
                         className="w-xd-15 h-xd-15 object-contain"
                     />
                     <span className="text-xd-12 text-[#388CFF]">
-                        Your Privacy Is Completely Safe
+                        {t.verification.privacySafe}
                     </span>
                 </div>
 
@@ -1168,7 +1191,7 @@ export default function IDCaptureScreen() {
                         onClick={handleCaptureClick}
                         className="w-xd-390 h-xd-60 py-4 rounded-xd-20 border border-dashed border-[#5D5C5D]/50 text-[#1D1D1D] text-xd-16 font-medium disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                        Start Live Detection Your ID
+                        {hints.startButton}
                     </button>
                 )}
             </div>

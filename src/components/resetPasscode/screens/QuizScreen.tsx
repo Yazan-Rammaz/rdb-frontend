@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { AnimatePresence, motion, type PanInfo } from 'framer-motion';
 import { FlexibleSpace } from '@/scaling';
+import { useTranslation } from '@/context/I18nContext';
 import closeSvg from '@/assets/icons/auth/close.svg';
 import type { QuizQuestion, ResetAnswer } from '@/services/resetPasscode/resetPasscodeApi';
 
@@ -46,6 +47,7 @@ const HINT_VISIBLE_MS = 5000;
  * its answer IS the submit (the chosen answers are kept and graded).
  */
 export default function QuizScreen({ questions, onComplete, onClose }: QuizScreenProps) {
+    const { t, tr } = useTranslation();
     const [[qi, direction], setPage] = useState<[number, number]>([0, 0]);
     const [answers, setAnswers] = useState<ResetAnswer[]>([]);
     const [submitting, setSubmitting] = useState(false);
@@ -118,7 +120,7 @@ export default function QuizScreen({ questions, onComplete, onClose }: QuizScree
     return (
         <div className="w-full h-full flex flex-col bg-white">
             {/* Close button */}
-            <div className="flex absolute justify-end right-xd-30 top-xd-30">
+            <div className="flex absolute justify-end end-xd-30 top-xd-30">
                 {onClose && (
                     <button
                         onClick={onClose}
@@ -126,7 +128,7 @@ export default function QuizScreen({ questions, onComplete, onClose }: QuizScree
                     >
                         <Image
                             src={closeSvg}
-                            alt="close"
+                            alt=""
                             width={16}
                             height={16}
                             className="object-contain"
@@ -138,9 +140,11 @@ export default function QuizScreen({ questions, onComplete, onClose }: QuizScree
             <FlexibleSpace share={0.5} size={188} />
             {/* Faded title block */}
             <div className="px-xd-40">
-                <h2 className="text-xd-30 font-bold text-[#C3C3C3]">Reset Passcode !</h2>
+                <h2 className="text-xd-30 font-bold text-[#C3C3C3]">
+                    {t.resetPasscode.quiz.title}
+                </h2>
                 <p className="text-xd-12 text-[#C3C3C3] mt-xd-8 leading-relaxed">
-                    Don&apos;t Worry, We Will Help You Reset Your Passcode By Following These Steps.
+                    {t.resetPasscode.quiz.description}
                 </p>
             </div>
 
@@ -212,8 +216,7 @@ export default function QuizScreen({ questions, onComplete, onClose }: QuizScree
                             transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
                             className="text-xd-12 text-[#8E8E8E] text-center leading-relaxed px-xd-10"
                         >
-                            Not sure? Swipe left or right to review and change your earlier answers.
-                            Answering this last question submits the quiz.
+                            {t.resetPasscode.quiz.swipeHint}
                         </motion.p>
                     )}
                 </AnimatePresence>
@@ -227,7 +230,9 @@ export default function QuizScreen({ questions, onComplete, onClose }: QuizScree
                                 key={question.id}
                                 onClick={() => goTo(index)}
                                 disabled={submitting}
-                                aria-label={`Question ${index + 1}`}
+                                aria-label={tr('resetPasscode.quiz.questionNumber', {
+                                    number: index + 1,
+                                })}
                                 className={`rounded-full transition-all duration-300 ${
                                     active
                                         ? 'w-xd-20 h-xd-8 bg-[#3B5BA5]'

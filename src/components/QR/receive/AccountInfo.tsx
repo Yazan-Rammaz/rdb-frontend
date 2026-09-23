@@ -55,11 +55,16 @@ export function AccountInfo({
                 {!downloadMode && (
                     <button
                         onClick={toggleShowName}
-                        className="absolute right-xd-10 top-1/2 -translate-y-1/2 p-2"
+                        aria-label={
+                            showName
+                                ? t.common.accessibility.hideName
+                                : t.common.accessibility.showName
+                        }
+                        className="absolute end-xd-10 top-1/2 -translate-y-1/2 p-2"
                     >
                         <Image
                             src={!showName ? EyeIcon : EyeOpenIcon}
-                            alt="toggle visibility"
+                            alt=""
                             width={16}
                             height={16}
                             className="size-xd-16 opacity-50"

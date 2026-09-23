@@ -45,12 +45,12 @@ export default function EnterNameScreen({ onSubmit, loading }: EnterNameScreenPr
 
             {/* Title block */}
             <div className="px-xd-30 flex flex-col items-start">
-                <h2 className="text-xd-30 font-bold text-[#1D1D1D]">Enter Your Name !</h2>
+                <h2 className="text-xd-30 font-bold text-[#1D1D1D]">{t.auth.enterName.title}</h2>
                 <p className="text-xd-16 font-medium text-[#1D1D1D] mt-xd-8">
-                    Last Step And Enjoy Our Services
+                    {t.auth.enterName.subtitle}
                 </p>
                 <p className="text-xd-12 font-normal text-[#1D1D1D] mt-xd-4">
-                    Ensure Greater Security And Protect Your Funds
+                    {t.auth.enterName.description}
                 </p>
             </div>
 
@@ -68,7 +68,7 @@ export default function EnterNameScreen({ onSubmit, loading }: EnterNameScreenPr
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-                            placeholder="Enter Your Name Exact ID"
+                            placeholder={t.auth.enterName.placeholder}
                             autoFocus
                             dir="auto"
                             autoComplete="name"
@@ -86,11 +86,11 @@ export default function EnterNameScreen({ onSubmit, loading }: EnterNameScreenPr
                                 className={`shrink-0 flex items-center justify-center transition-opacity disabled:opacity-50 ${
                                     canSubmit ? '' : 'opacity-30'
                                 }`}
-                                aria-label="Continue"
+                                aria-label={t.common.accessibility.continue}
                             >
                                 <Image
                                     src={ArrowRight}
-                                    alt="continue"
+                                    alt=""
                                     width={20}
                                     height={20}
                                     className="object-contain"

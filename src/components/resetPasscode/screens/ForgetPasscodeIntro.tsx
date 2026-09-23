@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { FlexibleSpace } from '@/scaling';
+import { useTranslation } from '@/context/I18nContext';
 import shieldSvg from '@/assets/icons/verification/shield.svg';
 import closeSvg from '@/assets/icons/auth/close.svg';
 
@@ -21,10 +22,11 @@ export default function ForgetPasscodeIntro({
     loading,
     onClose,
 }: ForgetPasscodeIntroProps) {
+    const { t } = useTranslation();
     return (
         <div className="w-full h-full flex flex-col bg-white">
             {/* Close button */}
-            <div className="flex absolute justify-end right-xd-30 top-xd-30">
+            <div className="flex absolute justify-end end-xd-30 top-xd-30">
                 {onClose && (
                     <button
                         onClick={onClose}
@@ -32,7 +34,7 @@ export default function ForgetPasscodeIntro({
                     >
                         <Image
                             src={closeSvg}
-                            alt="close"
+                            alt=""
                             width={16}
                             height={16}
                             className="object-contain"
@@ -48,13 +50,14 @@ export default function ForgetPasscodeIntro({
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
                 >
-                    <h2 className="text-xd-30 font-bold text-[#1D1D1D]">Forget Passcode !</h2>
+                    <h2 className="text-xd-30 font-bold text-[#1D1D1D]">
+                        {t.resetPasscode.intro.title}
+                    </h2>
                     <p className="text-xd-16 font-medium text-[#1D1D1D] text-trim-descend mt-xd-10">
-                        You Can Start Reset Your Passcode
+                        {t.resetPasscode.intro.subtitle}
                     </p>
                     <p className="text-xd-12 text-[#1D1D1D] mt-xd-8 leading-relaxed">
-                        Don&apos;t Worry, We Will Help You Reset Your Passcode By Following These
-                        Steps.
+                        {t.resetPasscode.intro.description}
                     </p>
                 </motion.div>
                 <FlexibleSpace size={60} share={0.4} />
@@ -72,20 +75,18 @@ export default function ForgetPasscodeIntro({
                     <div className="w-xd-20 h-xd-20 mb-xd-14">
                         <Image
                             src={shieldSvg}
-                            alt="security"
+                            alt=""
                             className="w-xd-20 h-xd-20 object-contain"
                         />
                     </div>
                     <p className="text-xd-12 text-[#388CFF] text-center leading-relaxed">
-                        Reset Your Passcode Is A Critically Important Security Measure To Ensure The
-                        Safety Of Your Transactions.
+                        {t.resetPasscode.intro.securityNote1}
                     </p>
                     <p className="text-xd-12 text-[#388CFF] text-center leading-relaxed mt-xd-14">
-                        Therefore, We Apply Strict Procedures In This Regard.
+                        {t.resetPasscode.intro.securityNote2}
                     </p>
                     <p className="text-xd-12 text-[#388CFF] text-center leading-relaxed mt-xd-14">
-                        If You Wish To Proceed With Reset Your Passcode, Please Follow The Security
-                        Instructions Below.
+                        {t.resetPasscode.intro.securityNote3}
                     </p>
                 </motion.div>
 
@@ -96,7 +97,7 @@ export default function ForgetPasscodeIntro({
                     disabled={loading}
                     className="w-xd-390 h-xd-60 rounded-xd-20 border border-dashed border-[#C3C3C3] bg-[#FCFCFC] text-[#1D1D1D] text-xd-16 font-medium flex items-center justify-center disabled:opacity-60 disabled:cursor-not-allowed transition-opacity"
                 >
-                    Start Reset Passcode
+                    {t.resetPasscode.intro.startButton}
                 </button>
                 <FlexibleSpace size={45} />
             </div>

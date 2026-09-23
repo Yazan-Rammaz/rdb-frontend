@@ -4,11 +4,14 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useCamera } from '@/hooks/useCamera';
 import { createKycService } from '@/services/kyc';
+import { useTranslation } from '@/context/I18nContext';
 import type { FaceReverifyOutcome } from '@/context/FaceReverifyContext';
 import FaceScanOverlay from './FaceScanOverlay';
 
 type FlowState = 'intro' | 'matching' | 'success' | 'fail';
 type FailReason = Exclude<FaceReverifyOutcome, { ok: true }>['reason'];
+// A code, not a sentence, so a language switch mid-flow re-renders in the new language.
+type MessageKey = 'positionFace' | 'verifying' | 'verified' | 'cameraError' | 'notVerified' | 'genericError';
 
 interface FaceVerifyFlowProps {
     challengeId: string;
@@ -29,6 +32,7 @@ interface FaceVerifyFlowProps {
  * stay inside the ~5s budget.
  */
 export default function FaceVerifyFlow({ challengeId, reason, onResult }: FaceVerifyFlowProps) {
+    const { t } = useTranslation();
     const kyc = useRef(createKycService());
     const {
         videoRef,
@@ -43,9 +47,9 @@ export default function FaceVerifyFlow({ challengeId, reason, onResult }: FaceVe
 
     const [state, setState] = useState<FlowState>('intro');
     const [faceDetected, setFaceDetected] = useState(false);
-    const [message, setMessage] = useState(
-        'Position your face in the frame and make sure the lighting is good.',
-    );
+    const [messageKey, setMessageKey] = useState<MessageKey>('positionFace');
+    // The server's own failure text, when it sends one; shown as-is.
+    const [serverMessage, setServerMessage] = useState<string | null>(null);
     const failReasonRef = useRef<FailReason>('error');
     const settledRef = useRef(false);
 
@@ -116,7 +120,8 @@ export default function FaceVerifyFlow({ challengeId, reason, onResult }: FaceVe
 
     const run = useCallback(async () => {
         setState('matching');
-        setMessage("Verifying it's you…");
+        setServerMessage(null);
+        setMessageKey('verifying');
         try {
             // Validates the challenge (and, on the streaming path, opens the AWS session).
             await kyc.current.startReverify(challengeId);
@@ -125,7 +130,7 @@ export default function FaceVerifyFlow({ challengeId, reason, onResult }: FaceVe
             if (!frame) {
                 failReasonRef.current = 'error';
                 setState('fail');
-                setMessage('Could not read the camera. Please try again.');
+                setMessageKey('cameraError');
                 return;
             }
 
@@ -133,7 +138,7 @@ export default function FaceVerifyFlow({ challengeId, reason, onResult }: FaceVe
 
             if (res.status === 'passed' && res.stepToken) {
                 setState('success');
-                setMessage("Verified — it's you.");
+                setMessageKey('verified');
                 window.setTimeout(() => settle({ ok: true, stepToken: res.stepToken! }), 900);
                 return;
             }
@@ -146,13 +151,12 @@ export default function FaceVerifyFlow({ challengeId, reason, onResult }: FaceVe
                       ? 'mismatch'
                       : 'error';
             setState('fail');
-            setMessage(
-                res.message ?? res.reason ?? "We couldn't verify it's you. Please try again.",
-            );
+            setServerMessage(res.message ?? res.reason ?? null);
+            setMessageKey('notVerified');
         } catch {
             failReasonRef.current = 'error';
             setState('fail');
-            setMessage('Something went wrong. Please try again.');
+            setMessageKey('genericError');
         }
     }, [challengeId, captureFrame, settle]);
 
@@ -161,11 +165,11 @@ export default function FaceVerifyFlow({ challengeId, reason, onResult }: FaceVe
     return (
         <div className="flex flex-col h-full bg-white px-xd-40">
             {/* Close button */}
-            <div className="flex absolute top-xd-50 right-xd-30 justify-end mb-2">
+            <div className="flex absolute top-xd-50 end-xd-30 justify-end mb-2">
                 <button
                     onClick={() => settle({ ok: false, reason: 'cancelled' })}
                     className="text-red-400 hover:text-red-600"
-                    aria-label="Cancel verification"
+                    aria-label={t.verification.faceReverify.cancelAria}
                 >
                     <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                         <path
@@ -181,10 +185,10 @@ export default function FaceVerifyFlow({ challengeId, reason, onResult }: FaceVe
             <div className="flex-1" />
 
             <h1 className="text-xd-30 font-bold text-center text-[#1D1D1D] mb-xd-5">
-                Verify it&apos;s you
+                {t.verification.faceReverify.title}
             </h1>
             <p className="text-center text-xd-16 font-medium text-[#1D1D1D] mb-xd-11 px-4">
-                {message}
+                {serverMessage ?? t.verification.faceReverify[messageKey]}
             </p>
 
             {/* Framed live camera preview */}
@@ -236,7 +240,7 @@ export default function FaceVerifyFlow({ challengeId, reason, onResult }: FaceVe
                         disabled={!isActive}
                         className="w-xd-390 h-xd-60 py-4 rounded-xd-20 border border-dashed border-[#5D5C5D]/50 text-[#1D1D1D] text-xd-16 font-medium disabled:opacity-40"
                     >
-                        Start Verification
+                        {t.verification.faceReverify.start}
                     </button>
                 )}
 
@@ -245,19 +249,18 @@ export default function FaceVerifyFlow({ challengeId, reason, onResult }: FaceVe
                         <button
                             onClick={() => {
                                 setState('intro');
-                                setMessage(
-                                    'Position your face in the frame and make sure the lighting is good.',
-                                );
+                                setServerMessage(null);
+                                setMessageKey('positionFace');
                             }}
                             className="w-xd-390 h-xd-60 py-4 rounded-xd-20 border border-dashed border-[#5D5C5D]/50 text-[#1D1D1D] text-xd-16 font-medium"
                         >
-                            Try Again
+                            {t.verification.faceReverify.tryAgain}
                         </button>
                         <button
                             onClick={() => settle({ ok: false, reason: failReasonRef.current })}
                             className="text-xd-14 mt-xd-30 text-[#4D84FF] hover:underline"
                         >
-                            Cancel
+                            {t.verification.faceReverify.cancel}
                         </button>
                     </>
                 )}
