@@ -8,6 +8,8 @@ import { useRouter } from 'next/navigation';
 import { useIdleTimer } from '@/hooks/useIdleTimer';
 import { useToast } from '@/context/ToastContext';
 import { useTranslation } from '@/context/I18nContext';
+import { useIsOnline, useOnReconnect } from '@/hooks/useIsOnline';
+import { isOffline } from '@/lib/networkStatus';
 import PasscodeScreen from '@/components/auth/screens/PasscodeScreen';
 import SessionTakeoverOverlay from '@/components/layout/SessionTakeoverOverlay';
 import { Page } from '@/scaling';
@@ -57,7 +59,16 @@ export default function PasskeyGate({ children }: PasskeyGateProps) {
         unlockWithPin,
         triggerLock,
         confirmUnlock,
+        initialize,
     } = usePasskey();
+    const isOnline = useIsOnline();
+
+    // SETUP_REQUIRED can be the product of an offline boot: the device-status
+    // read failed and was taken as "no PIN". Re-check once the connection is
+    // back instead of letting the user "set" a passcode that may already exist.
+    useOnReconnect(() => {
+        if (lockStatus === 'SETUP_REQUIRED') void initialize();
+    });
 
     // ── LOCKED overlay state ─────────────────────────────────────────────
     const [biometricLoading, setBiometricLoading] = useState(false);
@@ -112,7 +123,10 @@ export default function PasskeyGate({ children }: PasskeyGateProps) {
             hasBiometrics &&
             biometricAvailable &&
             !lockoutUntil &&
-            !biometricAutoDisabledRef.current
+            !biometricAutoDisabledRef.current &&
+            // Offline: skip, and deliberately not re-fired on reconnect — a
+            // WebAuthn prompt needs a user gesture; the button stays available.
+            !isOffline()
         ) {
             // Small delay: prevents AbortError from React StrictMode double-invoke
             // and from navigation transitions landing on LOCKED simultaneously.
@@ -149,6 +163,8 @@ export default function PasskeyGate({ children }: PasskeyGateProps) {
         biometricInFlightRef.current = false;
         if (!result.success && result.error !== 'WEBAUTHN_CANCELLED') {
             console.error('[PasskeyGate] biometric unlock failed:', result.error);
+            // The service reports a dropped connection as a WebAuthn failure.
+            if (isOffline()) return;
             toast.error(t.passkeyGate.biometricFailed);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -215,6 +231,7 @@ export default function PasskeyGate({ children }: PasskeyGateProps) {
                     }}
                     // Setup is complete once the PIN exists — no biometric step.
                     onDone={skipBiometricEnrollment}
+                    disabled={!isOnline}
                 />
             </div>
         );
@@ -251,6 +268,7 @@ export default function PasskeyGate({ children }: PasskeyGateProps) {
                                 onVerifyPasscode={handleVerifyPin}
                                 onSuccess={confirmUnlock}
                                 onForgotPasscode={() => startPasscodeReset('idle')}
+                                disabled={!isOnline}
                                 onUseBiometric={
                                     biometricAvailable
                                         ? async () => {
@@ -260,7 +278,10 @@ export default function PasskeyGate({ children }: PasskeyGateProps) {
                                                   const enrollResult = await enrollBiometric();
                                                   if (enrollResult.success) {
                                                       skipBiometricEnrollment();
-                                                  } else if (enrollResult.error !== 'WEBAUTHN_CANCELLED') {
+                                                  } else if (
+                                                      enrollResult.error !== 'WEBAUTHN_CANCELLED' &&
+                                                      !isOffline()
+                                                  ) {
                                                       toast.error(t.passkeyGate.biometricSetupFailed);
                                                   }
                                               }

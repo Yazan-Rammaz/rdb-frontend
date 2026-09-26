@@ -12,6 +12,8 @@ interface QuizScreenProps {
     questions: QuizQuestion[];
     onComplete: (answers: ResetAnswer[]) => void | Promise<void>;
     onClose?: () => void;
+    /** Offline: the last answer (which is the submit) cannot be chosen. */
+    disabled?: boolean;
 }
 
 // Slide direction follows navigation: +1 moves forward (card enters from the
@@ -46,7 +48,12 @@ const HINT_VISIBLE_MS = 5000;
  * telling the user they can swipe back to review/change answers — and selecting
  * its answer IS the submit (the chosen answers are kept and graded).
  */
-export default function QuizScreen({ questions, onComplete, onClose }: QuizScreenProps) {
+export default function QuizScreen({
+    questions,
+    onComplete,
+    onClose,
+    disabled = false,
+}: QuizScreenProps) {
     const { t, tr } = useTranslation();
     const [[qi, direction], setPage] = useState<[number, number]>([0, 0]);
     const [answers, setAnswers] = useState<ResetAnswer[]>([]);
@@ -86,7 +93,7 @@ export default function QuizScreen({ questions, onComplete, onClose }: QuizScree
     if (!q) return null;
 
     const handleSelect = (optionId: string) => {
-        if (submitting) return;
+        if (submitting || (isLast && disabled)) return;
         const next = [
             ...answers.filter((a) => a.questionId !== q.id),
             { questionId: q.id, optionId },
@@ -188,7 +195,7 @@ export default function QuizScreen({ questions, onComplete, onClose }: QuizScree
                                         variants={itemVariants}
                                         transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
                                         onClick={() => handleSelect(opt.id)}
-                                        disabled={submitting}
+                                        disabled={submitting || (isLast && disabled)}
                                         whileTap={{ scale: 0.98 }}
                                         className={`w-full h-xd-60 rounded-xd-20 border border-dashed flex items-center justify-center text-xd-16 transition-colors ${
                                             isSelected

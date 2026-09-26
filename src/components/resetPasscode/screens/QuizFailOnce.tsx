@@ -9,12 +9,14 @@ import closeSvg from '@/assets/icons/auth/close.svg';
 interface QuizFailOnceProps {
     onRetry: () => void;
     onClose?: () => void;
+    /** Offline: retrying needs the server to hand out a fresh question set. */
+    disabled?: boolean;
 }
 
 /**
  * Quiz first-failure screen (Image #4) — one attempt left.
  */
-export default function QuizFailOnce({ onRetry, onClose }: QuizFailOnceProps) {
+export default function QuizFailOnce({ onRetry, onClose, disabled = false }: QuizFailOnceProps) {
     const { t } = useTranslation();
     return (
         <div className="w-full h-full flex flex-col bg-white">
@@ -58,7 +60,8 @@ export default function QuizFailOnce({ onRetry, onClose }: QuizFailOnceProps) {
                 <FlexibleSpace grow />
                 <button
                     onClick={onRetry}
-                    className="w-xd-390 h-xd-60 rounded-xd-20 border border-dashed border-[#C3C3C3] bg-[#FCFCFC] text-[#1D1D1D] text-xd-16 font-medium flex items-center justify-center transition-opacity hover:opacity-80"
+                    disabled={disabled}
+                    className="w-xd-390 h-xd-60 rounded-xd-20 border border-dashed border-[#C3C3C3] bg-[#FCFCFC] text-[#1D1D1D] text-xd-16 font-medium flex items-center justify-center transition-opacity hover:opacity-80 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                     {t.resetPasscode.failOnce.retryButton}
                 </button>

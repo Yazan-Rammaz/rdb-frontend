@@ -6,6 +6,7 @@ import { useTranslation } from '@/context/I18nContext';
 import { useStore } from '@/context/StoreContext';
 import { useToast } from '@/context/ToastContext';
 import { usePaymentRequestAPI } from '@/hooks/usePaymentRequestAPI';
+import { useIsOnline, useOnReconnect } from '@/hooks/useIsOnline';
 import { isMerchantPayable, merchantDescription } from '@/api/helpers/paymentRequests';
 import { formatMoneyString } from '../../shared/formatMoneyString';
 import { formatDateTime } from '../../shared/formatDateTime';
@@ -81,6 +82,9 @@ const MerchantPaymentReview: React.FC<MerchantPaymentReviewProps> = ({
     );
 
     const cancelledRef = useRef(false);
+    const isOnline = useIsOnline();
+    // A lookup that failed for lack of connection, to re-run on reconnect.
+    const lookupPendingRef = useRef(false);
 
     const fetchOrder = useCallback(async () => {
         if (!code) return;
@@ -93,6 +97,12 @@ const MerchantPaymentReview: React.FC<MerchantPaymentReviewProps> = ({
         if (cancelledRef.current) return;
 
         if ('error' in result) {
+            // No connection: stay on the loading state and look it up again
+            // once the app is back online — the offline pill explains the wait.
+            if (result.network) {
+                lookupPendingRef.current = true;
+                return;
+            }
             setFetchError(result.error);
             setLoading(false);
             return;
@@ -120,6 +130,12 @@ const MerchantPaymentReview: React.FC<MerchantPaymentReviewProps> = ({
         };
     }, [code, prefetched, fetchOrder]);
 
+    useOnReconnect(() => {
+        if (!lookupPendingRef.current) return;
+        lookupPendingRef.current = false;
+        void fetchOrder();
+    });
+
     /**
      * The receipt tints the sheet green, the same way a completed transfer
      * does. Restored on unmount so the sheet is not left green for whatever
@@ -138,7 +154,7 @@ const MerchantPaymentReview: React.FC<MerchantPaymentReviewProps> = ({
     }, [receipt]);
 
     const handlePay = useCallback(async () => {
-        if (!order || isPaying) return;
+        if (!order || isPaying || !isOnline) return;
         setIsPaying(true);
 
         const result = await apiRef.current.payMerchantPayment({
@@ -147,13 +163,15 @@ const MerchantPaymentReview: React.FC<MerchantPaymentReviewProps> = ({
         });
 
         setIsPaying(false);
-        if ('error' in result) return; // the hook has already toasted
+        // The hook has already toasted a server error; a network failure is
+        // silent (the offline pill says it) and keeps the key for the retry.
+        if ('error' in result) return;
 
         setReceipt(result);
         // The payment shows up in the ledger — pull it in now so going back to
         // the transactions list does not show a stale one.
         void refreshTransactions?.();
-    }, [order, isPaying, refreshTransactions]);
+    }, [order, isPaying, isOnline, refreshTransactions]);
 
     // ─── States before the order can be shown ────────────────────────────────
 
@@ -183,7 +201,8 @@ const MerchantPaymentReview: React.FC<MerchantPaymentReviewProps> = ({
                     {code && (
                         <button
                             onClick={() => void fetchOrder()}
-                            className="text-[13px] text-[#388CFF] font-medium underline cursor-pointer"
+                            disabled={!isOnline}
+                            className="text-[13px] text-[#388CFF] font-medium underline cursor-pointer disabled:cursor-default disabled:text-[#C3C3C3]"
                         >
                             {t.common.retry}
                         </button>
@@ -437,7 +456,7 @@ const MerchantPaymentReview: React.FC<MerchantPaymentReviewProps> = ({
                     <SendButton
                         isExpired={isExpired || order.status === 'EXPIRED'}
                         isSending={isPaying}
-                        isDisabled={!payable}
+                        isDisabled={!payable || !isOnline}
                         onSend={() => void handlePay()}
                         label={t.merchantPayment.payButton}
                         sendingLabel={t.merchantPayment.payingButton}

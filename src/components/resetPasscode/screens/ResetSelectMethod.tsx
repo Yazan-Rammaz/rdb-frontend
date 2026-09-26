@@ -15,6 +15,8 @@ interface ResetSelectMethodProps {
     method: 'sms' | 'whatsapp' | '';
     phone?: string;
     loading?: boolean;
+    /** Offline: neither channel can be requested; the choice stays shown. */
+    disabled?: boolean;
     onClose?: () => void;
 }
 
@@ -28,9 +30,11 @@ export default function ResetSelectMethod({
     changeNumber,
     phone,
     loading = false,
+    disabled = false,
     onClose,
 }: ResetSelectMethodProps) {
     const { t } = useTranslation();
+    const inert = loading || disabled;
 
     return (
         <div className="w-full h-full flex flex-col bg-white">
@@ -118,8 +122,8 @@ export default function ResetSelectMethod({
                     <FlexibleSpace size={37} share={0} />
                     <div className="flex w-xd-400">
                         <button
-                            onClick={() => !loading && setMethod('whatsapp')}
-                            disabled={loading}
+                            onClick={() => !inert && setMethod('whatsapp')}
+                            disabled={inert}
                             className={`relative my-1 mx-0.5 w-xd-193 flex flex-1 flex-col items-center justify-center h-xd-60 rounded-xd-20 border border-dashed transition-all disabled:cursor-not-allowed ${
                                 method === 'whatsapp'
                                     ? 'border-[#388CFF] bg-[#FCFCFC]'
@@ -132,17 +136,19 @@ export default function ResetSelectMethod({
                                 <Image
                                     src={WhatsAppIcon}
                                     alt="whatsapp"
-                                    className="size-xd-20 object-contain"
+                                    className={`size-xd-20 object-contain transition-opacity ${disabled ? 'opacity-40 grayscale' : ''}`}
                                 />
                             </span>
-                            <span className="text-xd-16 font-normal text-[#1D1D1D]">
+                            <span
+                                className={`text-xd-16 font-normal transition-colors ${disabled ? 'text-[#C3C3C3]' : 'text-[#1D1D1D]'}`}
+                            >
                                 {t.auth.selectMethod.whatsapp}
                             </span>
                         </button>
 
                         <button
-                            onClick={() => !loading && setMethod('sms')}
-                            disabled={loading}
+                            onClick={() => !inert && setMethod('sms')}
+                            disabled={inert}
                             className={`relative my-1 mx-0.5 w-xd-193 flex flex-1 flex-col items-center justify-center h-xd-60 rounded-xd-20 border border-dashed transition-all disabled:cursor-not-allowed ${
                                 method === 'sms'
                                     ? 'border-[#388CFF] bg-[#FCFCFC]'
@@ -155,10 +161,12 @@ export default function ResetSelectMethod({
                                 <Image
                                     src={smsSvg}
                                     alt="sms"
-                                    className="size-xd-20 object-contain"
+                                    className={`size-xd-20 object-contain transition-opacity ${disabled ? 'opacity-40 grayscale' : ''}`}
                                 />
                             </span>
-                            <span className="text-xd-16 text-[#1D1D1D]">
+                            <span
+                                className={`text-xd-16 transition-colors ${disabled ? 'text-[#C3C3C3]' : 'text-[#1D1D1D]'}`}
+                            >
                                 {t.auth.selectMethod.sms}
                             </span>
                         </button>

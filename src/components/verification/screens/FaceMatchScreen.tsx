@@ -5,7 +5,9 @@ import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useVerification } from '@/context/VerificationContext';
 import { useTranslation } from '@/context/I18nContext';
-import { api } from '@/api';
+import { api, isNetworkError } from '@/api';
+import { isOffline } from '@/lib/networkStatus';
+import { useIsOnline } from '@/hooks/useIsOnline';
 import { useRouter } from 'next/navigation';
 import { createKycService } from '@/services/kyc';
 import ExitConfirmDialog from '../ExitConfirmDialog';
@@ -23,6 +25,7 @@ const FRAME_FLASH_MS = 300; // each flash lasts 300 ms
 
 export default function FaceMatchScreen() {
     const { t } = useTranslation();
+    const isOnline = useIsOnline();
     const {
         goTo,
         livenessResult,
@@ -160,8 +163,10 @@ export default function FaceMatchScreen() {
                     }
                 } catch (err) {
                     console.error('[FaceMatch] KYC submit failed:', err);
+                    // The kyc service drops the status, so offline is read from
+                    // the network store rather than the error.
                     handleFailure(
-                        err instanceof Error && err.message
+                        err instanceof Error && err.message && !isOffline()
                             ? err.message
                             : t.verification.faceMatch.submitFailed,
                     );
@@ -211,8 +216,14 @@ export default function FaceMatchScreen() {
         });
         apiResultRef.current = res.ok
             ? res.data
-            : { status: 'error', message: res.error.message };
-    }, [livenessResult, idDocument, handleFailure]);
+            : {
+                  status: 'error',
+                  // Never show the raw status-0 text; the offline pill explains it.
+                  message: isNetworkError(res.error)
+                      ? t.verification.faceMatch.submitFailed
+                      : res.error.message,
+              };
+    }, [livenessResult, idDocument, handleFailure, t]);
 
     useEffect(() => {
         runMatch();
@@ -474,7 +485,8 @@ export default function FaceMatchScreen() {
                     </button>
                     <button
                         onClick={() => runMatch()}
-                        className="text-xd-14 mt-xd-30 text-[#4D84FF] hover:underline"
+                        disabled={!isOnline}
+                        className="text-xd-14 mt-xd-30 text-[#4D84FF] hover:underline disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline"
                     >
                         {t.verification.faceMatch.rematch}
                     </button>

@@ -1,5 +1,7 @@
 'use client';
-import { api } from '@/api';
+import { api, isNetworkError } from '@/api';
+import { useIsOnline, useOnReconnect } from '@/hooks/useIsOnline';
+import { isOffline } from '@/lib/networkStatus';
 import { refreshQrToken } from '@/api/helpers/qrLogin';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -50,9 +52,13 @@ export default function QrLoginScreen({ onApproved, onCancel }: QrLoginScreenPro
     // doesn't create two orphaned QR sessions. The retry button still calls
     // startSession() directly, so it's unaffected.
     const autoStartedRef = useRef(false);
+    // Set when session creation failed for lack of a connection.
+    const awaitingNetworkRef = useRef(false);
+    const isOnline = useIsOnline();
 
     // ── Create / regenerate a QR session ──────────────────────────────────────
     const startSession = useCallback(async () => {
+        awaitingNetworkRef.current = false;
         setStatus('loading');
         setScanned(null);
         completedRef.current = false;
@@ -65,6 +71,15 @@ export default function QrLoginScreen({ onApproved, onCancel }: QrLoginScreenPro
                     ? { browser: 'web', os: navigator.platform, userAgent: navigator.userAgent }
                     : undefined;
             const res = await api.auth.createQrSession({ deviceInfo });
+            if (!res.ok && isNetworkError(res.error) && isOffline()) {
+                // No connection: keep the spinner rather than an error card —
+                // the offline pill explains it, and reconnect restarts below.
+                // (A blip the probe already saw recover falls through to the
+                // normal retry card, since no reconnect event would follow.)
+                setSession(null);
+                awaitingNetworkRef.current = true;
+                return;
+            }
             if (!res.ok) throw new Error(res.error.message);
 
             const data = res.data;
@@ -92,6 +107,12 @@ export default function QrLoginScreen({ onApproved, onCancel }: QrLoginScreenPro
         autoStartedRef.current = true;
         startSession();
     }, [startSession]);
+
+    // Only a session that never got created is resumed; a live QR keeps its
+    // own refresh loop and socket.
+    useOnReconnect(() => {
+        if (awaitingNetworkRef.current || status === 'error') startSession();
+    });
 
     // ── Rotate the QR image on the backend's interval while still pending ──────
     useEffect(() => {
@@ -217,7 +238,8 @@ export default function QrLoginScreen({ onApproved, onCancel }: QrLoginScreenPro
                     {showRetry && (
                         <button
                             onClick={startSession}
-                            className="flex flex-col items-center gap-xd-12 px-xd-24 text-center"
+                            disabled={!isOnline}
+                            className="flex flex-col items-center gap-xd-12 px-xd-24 text-center disabled:opacity-50"
                         >
                             <p className="text-xd-14 font-medium text-[#1D1D1D] leading-[1.4]">
                                 {retryMessage}

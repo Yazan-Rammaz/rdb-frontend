@@ -3,8 +3,9 @@
 import { useCallback, useState } from 'react';
 import { useToast } from '@/context/ToastContext';
 import { useTranslation } from '@/context/I18nContext';
-import { api } from '@/api';
+import { api, isNetworkError } from '@/api';
 import type { ApiResult } from '@/api';
+import { isOffline } from '@/lib/networkStatus';
 import { resolvePaymentRequestLookup } from '@/api/helpers/paymentRequests';
 import type {
     CreatePaymentRequestInput,
@@ -16,6 +17,13 @@ import type {
     ResolvedPaymentRequest,
 } from '@/core/types';
 
+/**
+ * A failed call. `network` is set when no response arrived (connection or
+ * timeout) — nothing was toasted, and callers must stay silent too: the
+ * offline pill is the message.
+ */
+export type PaymentRequestFailure = { error: string; network?: true };
+
 const RETRY_CONFIG = {
     maxAttempts: 3,
     delays: [1000, 2000, 4000],
@@ -25,7 +33,8 @@ const RETRY_CONFIG = {
  * Payment-request calls with automatic retry on transient failures.
  *
  * Retries up to 3 times with backoff (1s, 2s, 4s), then toasts and gives up.
- * The public shape is still `T | { error: string }`, so callers are unchanged.
+ * The public shape is `T | { error: string; network?: true }`; `network` marks
+ * a failure with no response, which is never toasted.
  *
  * ─── What migrating to @/api fixed here ─────────────────────────────────────
  * Retry used to be driven by thrown exceptions, and "don't retry a client
@@ -49,7 +58,7 @@ export function usePaymentRequestAPI() {
         async <T,>(
             operation: () => Promise<ApiResult<T>>,
             operationName: string,
-        ): Promise<T | { error: string }> => {
+        ): Promise<T | PaymentRequestFailure> => {
             setIsLoading(true);
             let lastMessage = '';
 
@@ -62,6 +71,21 @@ export function usePaymentRequestAPI() {
                 }
 
                 lastMessage = res.error.message;
+
+                // A network failure is never toasted — the offline pill says it.
+                // No retry on a timeout (a POST may have landed; only the user
+                // re-sends it) nor once offline (it would fail the same way).
+                if (res.error.status === 0) {
+                    const giveUp =
+                        !isNetworkError(res.error) || // ABORTED: the caller cancelled
+                        res.error.code === 'TIMEOUT' ||
+                        isOffline() ||
+                        attempt === RETRY_CONFIG.maxAttempts - 1;
+                    if (giveUp) {
+                        setIsLoading(false);
+                        return { error: lastMessage, network: true };
+                    }
+                }
 
                 // 4xx means the request itself is wrong — a retry sends the same
                 // wrong request. Only network failures (status 0) and 5xx are
@@ -93,7 +117,7 @@ export function usePaymentRequestAPI() {
         isLoading,
         createPaymentRequest: (
             input: CreatePaymentRequestInput,
-        ): Promise<PaymentRequest | { error: string }> =>
+        ): Promise<PaymentRequest | PaymentRequestFailure> =>
             withRetry(() => api.paymentRequests.create(input), t.home.qr.operations.create),
         /**
          * Looks a code up and says which kind of thing it turned out to be —
@@ -105,7 +129,7 @@ export function usePaymentRequestAPI() {
          */
         lookupPaymentRequest: async (
             code: string,
-        ): Promise<ResolvedPaymentRequest | { error: string }> => {
+        ): Promise<ResolvedPaymentRequest | PaymentRequestFailure> => {
             const res = await withRetry(
                 () => api.paymentRequests.lookup(code),
                 t.home.qr.operations.lookup,
@@ -122,7 +146,7 @@ export function usePaymentRequestAPI() {
         },
         fulfillPaymentRequest: (
             input: FulfillPaymentRequestInput,
-        ): Promise<PaymentRequest | { error: string }> =>
+        ): Promise<PaymentRequest | PaymentRequestFailure> =>
             withRetry(() => api.paymentRequests.fulfill(input), t.home.qr.operations.fulfill),
         /**
          * Pays a merchant order. Retries carry the caller's idempotencyKey
@@ -131,11 +155,11 @@ export function usePaymentRequestAPI() {
          */
         payMerchantPayment: (
             input: MerchantPayInput,
-        ): Promise<MerchantPayResponse | { error: string }> =>
+        ): Promise<MerchantPayResponse | PaymentRequestFailure> =>
             withRetry(() => api.merchant.pay(input), t.home.qr.operations.merchantPay),
         cancelPaymentRequest: (
             input: CancelPaymentRequestInput,
-        ): Promise<PaymentRequest | { error: string }> =>
+        ): Promise<PaymentRequest | PaymentRequestFailure> =>
             withRetry(() => api.paymentRequests.cancel(input), t.home.qr.operations.cancel),
     };
 }

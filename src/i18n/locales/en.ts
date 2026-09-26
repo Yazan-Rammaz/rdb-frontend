@@ -45,6 +45,10 @@ const en = {
         tryAgain: 'Try Again',
         poweredBy: 'Powered by Ramaaz Digital Banking',
         sessionExpired: 'Session expired. Please log in again.',
+        network: {
+            offline: 'No internet connection',
+            restored: 'Connection restored',
+        },
         camera: {
             startFailed: 'Could not start the camera.',
             startFailedDetail: 'Could not start the camera: {{detail}}',

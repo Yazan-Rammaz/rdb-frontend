@@ -47,6 +47,10 @@ const ar: TranslationSchema = {
         tryAgain: 'حاول مرة أخرى',
         poweredBy: 'بدعم من Ramaaz Digital Banking',
         sessionExpired: 'انتهت الجلسة. يرجى تسجيل الدخول مرة أخرى.',
+        network: {
+            offline: 'لا يوجد اتصال بالإنترنت',
+            restored: 'تمت استعادة الاتصال',
+        },
         camera: {
             startFailed: 'تعذّر تشغيل الكاميرا.',
             startFailedDetail: 'تعذّر تشغيل الكاميرا: {{detail}}',

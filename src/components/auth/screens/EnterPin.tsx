@@ -31,6 +31,8 @@ interface EnterPinScreenProps {
     overrideSubtitle?: string;
     timerSeconds?: number; // default 120; pass 600 for 10-min IP OTP
     onResend?: () => void; // custom resend handler; hides phone-resend logic when provided
+    /** Offline: the code stays typed but cannot be submitted or resent. */
+    disabled?: boolean;
 }
 
 export default function EnterPin({
@@ -51,6 +53,7 @@ export default function EnterPin({
     overrideSubtitle,
     timerSeconds = 120,
     onResend,
+    disabled = false,
 }: EnterPinScreenProps) {
     const { t } = useTranslation();
     const [timeLeft, setTimeLeft] = useState(timerSeconds);
@@ -78,6 +81,7 @@ export default function EnterPin({
     };
 
     const handleResend = async () => {
+        if (disabled) return;
         if (onResend) {
             onResend();
             setTimeLeft(timerSeconds);
@@ -205,7 +209,8 @@ export default function EnterPin({
                                 <div className="flex items-center pt-xd-8 gap-xd-5">
                                     <button
                                         onClick={handleResend}
-                                        className="text-trim-descend text-xd-13 text-[#388CFF] underline"
+                                        disabled={disabled}
+                                        className="text-trim-descend text-xd-13 text-[#388CFF] underline disabled:opacity-50"
                                     >
                                         {t.auth.enterPin.resendCode}
                                     </button>
@@ -264,7 +269,9 @@ export default function EnterPin({
                         value={pin}
                         onChange={setPin}
                         onComplete={handlePinComplete}
-                        disabled={loading === 'verify-pin' || isValidPin === 'valid' || isExpired}
+                        disabled={
+                            disabled || loading === 'verify-pin' || isValidPin === 'valid' || isExpired
+                        }
                         isValidPin={isValidPin}
                         isExpired={isExpired}
                     />

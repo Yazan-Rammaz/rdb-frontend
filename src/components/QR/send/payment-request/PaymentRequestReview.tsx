@@ -6,6 +6,7 @@ import { useStore } from '@/context/StoreContext';
 import { useToast } from '@/context/ToastContext';
 import { useTranslation } from '@/context/I18nContext';
 import { usePaymentRequestAPI } from '@/hooks/usePaymentRequestAPI';
+import { useIsOnline, useOnReconnect } from '@/hooks/useIsOnline';
 import { buildPaymentRequestQr } from '@/lib/paymentRequestQr';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import Input from '@/components/ui/Input';
@@ -103,6 +104,12 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
     // Payer mode inline cancel
     const [showCancelInput, setShowCancelInput] = useState(false);
     const [cancelReason, setCancelReason] = useState('');
+    const isOnline = useIsOnline();
+    // A lookup that failed for lack of connection, to re-run on reconnect.
+    const lookupPendingRef = useRef(false);
+    // One key per fulfilment attempt: kept across a dropped connection so the
+    // retry is deduplicated by the backend, cleared once the server has answered.
+    const idempotencyKeyRef = useRef<string | null>(null);
 
     const senderBalance = activeAssetSymbol ? balances[activeAssetSymbol] : undefined;
     const senderAccountNumber = senderBalance?.accountNumber || account?.number || '';
@@ -145,6 +152,12 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
             const result = await apiRef.current.lookupPaymentRequest(code);
 
             if ('error' in result) {
+                // No connection: stay on the loading state and look it up again
+                // once the app is back online — the offline pill explains the wait.
+                if (result.network) {
+                    lookupPendingRef.current = true;
+                    return;
+                }
                 setFetchError(result.error);
                 toastRef.current.error(result.error);
                 setLoading(false);
@@ -191,6 +204,12 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
         void fetchData();
     }, [fetchData]);
 
+    useOnReconnect(() => {
+        if (!lookupPendingRef.current) return;
+        lookupPendingRef.current = false;
+        void fetchData();
+    });
+
     const handleExpired = useCallback(async () => {
         try {
             let code: string | null = null;
@@ -212,7 +231,7 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
     }, [directRequestCode, scannedRequestCode, requesterAccount]);
 
     const handleSend = async () => {
-        if (!data || !requestId || isSending) return;
+        if (!data || !requestId || isSending || !isOnline) return;
 
         if (!data.isPermanent) {
             const expiryTime = new Date(data.expiresAt).getTime();
@@ -225,13 +244,20 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
         setIsSending(true);
         setSendError(null);
 
-        const idempotencyKey = `fulfill-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+        idempotencyKeyRef.current ??= `fulfill-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
 
         const result = await apiRef.current.fulfillPaymentRequest({
             id: requestId,
             accountNumber: senderAccountNumber,
-            idempotencyKey,
+            idempotencyKey: idempotencyKeyRef.current,
         });
+
+        if ('error' in result && result.network) {
+            // Outcome unknown — keep the key so the retry cannot pay twice.
+            setIsSending(false);
+            return;
+        }
+        idempotencyKeyRef.current = null;
 
         if ('error' in result) {
             setSendError(result.error);
@@ -272,7 +298,7 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
         });
 
         if ('error' in result) {
-            toastRef.current.error(result.error);
+            if (!result.network) toastRef.current.error(result.error);
             setIsCancelling(false);
             return;
         }
@@ -294,7 +320,7 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
         });
 
         if ('error' in result) {
-            toastRef.current.error(result.error);
+            if (!result.network) toastRef.current.error(result.error);
             setIsCancelling(false);
             return;
         }
@@ -403,7 +429,8 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
                     </p>
                     <button
                         onClick={() => void fetchData()}
-                        className="text-[13px] text-[#388CFF] font-medium underline"
+                        disabled={!isOnline}
+                        className="text-[13px] text-[#388CFF] font-medium underline disabled:text-[#C3C3C3]"
                     >
                         {t.common.retry}
                     </button>
@@ -624,6 +651,7 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
                                 icon={CancelSvg}
                                 label={t.home.qr.cancel}
                                 onClick={() => setShowCancelDialog(true)}
+                                disabled={!isOnline || isCancelling}
                             />
                         </div>
                     </div>
@@ -772,7 +800,7 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
                         <SendButton
                             isExpired={isExpired || data.status === 'EXPIRED'}
                             isSending={isSending}
-                            isDisabled={!canSend}
+                            isDisabled={!canSend || !isOnline}
                             onSend={() => void handleSend()}
                         />
                     </div>

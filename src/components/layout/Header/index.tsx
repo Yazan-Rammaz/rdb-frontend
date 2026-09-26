@@ -12,7 +12,6 @@ import { useScanner } from '@/context/ScannerContext';
 import { useStore } from '@/context/StoreContext';
 import { usePasskey } from '@/context/PasskeyContext';
 import { usePathname } from 'next/navigation';
-import WSStatusDot from './WSStatusDot';
 
 const Header = () => {
     const { t } = useTranslation();
@@ -24,7 +23,6 @@ const Header = () => {
 
     return (
         <header className="relative w-full bg-white flex items-end justify-between h-xd-70 px-xd-25">
-            <WSStatusDot />
             {/* Logo */}
             <div className="flex h-full items-center gap-3">
                 <div className="relative h-xd-30 w-xd-60">

@@ -37,7 +37,15 @@ export const api = {
     transfers,
 };
 
-export type { ApiError, ApiResult, Paginated, PageParams, RequestOptions } from './types/common';
+export { isNetworkError } from './client';
+export type {
+    ApiError,
+    ApiResult,
+    NetworkErrorCode,
+    Paginated,
+    PageParams,
+    RequestOptions,
+} from './types/common';
 
 export type * from './types/auth';
 export type * from './types/banking';

@@ -34,6 +34,8 @@ import { useTranslation } from '@/context/I18nContext';
 import type { TranslationSchema } from '@/i18n';
 import FlexibleSpace from '@/scaling/FlexibleSpace';
 import { faceConfig } from '@/config/kycConfig';
+import { isOffline } from '@/lib/networkStatus';
+import { useIsOnline } from '@/hooks/useIsOnline';
 
 // ─── Progress bar based on /assets/icons/verification/face-bar.svg ───────────
 export function FaceProgressBar({ pct, tone }: { pct: number; tone: Tone }) {
@@ -715,6 +717,7 @@ function SparkleField({
 
 export default function AwsFaceLivenessScreen() {
     const { t } = useTranslation();
+    const isOnline = useIsOnline();
     const hints = t.faceLiveness.hints;
     const { goTo, setLivenessResult, markCompleted } = useVerification();
     const router = useRouter();
@@ -886,8 +889,12 @@ export default function AwsFaceLivenessScreen() {
                 console.error('[AwsFaceLiveness] final capture detectFace failed:', err);
                 if (runIdRef.current !== runId) return;
                 consecutiveErrorsRef.current += 1;
-                setTone('red');
-                setInstruction(describeError(err, 'Face check failed — retrying...'));
+                // Offline: keep the current instruction — the offline pill says
+                // what broke, and the raw network error is not for the user.
+                if (!isOffline()) {
+                    setTone('red');
+                    setInstruction(describeError(err, 'Face check failed — retrying...'));
+                }
                 await new Promise((r) =>
                     setTimeout(r, errorBackoffMs(consecutiveErrorsRef.current)),
                 );
@@ -998,8 +1005,10 @@ export default function AwsFaceLivenessScreen() {
                 );
                 if (runIdRef.current !== runId) return;
                 consecutiveErrorsRef.current += 1;
-                setTone('red');
-                setInstruction(describeError(err, 'Face check failed — retrying...'));
+                if (!isOffline()) {
+                    setTone('red');
+                    setInstruction(describeError(err, 'Face check failed — retrying...'));
+                }
                 await new Promise((r) =>
                     setTimeout(r, errorBackoffMs(consecutiveErrorsRef.current)),
                 );
@@ -1379,8 +1388,9 @@ export default function AwsFaceLivenessScreen() {
                 {(phase === 'ready' || phase === 'failed') && (
                     <motion.button
                         onClick={handleBegin}
-                        whileTap={{ scale: 0.97 }}
-                        className="w-xd-390 h-xd-60 py-4 rounded-xd-20 border border-dashed border-[#5D5C5D]/50 text-[#1D1D1D] text-xd-16 font-medium"
+                        disabled={!isOnline}
+                        whileTap={isOnline ? { scale: 0.97 } : undefined}
+                        className="w-xd-390 h-xd-60 py-4 rounded-xd-20 border border-dashed border-[#5D5C5D]/50 text-[#1D1D1D] text-xd-16 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {phase === 'failed'
                             ? t.faceLiveness.restartButton

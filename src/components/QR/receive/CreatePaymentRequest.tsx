@@ -10,6 +10,7 @@ import { BalancesMap } from '@/context/StoreContext';
 import { useTranslation } from '@/context/I18nContext';
 import { useTransferPurposes } from '@/hooks/useTransferPurposes';
 import { usePaymentRequestAPI } from '@/hooks/usePaymentRequestAPI';
+import { useIsOnline } from '@/hooks/useIsOnline';
 import { buildPaymentRequestQr } from '@/lib/paymentRequestQr';
 import { RequestView } from './views/RequestView';
 import { type FieldValidationConfig, validateField } from '@/components/ui/field-error';
@@ -55,6 +56,7 @@ const CreatePaymentRequest = ({
     const { t } = useTranslation();
     const { toast } = useToast();
     const { purposes } = useTransferPurposes();
+    const isOnline = useIsOnline();
     const downloadRef = useRef<HTMLDivElement>(null);
 
     // Derive account info from props BEFORE any hooks that depend on them
@@ -185,6 +187,8 @@ const CreatePaymentRequest = ({
                 });
 
                 if ('error' in result) {
+                    // No connection: silent — the offline pill is the message.
+                    if (result.network) return 'network' as const;
                     toast.error(result.error);
                     return false;
                 }
@@ -222,7 +226,9 @@ const CreatePaymentRequest = ({
             isForceRequest?: boolean;
         }) => {
             return (async () => {
-                const success = await generateQrValue({ cU, isForceRequest });
+                const outcome = await generateQrValue({ cU, isForceRequest });
+                if (outcome === 'network') return false;
+                const success = outcome;
 
                 if (!success) {
                     if (toastMsg) {
@@ -254,7 +260,7 @@ const CreatePaymentRequest = ({
 
     const handleGenerate = () => {
         touchAll();
-        if (!isFormValid || isGenerating || isApiLoading) return;
+        if (!isFormValid || isGenerating || isApiLoading || !isOnline) return;
         setIsGenerating(true);
         void handleRequest({ toastMsg: true, isForceRequest: true }).then((success) => {
             setIsGenerating(false);
@@ -423,7 +429,8 @@ const CreatePaymentRequest = ({
                 <div className="absolute bottom-0 left-0 right-0 bg-background border-0 border-[#F2F2F2]">
                     {!isExpired && (
                         <ActionButtons
-                            isFormValid={isFormValid}
+                            // Offline, Generate reads as not ready (grey, disabled).
+                            isFormValid={isFormValid && isOnline}
                             mode={mode}
                             isLoading={isGenerating || isApiLoading}
                             onRequest={() => {

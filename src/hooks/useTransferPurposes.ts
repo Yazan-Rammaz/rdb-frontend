@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useStore, type PurposeOption } from '@/context/StoreContext';
 import { api } from '@/api';
+import { useOnReconnect } from '@/hooks/useIsOnline';
 
 export type { PurposeOption };
 
@@ -68,6 +69,12 @@ export function useTransferPurposes() {
     useEffect(() => {
         return () => abortRef.current?.abort();
     }, []);
+
+    // A load that failed offline left the list empty — fetch it once the app is
+    // back online instead of waiting for the user to notice.
+    useOnReconnect(() => {
+        if (storePurposes.length === 0 && !isLoadingPurposes) void fetchPurposes();
+    });
 
     // Fall back to fetching when the store has nothing and no preload is running.
     useEffect(() => {
