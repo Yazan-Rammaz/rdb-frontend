@@ -80,7 +80,10 @@ export default function ResetSelectMethod({
                                 </div>
                             </div>
                             <div className="flex pt-xd-8 items-center gap-xd-6">
-                                <p className="text-trim-descend text-xd-12 font-medium text-[#1D1D1D]">
+                                <p
+                                    dir="ltr"
+                                    className="text-trim-descend text-xd-12 font-medium text-[#1D1D1D]"
+                                >
                                     +{phone}
                                 </p>
                                 <button

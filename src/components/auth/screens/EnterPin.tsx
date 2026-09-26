@@ -168,7 +168,11 @@ export default function EnterPin({
                             )}
                             <div className="flex items-center pt-xd-8 gap-xd-5">
                                 {!overrideTitle && (
-                                    <span className="text-trim-descend text-xd-12 font-normal text-[#1D1D1D]">
+                                    // LTR, or RTL copy pushes the `+` to the far end.
+                                    <span
+                                        dir="ltr"
+                                        className="text-trim-descend text-xd-12 font-normal text-[#1D1D1D]"
+                                    >
                                         +{phone}
                                     </span>
                                 )}

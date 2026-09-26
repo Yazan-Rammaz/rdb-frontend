@@ -158,8 +158,14 @@ export default function PhoneInput({
                 layout: both host screens pin this into a fixed w-xd-390 h-xd-60
                 box, and a flow child would push straight out of it. */}
             <div className="relative flex w-full items-center justify-center">
+                {/* A phone number is digits, so the field is LTR content in
+                    every language, as on the App. Under the inherited dir=rtl
+                    the row mirrored — `+` after the digits — and the bidi
+                    algorithm painted the space-separated groups in reverse.
+                    The error line below is a sibling, so it stays RTL. */}
                 <div
                     ref={inputRef}
+                    dir="ltr"
                     onClick={() => {
                         setIsFocused(true);
                         if (showCustomKeypad) setKeypadOpen(true);
@@ -279,6 +285,7 @@ export default function PhoneInput({
                 <input
                     ref={hiddenInputRef}
                     type="tel"
+                    dir="ltr"
                     inputMode="numeric"
                     autoComplete="off"
                     className="sr-only"
