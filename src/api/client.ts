@@ -1,5 +1,6 @@
 import { apiFetch } from '@/core/utils';
-import type { ApiError, ApiResult, RequestOptions } from './types/common';
+import { networkStatus } from '@/lib/networkStatus';
+import type { ApiError, ApiResult, NetworkErrorCode, RequestOptions } from './types/common';
 
 /**
  * The one way this app talks to its backend.
@@ -25,6 +26,21 @@ import type { ApiError, ApiResult, RequestOptions } from './types/common';
  * endpoint modules that could not name the route they called.
  */
 
+/**
+ * Upper bound for any single request, uploads included. `fetch` has no timeout
+ * of its own, so on a link that is "up" but passes nothing a request would
+ * otherwise hang until the OS gives up.
+ *
+ * Chosen so it cannot cut short a request that succeeds today: the backend sits
+ * behind Cloudflare, which fails any origin response slower than 100 s (HTTP
+ * 524), and the ceiling also has to cover the upload that precedes it — a ~5 MB
+ * KYC/photo body at ~0.5 Mbps is ~80 s. 100 + 80 = 180 s; 300 s leaves margin.
+ *
+ * This only guarantees a spinner ends. Telling the user is the stall watchdog's
+ * job (`networkStatus.watch()`), which reacts within seconds.
+ */
+const REQUEST_CEILING_MS = 300_000;
+
 /** Never throws. Failures come back as `{ ok: false }` so callers must handle them. */
 export async function request<T>(spec: {
     /** Path under /api, e.g. '/users/me'. */
@@ -43,37 +59,91 @@ export async function request<T>(spec: {
 }): Promise<ApiResult<T>> {
     const { path, method = 'GET', body, formData, query, options } = spec;
 
+    // The ceiling and the caller's signal both abort the same controller. Plain
+    // AbortController + setTimeout rather than AbortSignal.any/timeout: `any`
+    // needs Safari 17.4+, and older iPhones are in scope.
+    //
+    // The ceiling also rejects `ceilingHit`, raced against the whole call: on a
+    // 401 apiFetch awaits the shared token refresh, which deliberately carries
+    // no signal (aborting a rotation half-way could burn the refresh token), so
+    // the abort alone would not end this request. The refresh keeps running and
+    // settles on its own; only this caller stops waiting for it.
+    const controller = new AbortController();
+    let timedOut = false;
+    let rejectCeiling: (reason: unknown) => void = () => {};
+    const ceilingHit = new Promise<never>((_, reject) => {
+        rejectCeiling = reject;
+    });
+    ceilingHit.catch(() => {}); // fires after the race may have settled
+    const ceiling = setTimeout(() => {
+        timedOut = true;
+        controller.abort();
+        rejectCeiling(new Error('Request ceiling reached'));
+    }, REQUEST_CEILING_MS);
+    const callerSignal = options?.signal;
+    const onCallerAbort = () => controller.abort();
+    if (callerSignal?.aborted) controller.abort();
+    else callerSignal?.addEventListener('abort', onCallerAbort, { once: true });
+    // No watchdog on uploads: a large body saturating the uplink can starve the
+    // probe and would report a working connection as offline.
+    const stopWatchdog = formData ? () => {} : networkStatus.watch();
+
     try {
         const hasJsonBody = body !== undefined;
-        const res = await apiFetch(buildUrl(path, query), {
-            method,
-            headers: {
-                // Never set Content-Type for FormData — the browser must
-                // append its own multipart boundary.
-                ...(hasJsonBody ? { 'Content-Type': 'application/json' } : {}),
-                ...options?.headers,
-            },
-            ...(hasJsonBody ? { body: JSON.stringify(body) } : {}),
-            ...(formData ? { body: formData } : {}),
-            signal: options?.signal,
-        });
+        const res = await Promise.race([
+            apiFetch(buildUrl(path, query), {
+                method,
+                headers: {
+                    // Never set Content-Type for FormData — the browser must
+                    // append its own multipart boundary.
+                    ...(hasJsonBody ? { 'Content-Type': 'application/json' } : {}),
+                    ...options?.headers,
+                },
+                ...(hasJsonBody ? { body: JSON.stringify(body) } : {}),
+                ...(formData ? { body: formData } : {}),
+                signal: controller.signal,
+            }),
+            ceilingHit,
+        ]);
+        networkStatus.reportResponse();
 
         return await toResult<T>(res);
-    } catch (err) {
-        // Network failure, DNS, or an aborted request — the call never reached a
-        // server, so there is no status to report.
-        return {
-            ok: false,
-            error: {
-                status: 0,
-                message:
-                    err instanceof DOMException && err.name === 'AbortError'
-                        ? 'Request cancelled.'
-                        : 'Could not reach the server. Check your connection.',
-            },
-        };
+    } catch {
+        // Network failure, DNS, the ceiling, or the caller's abort — no response
+        // arrived, so there is no status to report; `code` says which it was.
+        const code: NetworkErrorCode = timedOut
+            ? 'TIMEOUT'
+            : callerSignal?.aborted
+              ? 'ABORTED'
+              : 'NETWORK';
+        // Settle the connectivity state before returning, so a caller that has
+        // lost the status (a wrapper that returns only a message) can still
+        // check isOffline(). Callers holding the ApiError use isNetworkError().
+        if (code !== 'ABORTED') await networkStatus.reportFailure();
+        return { ok: false, error: { status: 0, code, message: NETWORK_MESSAGES[code] } };
+    } finally {
+        clearTimeout(ceiling);
+        stopWatchdog();
+        callerSignal?.removeEventListener('abort', onCallerAbort);
     }
 }
+
+/**
+ * The request got no response because of the connection (or the ceiling), not
+ * because the caller cancelled it. True whatever the probe concluded, so a
+ * short blip is silenced too. Screens show nothing for it — the offline pill is
+ * the message — and must never render `error.message` for it.
+ */
+export function isNetworkError(error: ApiError): boolean {
+    return error.status === 0 && error.code !== 'ABORTED';
+}
+
+/** For logs only — no screen shows a status-0 message; the offline pill does. */
+const NETWORK_MESSAGES: Record<NetworkErrorCode, string> = {
+    NETWORK: 'Could not reach the server. Check your connection.',
+    TIMEOUT: 'The request timed out.',
+    ABORTED: 'Request cancelled.',
+};
 
 function buildUrl(
     path: string,

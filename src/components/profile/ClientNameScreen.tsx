@@ -9,7 +9,8 @@ import infoSvg from '@/assets/icons/profile/info.svg';
 import { useToast } from '@/context/ToastContext';
 import { useTranslation } from '@/context/I18nContext';
 import { unwrapKycRequest } from '@/api/helpers/kyc';
-import { api } from '@/api';
+import { api, isNetworkError } from '@/api';
+import { useIsOnline } from '@/hooks/useIsOnline';
 import {
     NAME_MAX_LENGTH,
     type NameIssue,
@@ -40,6 +41,7 @@ export default function ClientNameScreen({
 }: ClientNameScreenProps) {
     const { toast } = useToast();
     const { t, tr, rtl } = useTranslation();
+    const isOnline = useIsOnline();
     const nameErrors: Record<NameIssue, string> = {
         empty: t.auth.enterName.errors.tooShort,
         'invalid-chars': t.auth.enterName.errors.invalidChars,
@@ -84,6 +86,8 @@ export default function ClientNameScreen({
             return;
         }
 
+        if (!isOnline) return;
+
         const trimmed = normalizeName(name);
         const parts = trimmed.split(' ');
         const firstName = parts[0];
@@ -97,6 +101,10 @@ export default function ClientNameScreen({
             if (res.ok) {
                 onSaved?.(trimmed);
                 toast.success(t.profile.clientName.updateSuccess);
+            } else if (isNetworkError(res.error)) {
+                // Nothing was saved: stay on the field so the user can retry
+                // once the connection is back. The offline pill says why.
+                return;
             } else {
                 // The server's own message beats a generic string — a 429 or a
                 // validation failure now says what actually went wrong.
@@ -303,7 +311,7 @@ export default function ClientNameScreen({
                     <button
                         type="button"
                         onClick={handleSave}
-                        disabled={saving}
+                        disabled={saving || !isOnline}
                         className="w-xd-406 h-xd-44 rounded-xd-15 bg-[#3066CC] text-white font-medium text-xd-13 disabled:opacity-50"
                     >
                         {saving ? t.common.saving : t.common.save}

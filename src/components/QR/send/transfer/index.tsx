@@ -2,8 +2,10 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import Image from 'next/image';
-import { api } from '@/api';
-import type { TransferResult } from '@/api';
+import { api, isNetworkError } from '@/api';
+import type { ApiError, TransferResult } from '@/api';
+import { isOffline } from '@/lib/networkStatus';
+import { useIsOnline, useOnReconnect } from '@/hooks/useIsOnline';
 import { resolveRecipient } from '@/api/helpers/resolveRecipient';
 import { lookupAccountByPhoneMock } from '@/api/helpers/lookupAccountByPhone.mock';
 import { useStore } from '@/context/StoreContext';
@@ -56,6 +58,10 @@ const TransferSend: React.FC<TransferSendProps> = ({
     // Flag to trigger validation after paste
     const [pendingPasteValidation, setPendingPasteValidation] = useState<string | null>(null);
     const recipientValidateDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const isOnline = useIsOnline();
+    // Idempotency key for the transfer currently on screen — see handleSend.
+    const idempotencyKeyRef = useRef<string | null>(null);
+    const refreshAfterReconnectRef = useRef(false);
 
     const resolvedAssetSymbol = prefillCurrencySymbol || activeAssetSymbol || 'USD';
     const senderBalance =
@@ -86,6 +92,8 @@ const TransferSend: React.FC<TransferSendProps> = ({
                 setForm((prev) => ({ ...prev, accountError: formatError }));
                 return;
             }
+            // Offline: the lookup runs on reconnect instead (see useOnReconnect).
+            if (isOffline()) return;
 
             setForm((prev) => ({
                 ...prev,
@@ -98,6 +106,13 @@ const TransferSend: React.FC<TransferSendProps> = ({
                 const cleaned = value.replace(/-/g, '');
                 const formatted = `${cleaned.slice(0, 4)}-${cleaned.slice(4)}`;
                 const result = await resolveRecipient(formatted);
+
+                // resolveRecipient keeps only the message; the api client has
+                // already settled the connectivity state, so ask it instead.
+                if (!result.ok && isOffline()) {
+                    setForm((prev) => ({ ...prev, isValidatingAccount: false }));
+                    return;
+                }
 
                 if (!result.ok) {
                     setForm((prev) => ({
@@ -209,6 +224,7 @@ const TransferSend: React.FC<TransferSendProps> = ({
                 return;
             }
         }
+        if (isOffline()) return;
 
         setForm((prev) => ({
             ...prev,
@@ -228,6 +244,11 @@ const TransferSend: React.FC<TransferSendProps> = ({
                 const cleaned = value.replace(/-/g, '');
                 const formatted = `${cleaned.slice(0, 4)}-${cleaned.slice(4)}`;
                 result = await resolveRecipient(formatted);
+            }
+
+            if (!result.ok && isOffline()) {
+                setForm((prev) => ({ ...prev, isValidatingAccount: false }));
+                return;
             }
 
             if (!result.ok) {
@@ -267,6 +288,7 @@ const TransferSend: React.FC<TransferSendProps> = ({
             setForm((prev) => ({ ...prev, amountError: t.transfer.error.invalidAmount }));
             return;
         }
+        if (isOffline()) return;
 
         setForm((prev) => ({ ...prev, isCheckingBalance: true, amountError: null }));
         console.log(
@@ -290,6 +312,11 @@ const TransferSend: React.FC<TransferSendProps> = ({
                 assetType: assetType,
                 amount: numAmount,
             });
+
+            if (!res.ok && isNetworkError(res.error)) {
+                setForm((prev) => ({ ...prev, isCheckingBalance: false }));
+                return;
+            }
 
             if (!res.ok) {
                 setForm((prev) => ({
@@ -410,16 +437,32 @@ const TransferSend: React.FC<TransferSendProps> = ({
         });
     };
 
+    // A network failure leaves the outcome unknown: the transfer may have landed
+    // with only the response lost. Stay silent (the offline pill says it), keep
+    // the key so a retry is deduplicated, and refresh the ledger and balance
+    // once back online so a transfer that did land shows up.
+    const handleSendFailure = (error: ApiError) => {
+        if (isNetworkError(error)) {
+            refreshAfterReconnectRef.current = true;
+            return;
+        }
+        idempotencyKeyRef.current = null;
+        toast.error(error.message);
+    };
+
     // Send transfer
     const handleSend = async () => {
         if (!form.recipientDetails || !form.amountConfirmed || !form.selectedPurposeId) return;
+        if (isOffline()) return;
 
         setForm((prev) => ({ ...prev, isSending: true }));
 
         try {
-            // Generate idempotency key once and reuse on the post-step-up retry so
-            // the backend dedups rather than creating a second transfer.
-            const idempotencyKey = `transfer-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+            // One key per transfer, not per tap: reused on the post-step-up
+            // retry and on a retry after a dropped connection, so the backend
+            // dedups rather than creating a second transfer.
+            idempotencyKeyRef.current ??= `transfer-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+            const idempotencyKey = idempotencyKeyRef.current;
 
             const attempt = () =>
                 api.transfers.send({
@@ -441,7 +484,7 @@ const TransferSend: React.FC<TransferSendProps> = ({
             // here would just hide the ambiguity from the user.
             if (!res.ok) {
                 setForm((prev) => ({ ...prev, isSending: false }));
-                toast.error(res.error.message);
+                handleSendFailure(res.error);
                 return;
             }
 
@@ -459,10 +502,14 @@ const TransferSend: React.FC<TransferSendProps> = ({
                 res = await attempt();
                 if (!res.ok) {
                     setForm((prev) => ({ ...prev, isSending: false }));
-                    toast.error(res.error.message);
+                    handleSendFailure(res.error);
                     return;
                 }
             }
+
+            // The server has answered: whatever it decided, a later tap is a new
+            // transfer and gets a new key.
+            idempotencyKeyRef.current = null;
 
             if (extractStepUp(res.data)) {
                 // Still gated after a satisfied challenge — surface as an error.
@@ -487,7 +534,44 @@ const TransferSend: React.FC<TransferSendProps> = ({
         }
     };
 
-    const canSend = form.accountConfirmed && form.amountConfirmed && !!form.selectedPurposeId;
+    // Changing what is being sent makes it a different transfer — new key.
+    useEffect(() => {
+        idempotencyKeyRef.current = null;
+    }, [
+        form.recipientDetails?.accountNumber,
+        form.amount,
+        form.selectedPurposeId,
+        form.note,
+    ]);
+
+    useOnReconnect(() => {
+        if (refreshAfterReconnectRef.current) {
+            refreshAfterReconnectRef.current = false;
+            refreshTransactions();
+            refreshBalances(assetSymbol);
+        }
+        // A lookup or amount check skipped while offline runs now.
+        if (
+            !form.accountConfirmed &&
+            !form.isValidatingAccount &&
+            !form.accountError &&
+            form.recipientInputMode === 'account' &&
+            /^\d{4}-\d{4}$/.test(form.recipientAccountNumber)
+        ) {
+            void validateAccountByNumber(form.recipientAccountNumber);
+        } else if (
+            form.recipientDetails &&
+            form.amount &&
+            !form.amountConfirmed &&
+            !form.isCheckingBalance &&
+            !form.amountError
+        ) {
+            void handleValidateAmount();
+        }
+    });
+
+    const canSend =
+        form.accountConfirmed && form.amountConfirmed && !!form.selectedPurposeId && isOnline;
 
     const handleSendWithAnimation = () => {
         if (!canSend || form.isSending) return;

@@ -10,6 +10,7 @@ import deleteIcon from '@/assets/icons/profile/delete.svg';
 import addPhotoIcon from '@/assets/icons/profile/add_photo.svg';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useTranslation } from '@/context/I18nContext';
+import { useIsOnline } from '@/hooks/useIsOnline';
 
 type PhotoView = 'display' | 'crop' | 'review';
 
@@ -25,6 +26,7 @@ export default function ProfilePhotoScreen({
     onSave,
 }: ProfilePhotoScreenProps) {
     const { t, rtl } = useTranslation();
+    const isOnline = useIsOnline();
     const [view, setView] = useState<PhotoView>('display');
     const [photoUrl, setPhotoUrl] = useState<string | undefined>(currentUrl);
     const [croppedDataUrl, setCroppedDataUrl] = useState<string | null>(null);
@@ -154,7 +156,7 @@ export default function ProfilePhotoScreen({
 
     // Confirm review → actually save
     const handleConfirm = () => {
-        if (!croppedDataUrl) return;
+        if (!croppedDataUrl || !isOnline) return;
         setPhotoUrl(croppedDataUrl);
         onSave(croppedDataUrl);
         setView('display');
@@ -163,6 +165,7 @@ export default function ProfilePhotoScreen({
     };
 
     const handleDelete = () => {
+        if (!isOnline) return;
         setPhotoUrl(undefined);
         onSave('');
         setShowOptions(false);
@@ -292,7 +295,11 @@ export default function ProfilePhotoScreen({
                     <span className="text-xd-16 font-medium text-[#1D1D1D]">
                         {t.profile.photo.title}
                     </span>
-                    <button onClick={handleConfirm} className="absolute end-xd-20 text-xd-16 font-medium text-[#3066CC]">
+                    <button
+                        onClick={handleConfirm}
+                        disabled={!isOnline}
+                        className="absolute end-xd-20 text-xd-16 font-medium text-[#3066CC] disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
                         {t.common.save}
                     </button>
                 </div>
@@ -407,7 +414,8 @@ export default function ProfilePhotoScreen({
                             {hasPhoto && (
                                 <button
                                     onClick={() => setShowDeleteConfirm(true)}
-                                    className="flex flex-col items-center gap-xd-6"
+                                    disabled={!isOnline}
+                                    className="flex flex-col items-center gap-xd-6 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     <Image
                                         src={deleteIcon}

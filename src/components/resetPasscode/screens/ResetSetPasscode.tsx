@@ -10,6 +10,8 @@ interface ResetSetPasscodeProps {
     onSavePasscode: (passcode: string) => Promise<boolean>;
     onDone?: () => void;
     onSaveFailed?: () => void;
+    /** Offline: the re-entered passcode cannot be submitted; digits stay. */
+    disabled?: boolean;
 }
 
 type SetStep = 'set' | 'reenter' | 'saving' | 'done';
@@ -22,6 +24,7 @@ export default function ResetSetPasscode({
     onSavePasscode,
     onDone,
     onSaveFailed,
+    disabled = false,
 }: ResetSetPasscodeProps) {
     const { t } = useTranslation();
     const [setStep, setSetStep] = useState<SetStep>('set');
@@ -43,6 +46,7 @@ export default function ResetSetPasscode({
     });
 
     const handleReenterComplete = async (value: string) => {
+        if (disabled) return;
         if (value === passcode) {
             setSetIsValid('valid');
             setSetStep('saving');
@@ -146,7 +150,11 @@ export default function ResetSetPasscode({
                                         value={reenterValue}
                                         onChange={setReenterValue}
                                         onComplete={handleReenterComplete}
-                                        disabled={setStep === 'saving' || setIsValid === 'valid'}
+                                        disabled={
+                                            disabled ||
+                                            setStep === 'saving' ||
+                                            setIsValid === 'valid'
+                                        }
                                         isValidPin={setStep === 'saving' ? 'valid' : setIsValid}
                                         label={t.resetPasscode.setPasscode.reenterLabel}
                                     />

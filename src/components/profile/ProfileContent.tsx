@@ -37,10 +37,13 @@ import LoginHistoryScreen from './LoginHistoryScreen';
 import { QRCodeDisplay } from '../QR/send/shared/QRCodeDisplay';
 
 import { KycVerificationStatus, type KycStatusResponse } from '@/core/types/auth';
-import { api } from '@/api';
+import { api, isNetworkError } from '@/api';
+import { isOffline } from '@/lib/networkStatus';
+import { useIsOnline } from '@/hooks/useIsOnline';
 
 const ProfileContent = () => {
     const { userData, removeAuthCookies, refreshUser, isLoading } = useAuth();
+    const isOnline = useIsOnline();
     const { account } = useStore();
     const { toast } = useToast();
     const router = useRouter();
@@ -79,7 +82,7 @@ const ProfileContent = () => {
 
     const handlePhotoSave = async (dataUrl: string) => {
         const user = userData?.user;
-        if (!user) return;
+        if (!user || isOffline()) return;
 
         if (!dataUrl) {
             setLocalPhotoUrl(undefined);
@@ -89,7 +92,7 @@ const ProfileContent = () => {
             const delRes = await api.profile.update({ profilePictureURL: '' });
             if (delRes.ok) {
                 toast.success(t.profile.photo.removed);
-            } else {
+            } else if (!isNetworkError(delRes.error)) {
                 toast.error(delRes.error.message);
             }
             return;
@@ -102,7 +105,7 @@ const ProfileContent = () => {
 
         const uploadRes = await api.profile.uploadPhoto(file);
         if (!uploadRes.ok) {
-            toast.error(uploadRes.error.message);
+            if (!isNetworkError(uploadRes.error)) toast.error(uploadRes.error.message);
             return;
         }
         const imageUrl = uploadRes.data.url;
@@ -114,7 +117,7 @@ const ProfileContent = () => {
             language: user.language,
         });
         if (!updateRes.ok) {
-            toast.error(updateRes.error.message);
+            if (!isNetworkError(updateRes.error)) toast.error(updateRes.error.message);
             return;
         }
 
@@ -610,7 +613,10 @@ const ProfileContent = () => {
                         <button
                             type="button"
                             onClick={() => setShowLogoutDialog(true)}
-                            className="flex items-center justify-between h-xd-58 w-xd-406 rounded-xd-15 px-xd-12 py-xd-20 bg-[#FCFCFC]"
+                            // Logging out needs the server to clear the httpOnly
+                            // cookies; offline it would only reload into an error page.
+                            disabled={!isOnline}
+                            className="flex items-center justify-between h-xd-58 w-xd-406 rounded-xd-15 px-xd-12 py-xd-20 bg-[#FCFCFC] disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <div className="flex items-center gap-xd-16">
                                 <Image

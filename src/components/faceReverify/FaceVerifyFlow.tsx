@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { useCamera } from '@/hooks/useCamera';
 import { createKycService } from '@/services/kyc';
 import { useTranslation } from '@/context/I18nContext';
+import { useIsOnline } from '@/hooks/useIsOnline';
 import type { FaceReverifyOutcome } from '@/context/FaceReverifyContext';
 import FaceScanOverlay from './FaceScanOverlay';
 
@@ -33,6 +34,7 @@ interface FaceVerifyFlowProps {
  */
 export default function FaceVerifyFlow({ challengeId, reason, onResult }: FaceVerifyFlowProps) {
     const { t } = useTranslation();
+    const isOnline = useIsOnline();
     const kyc = useRef(createKycService());
     const {
         videoRef,
@@ -237,7 +239,7 @@ export default function FaceVerifyFlow({ challengeId, reason, onResult }: FaceVe
                 {state === 'intro' && (
                     <button
                         onClick={run}
-                        disabled={!isActive}
+                        disabled={!isActive || !isOnline}
                         className="w-xd-390 h-xd-60 py-4 rounded-xd-20 border border-dashed border-[#5D5C5D]/50 text-[#1D1D1D] text-xd-16 font-medium disabled:opacity-40"
                     >
                         {t.verification.faceReverify.start}

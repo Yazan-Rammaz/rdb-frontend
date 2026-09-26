@@ -23,7 +23,10 @@ export interface ApiError {
     status: number;
     /** Human-readable message, safe to surface to the user. */
     message: string;
-    /** Machine-readable code from the backend, when it sends one. */
+    /**
+     * Machine-readable code from the backend, when it sends one. On `status: 0`
+     * it is always a {@link NetworkErrorCode} instead.
+     */
     code?: string;
     /** Field-level validation errors, keyed by field name. */
     fields?: Record<string, string[]>;
@@ -41,6 +44,14 @@ export interface ApiError {
      */
     body?: unknown;
 }
+
+/**
+ * Why a request got no response (`status: 0`):
+ *  - `NETWORK` — the connection failed or dropped.
+ *  - `TIMEOUT` — the client's request ceiling ran out.
+ *  - `ABORTED` — the caller cancelled it through `signal`.
+ */
+export type NetworkErrorCode = 'NETWORK' | 'TIMEOUT' | 'ABORTED';
 
 /** Standard cursor/offset pagination accepted by list endpoints. */
 export interface PageParams {

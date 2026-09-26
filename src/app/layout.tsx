@@ -9,6 +9,7 @@ import { I18nProvider } from '@/context/I18nContext';
 import { ToastProvider } from '@/context/ToastContext';
 import { ScannerProvider } from '@/context/ScannerContext';
 import ToastContainer from '@/components/ui/Toast/ToastContainer';
+import NetworkBanner from '@/components/layout/NetworkBanner';
 import React from 'react';
 import { PasskeyProvider } from '@/context/PasskeyContext';
 import { Quicksand } from 'next/font/google';
@@ -78,6 +79,7 @@ export default function RootLayout({
                                             <ToastProvider>
                                                 {children}
                                                 <ToastContainer />
+                                                <NetworkBanner />
                                             </ToastProvider>
                                         </LayoutProvider>
                                     </RDBLayout>

@@ -21,6 +21,8 @@ interface ResetEnterOtpProps {
     changeMethod?: () => void;
     onClose?: () => void;
     timerSeconds?: number;
+    /** Offline: the code stays typed but cannot be submitted or resent. */
+    disabled?: boolean;
 }
 
 /**
@@ -40,6 +42,7 @@ export default function ResetEnterOtp({
     changeMethod,
     onClose,
     timerSeconds = 120,
+    disabled = false,
 }: ResetEnterOtpProps) {
     const { t } = useTranslation();
     const [timeLeft, setTimeLeft] = useState(timerSeconds);
@@ -67,6 +70,7 @@ export default function ResetEnterOtp({
     };
 
     const handleResend = () => {
+        if (disabled) return;
         onResend();
         setTimeLeft(timerSeconds);
         setCanResend(false);
@@ -127,7 +131,8 @@ export default function ResetEnterOtp({
                                 <div className="flex items-center pt-xd-8 gap-xd-5">
                                     <button
                                         onClick={handleResend}
-                                        className="text-trim-descend text-xd-13 text-[#388CFF] underline"
+                                        disabled={disabled}
+                                        className="text-trim-descend text-xd-13 text-[#388CFF] underline disabled:opacity-50"
                                     >
                                         {t.auth.enterPin.resendCode}
                                     </button>
@@ -185,7 +190,9 @@ export default function ResetEnterOtp({
                         value={pin}
                         onChange={setPin}
                         onComplete={handlePinComplete}
-                        disabled={loading === 'verify-pin' || isValidPin === 'valid' || isExpired}
+                        disabled={
+                            disabled || loading === 'verify-pin' || isValidPin === 'valid' || isExpired
+                        }
                         isValidPin={isValidPin}
                         isExpired={isExpired}
                     />

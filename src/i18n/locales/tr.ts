@@ -47,6 +47,10 @@ const tr: TranslationSchema = {
         tryAgain: 'Tekrar Dene',
         poweredBy: 'Ramaaz Digital Banking tarafından desteklenmektedir',
         sessionExpired: 'Oturumun süresi doldu. Lütfen tekrar giriş yapın.',
+        network: {
+            offline: 'İnternet bağlantısı yok',
+            restored: 'Bağlantı yeniden kuruldu',
+        },
         camera: {
             startFailed: 'Kamera başlatılamadı.',
             startFailedDetail: 'Kamera başlatılamadı: {{detail}}',

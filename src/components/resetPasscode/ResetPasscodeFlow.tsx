@@ -11,6 +11,8 @@ import { toE164 } from '@/lib/phoneValidation';
 import { useToast } from '@/context/ToastContext';
 import { useTranslation } from '@/context/I18nContext';
 import { useRouter } from 'next/navigation';
+import { useIsOnline } from '@/hooks/useIsOnline';
+import { isOffline } from '@/lib/networkStatus';
 import {
     resetPasscodeApi,
     createStepResetPasscodeApi,
@@ -51,6 +53,12 @@ export default function ResetPasscodeFlow() {
     const { toast } = useToast();
     const { t, tr } = useTranslation();
     const router = useRouter();
+    const isOnline = useIsOnline();
+
+    // The reset service answers a dropped connection with a domain-shaped
+    // failure (no questions, "invalid code", …) rather than a status, so every
+    // failure branch below first asks the store: offline means the pill already
+    // said it, and the user stays where they are to retry.
 
     // Pick the endpoint set by entry point (doc §0.1). The mid-login set carries
     // the 10-min login stepToken as its bearer; the idle set rides on rdb_at.
@@ -109,12 +117,14 @@ export default function ResetPasscodeFlow() {
 
     // ── Intro → init → branch ────────────────────────────────────────────
     const handleStart = async () => {
+        if (isOffline()) return;
         setInitLoading(true);
         // Every (re)start is a fresh challenge — drop any stale face proof
         // (single-use; a replay would 403 at complete anyway).
         faceTokenRef.current = undefined;
         try {
             const res = await api.init();
+            if (isOffline()) return;
             if (res.lockout) {
                 setLockout(res.lockout);
                 goTo('lockout');
@@ -155,7 +165,7 @@ export default function ResetPasscodeFlow() {
                 // face branch above, and step/questions would 409 for them.)
                 const q = await api.getQuestions();
                 if (!q.questions.length) {
-                    toast.error(t.resetPasscode.toasts.questionsFailed);
+                    if (!isOffline()) toast.error(t.resetPasscode.toasts.questionsFailed);
                     return;
                 }
                 setQuestions(q.questions);
@@ -168,7 +178,7 @@ export default function ResetPasscodeFlow() {
                 handleStepExpired();
                 return;
             }
-            toast.error(t.resetPasscode.toasts.startFailed);
+            if (!isOffline()) toast.error(t.resetPasscode.toasts.startFailed);
         } finally {
             setInitLoading(false);
         }
@@ -178,12 +188,13 @@ export default function ResetPasscodeFlow() {
     const handleSubmitPhone = () => goTo('select-method');
 
     const handleSelectMethod = async (m: 'sms' | 'whatsapp') => {
-        if (!toE164(phone)) return;
+        if (!toE164(phone) || isOffline()) return;
         setMethod(m);
         setMethodLoading(true);
         const res = await api.sendOtp(toE164(phone), m);
         setMethodLoading(false);
         if (!res.ok) {
+            if (isOffline()) return;
             toast.error(res.error ?? t.resetPasscode.toasts.sendCodeFailed);
             return;
         }
@@ -193,17 +204,20 @@ export default function ResetPasscodeFlow() {
     };
 
     const handleResendOtp = async () => {
-        if (!method) return;
+        if (!method || isOffline()) return;
         setOtpLoading('resend-pin');
         await api.sendOtp(toE164(phone), method);
         setOtpLoading('');
     };
 
     const handleVerifyOtp = async (code: string) => {
+        if (isOffline()) return;
         setOtpLoading('verify-pin');
         const res = await api.verifyOtp(toE164(phone), code);
         if (!res.ok) {
             setOtpLoading('');
+            // Not a wrong code — keep it typed for the retry.
+            if (isOffline()) return;
             setOtpValid('notvalid');
             setTimeout(() => {
                 setOtpValid('');
@@ -217,6 +231,7 @@ export default function ResetPasscodeFlow() {
         setOtpLoading('');
         if (!q.questions.length) {
             setOtpValid('');
+            if (isOffline()) return;
             toast.error(t.resetPasscode.toasts.questionsFailed);
             return;
         }
@@ -227,6 +242,7 @@ export default function ResetPasscodeFlow() {
 
     // ── Quiz → grade ─────────────────────────────────────────────────────
     const handleSubmitAnswers = async (answers: ResetAnswer[]) => {
+        if (isOffline()) return;
         let res;
         try {
             res = await api.submitAnswers(answers);
@@ -235,9 +251,11 @@ export default function ResetPasscodeFlow() {
                 handleStepExpired();
                 return;
             }
-            toast.error(t.resetPasscode.toasts.submitAnswersFailed);
+            if (!isOffline()) toast.error(t.resetPasscode.toasts.submitAnswersFailed);
             return;
         }
+        // A dropped connection is not a wrong answer: stay on the quiz.
+        if (!res.success && isOffline()) return;
         if (res.success) {
             resetTokenRef.current = res.resetToken;
             goTo('set-passcode');
@@ -256,6 +274,7 @@ export default function ResetPasscodeFlow() {
     };
 
     const handleRetryQuiz = async () => {
+        if (isOffline()) return;
         let q;
         try {
             q = await api.getQuestions();
@@ -270,6 +289,7 @@ export default function ResetPasscodeFlow() {
         // error. Entering the quiz with no questions would render a blank screen
         // with no way out — restart from the intro instead.
         if (!q.questions.length) {
+            if (isOffline()) return;
             toast.error(t.resetPasscode.toasts.resetExpired);
             goTo('intro', -1);
             return;
@@ -339,7 +359,7 @@ export default function ResetPasscodeFlow() {
                 >
                     {step === 'intro' && (
                         <ForgetPasscodeIntro
-                            loading={initLoading}
+                            loading={initLoading || !isOnline}
                             onStart={handleStart}
                             onClose={close}
                         />
@@ -361,6 +381,7 @@ export default function ResetPasscodeFlow() {
                             setMethod={handleSelectMethod}
                             changeNumber={() => goTo('enter-phone', -1)}
                             loading={methodLoading}
+                            disabled={!isOnline}
                             onClose={close}
                         />
                     )}
@@ -378,6 +399,7 @@ export default function ResetPasscodeFlow() {
                             changeNumber={() => goTo('enter-phone', -1)}
                             changeMethod={() => goTo('select-method', -1)}
                             onClose={close}
+                            disabled={!isOnline}
                         />
                     )}
 
@@ -386,11 +408,16 @@ export default function ResetPasscodeFlow() {
                             questions={questions}
                             onComplete={handleSubmitAnswers}
                             onClose={close}
+                            disabled={!isOnline}
                         />
                     )}
 
                     {step === 'fail-once' && (
-                        <QuizFailOnce onRetry={handleRetryQuiz} onClose={close} />
+                        <QuizFailOnce
+                            onRetry={handleRetryQuiz}
+                            onClose={close}
+                            disabled={!isOnline}
+                        />
                     )}
 
                     {step === 'lockout' && lockout && (
@@ -405,9 +432,12 @@ export default function ResetPasscodeFlow() {
                         <ResetSetPasscode
                             onSavePasscode={handleSaveNewPasscode}
                             onDone={handleNewPasscodeDone}
-                            onSaveFailed={() =>
-                                toast.error(t.resetPasscode.toasts.setPasscodeFailed)
-                            }
+                            onSaveFailed={() => {
+                                if (!isOffline()) {
+                                    toast.error(t.resetPasscode.toasts.setPasscodeFailed);
+                                }
+                            }}
+                            disabled={!isOnline}
                         />
                     )}
                 </motion.div>

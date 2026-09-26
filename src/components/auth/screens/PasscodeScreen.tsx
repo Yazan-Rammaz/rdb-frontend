@@ -29,7 +29,13 @@ function detectBiometricType(): BiometricType {
     return 'passkey';
 }
 
-type PasscodeScreenProps =
+type PasscodeScreenProps = {
+    /**
+     * Offline: every input that would send the passcode (and the forgot /
+     * biometric shortcuts) is inert. Digits already typed stay.
+     */
+    disabled?: boolean;
+} & (
     | {
           mode: 'set';
           onSavePasscode: (passcode: string) => Promise<boolean>;
@@ -44,13 +50,15 @@ type PasscodeScreenProps =
           onUseBiometric?: () => void;
           /** When provided, the "Forget Passcode ?" label becomes a button that opens the reset flow */
           onForgotPasscode?: () => void;
-      };
+      }
+);
 
 type SetStep = 'set' | 'reenter' | 'saving' | 'done';
 
 export default function PasscodeScreen(props: PasscodeScreenProps) {
     const { t } = useTranslation();
     const { userData, partialUserPhone, loginStep } = useAuth();
+    const disabled = props.disabled ?? false;
 
     // ── Set mode state ──────────────────────────────────────────────
     const [setStep, setSetStep] = useState<SetStep>('set');
@@ -82,7 +90,7 @@ export default function PasscodeScreen(props: PasscodeScreenProps) {
     });
 
     const handleReenterComplete = async (value: string) => {
-        if (props.mode !== 'set') return;
+        if (props.mode !== 'set' || disabled) return;
         if (value === passcode) {
             setSetIsValid('valid');
             setSetStep('saving');
@@ -121,7 +129,7 @@ export default function PasscodeScreen(props: PasscodeScreenProps) {
     });
 
     const handleEnterComplete = async (value: string) => {
-        if (props.mode !== 'enter') return;
+        if (props.mode !== 'enter' || disabled) return;
         setLoading(true);
         const ok = await props.onVerifyPasscode(value);
         setLoading(false);
@@ -230,7 +238,9 @@ export default function PasscodeScreen(props: PasscodeScreenProps) {
                                             onChange={setReenterValue}
                                             onComplete={handleReenterComplete}
                                             disabled={
-                                                setStep === 'saving' || setIsValid === 'valid'
+                                                disabled ||
+                                                setStep === 'saving' ||
+                                                setIsValid === 'valid'
                                             }
                                             isValidPin={setStep === 'saving' ? 'valid' : setIsValid}
                                             label={
@@ -325,7 +335,7 @@ export default function PasscodeScreen(props: PasscodeScreenProps) {
                         value={enterValue}
                         onChange={setEnterValue}
                         onComplete={handleEnterComplete}
-                        disabled={loading || enterIsValid === 'valid'}
+                        disabled={disabled || loading || enterIsValid === 'valid'}
                         isValidPin={enterIsValid}
                         label=""
                         autoFocus={false}
@@ -334,7 +344,8 @@ export default function PasscodeScreen(props: PasscodeScreenProps) {
                     {props.onForgotPasscode ? (
                         <button
                             onClick={props.onForgotPasscode}
-                            className="text-xd-11 font-medium text-[#388CFF] mb-xd-3 underline"
+                            disabled={disabled}
+                            className="text-xd-11 font-medium text-[#388CFF] mb-xd-3 underline disabled:opacity-50"
                         >
                             {t.auth.enterPasscode.forgotLabel}
                         </button>
@@ -344,7 +355,7 @@ export default function PasscodeScreen(props: PasscodeScreenProps) {
                         </p>
                     )}
                     {props.mode === 'enter' && props.onUseBiometric && (
-                        <BiometricButton onPress={props.onUseBiometric} />
+                        <BiometricButton onPress={props.onUseBiometric} disabled={disabled} />
                     )}
                     <FlexibleSpace size={60} />
                 </div>
@@ -367,14 +378,18 @@ const BIOMETRIC_CONFIG: Record<
     passkey: { icon: passkeyIcon, labelKey: 'passkey' },
 };
 
-function BiometricButton({ onPress }: { onPress: () => void }) {
+function BiometricButton({ onPress, disabled }: { onPress: () => void; disabled: boolean }) {
     const { t } = useTranslation();
     const type = useMemo(detectBiometricType, []);
     const { icon, labelKey } = BIOMETRIC_CONFIG[type];
     const label = t.auth.biometric[labelKey];
 
     return (
-        <button onClick={onPress} className="mt-xd-5 flex flex-col items-center gap-xd-5">
+        <button
+            onClick={onPress}
+            disabled={disabled}
+            className="mt-xd-5 flex flex-col items-center gap-xd-5 disabled:opacity-50"
+        >
             <div className="w-xd-60 h-xd-60 rounded-full bg-white flex items-center justify-center">
                 <Image
                     src={icon}

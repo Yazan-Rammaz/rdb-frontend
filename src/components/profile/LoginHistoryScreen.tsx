@@ -8,6 +8,8 @@ import loginhistoryIcon from '@/assets/icons/profile/loginhistory.svg';
 import { useTranslation } from '@/context/I18nContext';
 import { createLoginHistoryService } from '@/services/login-history';
 import { formatLoginTime } from '@/lib/formatLoginTime';
+import { isOffline } from '@/lib/networkStatus';
+import { useIsOnline, useOnReconnect } from '@/hooks/useIsOnline';
 import type { LoginHistoryItem, LoginDevice } from '@/core/types/loginHistory';
 
 interface LoginHistoryScreenProps {
@@ -35,6 +37,7 @@ function locationLabel(city: string | undefined, country: string | undefined, fa
 
 export default function LoginHistoryScreen({ onBack }: LoginHistoryScreenProps) {
     const { t, rtl, language } = useTranslation();
+    const isOnline = useIsOnline();
     // `null` = still loading; `[]` = loaded but empty.
     const [items, setItems] = useState<LoginHistoryItem[] | null>(null);
     const [error, setError] = useState(false);
@@ -51,7 +54,9 @@ export default function LoginHistoryScreen({ onBack }: LoginHistoryScreenProps) 
                 if (active) setItems(data.items);
             })
             .catch(() => {
-                if (active) {
+                // Offline: stay on the skeleton — the pill explains it, and
+                // the list reloads by itself on reconnect (below).
+                if (active && !isOffline()) {
                     setError(true);
                     setItems([]);
                 }
@@ -60,6 +65,10 @@ export default function LoginHistoryScreen({ onBack }: LoginHistoryScreenProps) 
             active = false;
         };
     }, [language, reloadKey]);
+
+    useOnReconnect(() => {
+        if (items === null || error) setReloadKey((k) => k + 1);
+    });
 
     const loading = items === null;
     const isEmpty = !error && Array.isArray(items) && items.length === 0;
@@ -102,7 +111,8 @@ export default function LoginHistoryScreen({ onBack }: LoginHistoryScreenProps) 
                         <button
                             type="button"
                             onClick={() => setReloadKey((k) => k + 1)}
-                            className="text-xd-12 font-medium text-[#3066CC] px-xd-16 py-xd-8 rounded-xd-15 bg-[#F0F6FD]"
+                            disabled={!isOnline}
+                            className="text-xd-12 font-medium text-[#3066CC] px-xd-16 py-xd-8 rounded-xd-15 bg-[#F0F6FD] disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {t.common.retry}
                         </button>

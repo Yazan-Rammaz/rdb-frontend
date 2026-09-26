@@ -22,8 +22,10 @@ import { useRouter } from 'next/navigation';
 import { extractMerchantCode, stashMerchantCode } from '@/lib/merchantPayment';
 import { useAuth, type LoginApiResponse } from '@/context/AuthContext';
 import { usePasskey } from '@/context/PasskeyContext';
-import { api } from '@/api';
+import { api, isNetworkError } from '@/api';
 import { useToast } from '@/context/ToastContext';
+import { useIsOnline } from '@/hooks/useIsOnline';
+import { isOffline } from '@/lib/networkStatus';
 import { useTranslation } from '@/context/I18nContext';
 import { useStore } from '@/context/StoreContext';
 import { setupPin, unlockWithPin, getDeviceId } from '@/services/passkeyApi';
@@ -106,6 +108,7 @@ function AuthPageInner() {
     const { toast } = useToast();
     const { t, tr } = useTranslation();
     const { preloadData } = useStore();
+    const isOnline = useIsOnline();
     // Read cached auth-flow state synchronously so the first render already
     // shows the correct step (cache is populated during the splash window by
     // ClientProviders).
@@ -400,6 +403,7 @@ function AuthPageInner() {
     const [enterNameLoading, setEnterNameLoading] = useState(false);
 
     const handleEnterName = async (name: string) => {
+        if (isOffline()) return;
         setEnterNameLoading(true);
         try {
             const parts = name.trim().split(/\s+/);
@@ -441,7 +445,7 @@ function AuthPageInner() {
         // Unreachable through the UI — this screen is only arrived at with a
         // valid number. Guarded so a future caller cannot quietly ask the
         // backend for an OTP on an empty string.
-        if (!toE164(phone)) return;
+        if (!toE164(phone) || isOffline()) return;
         setMethod(selectedMethod);
         setLoading('send-pin');
         // `type` is dropped: the old action accepted it but never put it in the
@@ -452,6 +456,8 @@ function AuthPageInner() {
         });
         setLoading('');
         if (!sendOtpRes.ok) {
+            // The connection dropped mid-request: the offline pill says so.
+            if (isNetworkError(sendOtpRes.error)) return;
             toast.error(tr('auth.otp.sendError', { error: sendOtpRes.error.message }));
             return;
         }
@@ -470,6 +476,7 @@ function AuthPageInner() {
     };
 
     const handleVerifyPin = async (pinValue: string) => {
+        if (isOffline()) return;
         setLoading('verify-pin');
         const verifyOtpRes = await api.auth.verifyOtp({
             phoneNumber: toE164(phone),
@@ -486,6 +493,8 @@ function AuthPageInner() {
 
         if (!verifyOtpRes.ok) {
             setLoading('');
+            // Keep the typed code; the user resubmits once the pill turns green.
+            if (isNetworkError(verifyOtpRes.error)) return;
             const message = verifyOtpRes.error.message;
             if (message.includes('Invalid') || message.includes('expired')) {
                 setIsValidPin('notvalid');
@@ -660,6 +669,9 @@ function AuthPageInner() {
     };
 
     const handleSavePasscodeFailed = () => {
+        // setupPin reports a dropped connection as a plain failure; the store
+        // already knows it is offline by the time we get here.
+        if (isOffline()) return;
         toast.error(t.auth.setPasscode.saveFailed);
     };
 
@@ -811,6 +823,7 @@ function AuthPageInner() {
                         onVerifyPasscode={handleVerifyPasscode}
                         onSuccess={handlePasscodeSuccess}
                         onForgotPasscode={() => startPasscodeReset('step')}
+                        disabled={!isOnline}
                     />
                 </main>
             </Page>
@@ -897,6 +910,7 @@ function AuthPageInner() {
                                     phone={phone}
                                     authType={authType}
                                     loading={loading === 'send-pin'}
+                                    disabled={!isOnline}
                                     onClose={handleClose}
                                 />
                             )}
@@ -916,6 +930,7 @@ function AuthPageInner() {
                                     setSessionInfo={setSessionInfo}
                                     loading={loading}
                                     setLoading={setLoading}
+                                    disabled={!isOnline}
                                 />
                             )}
 
@@ -955,7 +970,7 @@ function AuthPageInner() {
                             {step === 'enter-name' && (
                                 <EnterNameScreen
                                     onSubmit={handleEnterName}
-                                    loading={enterNameLoading}
+                                    loading={enterNameLoading || !isOnline}
                                 />
                             )}
 
@@ -965,6 +980,7 @@ function AuthPageInner() {
                                     onSavePasscode={handleSavePasscode}
                                     onDone={handlePasscodeDone}
                                     onSaveFailed={handleSavePasscodeFailed}
+                                    disabled={!isOnline}
                                 />
                             )}
 
@@ -974,6 +990,7 @@ function AuthPageInner() {
                                     onVerifyPasscode={handleVerifyPasscode}
                                     onSuccess={handlePasscodeSuccess}
                                     onForgotPasscode={() => startPasscodeReset('step')}
+                                    disabled={!isOnline}
                                 />
                             )}
                         </motion.div>
