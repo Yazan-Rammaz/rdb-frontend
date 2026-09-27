@@ -9,7 +9,6 @@ import { useIdleTimer } from '@/hooks/useIdleTimer';
 import { useInlineFeedback } from '@/hooks/useInlineFeedback';
 import { setAuthNotice } from '@/lib/authNotice';
 import { useLogout } from '@/hooks/useLogout';
-import { useToast } from '@/context/ToastContext';
 import { useTranslation } from '@/context/I18nContext';
 import { useIsOnline, useOnReconnect } from '@/hooks/useIsOnline';
 import { isOffline } from '@/lib/networkStatus';
