@@ -6,6 +6,7 @@ import { useResetPasscode } from '@/context/ResetPasscodeContext';
 import { useSessionTakeover } from '@/context/SessionTakeoverContext';
 import { useRouter } from 'next/navigation';
 import { useIdleTimer } from '@/hooks/useIdleTimer';
+import { useLogout } from '@/hooks/useLogout';
 import { useToast } from '@/context/ToastContext';
 import { useTranslation } from '@/context/I18nContext';
 import { useIsOnline, useOnReconnect } from '@/hooks/useIsOnline';
@@ -47,6 +48,7 @@ export default function PasskeyGate({ children }: PasskeyGateProps) {
     const { t } = useTranslation();
     const { start: startPasscodeReset } = useResetPasscode();
     const { takeoverSince } = useSessionTakeover();
+    const logout = useLogout();
 
     const {
         lockStatus,
@@ -268,6 +270,7 @@ export default function PasskeyGate({ children }: PasskeyGateProps) {
                                 onVerifyPasscode={handleVerifyPin}
                                 onSuccess={confirmUnlock}
                                 onForgotPasscode={() => startPasscodeReset('idle')}
+                                onSwitchAccount={logout}
                                 disabled={!isOnline}
                                 onUseBiometric={
                                     biometricAvailable

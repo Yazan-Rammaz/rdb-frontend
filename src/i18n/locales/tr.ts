@@ -232,6 +232,7 @@ const tr: TranslationSchema = {
             subtitle: 'Devam Etmek İçin Şifrenizi Girin',
             label: 'Şifrenizi Girin',
             forgotLabel: 'Şifremi Unuttum ?',
+            switchAccountLabel: 'Başka bir hesapla giriş yap',
         },
     },
 
