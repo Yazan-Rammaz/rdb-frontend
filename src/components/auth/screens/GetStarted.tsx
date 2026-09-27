@@ -3,6 +3,8 @@
 import { RdbIcon } from '../../icons';
 import { useTranslation } from '@/context/I18nContext';
 import { FlexibleSpace } from '@/scaling';
+import InlineFeedback from '@/components/ui/InlineFeedback';
+import type { Feedback } from '@/hooks/useInlineFeedback';
 import qrloginSvg from '@/assets/icons/auth/qrlogin.svg';
 import Image from 'next/image';
 
@@ -11,6 +13,8 @@ interface GetStartedScreenProps {
     onNewCustomer?: () => void;
     onLater?: () => void;
     onScanQr?: () => void;
+    /** A QR-login failure or a notice from the page that sent the user here. */
+    feedback?: Feedback | null;
 }
 // all items hieght 616
 export default function GetStartedScreen({
@@ -18,6 +22,7 @@ export default function GetStartedScreen({
     onNewCustomer,
     onLater,
     onScanQr,
+    feedback = null,
 }: GetStartedScreenProps) {
     const { t } = useTranslation();
 
@@ -46,8 +51,13 @@ export default function GetStartedScreen({
             <FlexibleSpace size={280} share={0.45} />
 
             {/* Logo */}
-            <div className="flex flex-col items-center">
+            <div className="relative flex flex-col items-center">
                 <RdbIcon className="w-xd-144 h-xd-104" />
+                {/* In the empty logo↔title gap — out of flow, nothing moves. */}
+                <InlineFeedback
+                    feedback={feedback}
+                    className="absolute inset-x-xd-30 top-full pt-xd-40"
+                />
             </div>
 
             {/* Space between logo and content — absorbs 28% of vertical compression */}

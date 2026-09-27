@@ -4,6 +4,8 @@ import Image from 'next/image';
 import PhoneInput from '@/components/ui/PhoneInput';
 import { useTranslation } from '@/context/I18nContext';
 import { FlexibleSpace } from '@/scaling';
+import InlineFeedback from '@/components/ui/InlineFeedback';
+import type { Feedback } from '@/hooks/useInlineFeedback';
 import simSvg from '@/assets/icons/auth/sim.svg';
 import shieldSvg from '@/assets/icons/auth/shield.svg';
 import closeSvg from '@/assets/icons/auth/close.svg';
@@ -15,6 +17,8 @@ interface EnterPhoneScreenProps {
     authType: string;
     setPhone: (phone: string) => void;
     onClose?: () => void;
+    /** A notice from the page that sent the user here (a resumed step). */
+    feedback?: Feedback | null;
 }
 
 export default function EnterPhoneScreen({
@@ -24,6 +28,7 @@ export default function EnterPhoneScreen({
     authType,
     setPhone,
     onClose,
+    feedback = null,
 }: EnterPhoneScreenProps) {
     const { t } = useTranslation();
 
@@ -102,13 +107,19 @@ export default function EnterPhoneScreen({
                 {/* Space between content and midpoint — absorbs 60% of compression */}
                 <FlexibleSpace size={35} share={0} />
                 <div className="h-1/2 flex flex-col items-center">
-                    <div className="w-xd-390 h-xd-60">
+                    <div className="relative w-xd-390 h-xd-60">
                         <PhoneInput
                             onSend={() => onSubmit(phone)}
                             value={phone}
                             onChange={setPhone}
                             placeholder={t.auth.enterPhone.phonePlaceholder}
                             isLoading={loading}
+                        />
+                        {/* Under the input, in the grow space and below the
+                            PhoneInput's own validation hint — out of flow. */}
+                        <InlineFeedback
+                            feedback={feedback}
+                            className="absolute inset-x-0 top-full pt-xd-30"
                         />
                     </div>
                     <FlexibleSpace grow />

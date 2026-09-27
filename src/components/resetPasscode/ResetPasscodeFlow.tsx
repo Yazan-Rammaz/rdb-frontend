@@ -8,7 +8,8 @@ import { usePasskey } from '@/context/PasskeyContext';
 import { useAuth } from '@/context/AuthContext';
 import { clearAuthFlowState } from '@/lib/authFlowCookie';
 import { toE164 } from '@/lib/phoneValidation';
-import { useToast } from '@/context/ToastContext';
+import { useInlineFeedback } from '@/hooks/useInlineFeedback';
+import { setAuthNotice } from '@/lib/authNotice';
 import { useTranslation } from '@/context/I18nContext';
 import { useRouter } from 'next/navigation';
 import { useIsOnline } from '@/hooks/useIsOnline';
@@ -50,7 +51,11 @@ export default function ResetPasscodeFlow() {
     const { satisfyStepUp, runStepUp } = useStepUp();
     const { confirmUnlock } = usePasskey();
     const { loginStep, setLoginStep } = useAuth();
-    const { toast } = useToast();
+    // One feedback line for the whole flow: the screens are keyed children of
+    // AnimatePresence, so a message that fires across a step change (codeSent,
+    // resetExpired) has to outlive the screen that caused it.
+    const { feedback, success: showSuccess, error: showError, clear: clearFeedback } =
+        useInlineFeedback();
     const { t, tr } = useTranslation();
     const router = useRouter();
     const isOnline = useIsOnline();
@@ -76,7 +81,8 @@ export default function ResetPasscodeFlow() {
     // the start (a fresh OTP mints a new stepToken). Counters are server-side
     // durable, so the user dodges nothing by restarting.
     const handleStepExpired = () => {
-        toast.error(t.resetPasscode.toasts.loginExpired);
+        // The reload below wipes React state; the /auth page picks this up once.
+        setAuthNotice('loginExpired');
         setLoginStep(null);
         clearAuthFlowState();
         void apiClient.session.saveStepToken({ stepToken: '' });
@@ -113,6 +119,8 @@ export default function ResetPasscodeFlow() {
     const goTo = (next: ResetStep, dir = 1) => {
         setDirection(dir);
         setStep(next);
+        // A line belongs to the screen it was shown on.
+        clearFeedback();
     };
 
     // ── Intro → init → branch ────────────────────────────────────────────
@@ -144,7 +152,7 @@ export default function ResetPasscodeFlow() {
                         faceTokenRef.current = outcome.stepToken;
                         goTo('set-passcode');
                     } else {
-                        toast.error(t.resetPasscode.toasts.verificationIncomplete);
+                        showError(t.resetPasscode.toasts.verificationIncomplete);
                     }
                     return;
                 }
@@ -154,7 +162,7 @@ export default function ResetPasscodeFlow() {
                 if (ok) {
                     goTo('set-passcode');
                 } else {
-                    toast.error(t.resetPasscode.toasts.verificationIncomplete);
+                    showError(t.resetPasscode.toasts.verificationIncomplete);
                 }
                 return;
             }
@@ -165,7 +173,7 @@ export default function ResetPasscodeFlow() {
                 // face branch above, and step/questions would 409 for them.)
                 const q = await api.getQuestions();
                 if (!q.questions.length) {
-                    if (!isOffline()) toast.error(t.resetPasscode.toasts.questionsFailed);
+                    if (!isOffline()) showError(t.resetPasscode.toasts.questionsFailed);
                     return;
                 }
                 setQuestions(q.questions);
@@ -178,7 +186,7 @@ export default function ResetPasscodeFlow() {
                 handleStepExpired();
                 return;
             }
-            if (!isOffline()) toast.error(t.resetPasscode.toasts.startFailed);
+            if (!isOffline()) showError(t.resetPasscode.toasts.startFailed);
         } finally {
             setInitLoading(false);
         }
@@ -195,12 +203,13 @@ export default function ResetPasscodeFlow() {
         setMethodLoading(false);
         if (!res.ok) {
             if (isOffline()) return;
-            toast.error(res.error ?? t.resetPasscode.toasts.sendCodeFailed);
+            showError(res.error ?? t.resetPasscode.toasts.sendCodeFailed);
             return;
         }
         setOtp('');
         goTo('enter-otp');
-        toast.success(tr('resetPasscode.toasts.codeSent', { method: m === 'sms' ? 'SMS' : 'WhatsApp' }));
+        // After goTo, which clears the line — this one is for the OTP screen.
+        showSuccess(tr('resetPasscode.toasts.codeSent', { method: m === 'sms' ? 'SMS' : 'WhatsApp' }));
     };
 
     const handleResendOtp = async () => {
@@ -232,7 +241,7 @@ export default function ResetPasscodeFlow() {
         if (!q.questions.length) {
             setOtpValid('');
             if (isOffline()) return;
-            toast.error(t.resetPasscode.toasts.questionsFailed);
+            showError(t.resetPasscode.toasts.questionsFailed);
             return;
         }
         setQuestions(q.questions);
@@ -251,7 +260,7 @@ export default function ResetPasscodeFlow() {
                 handleStepExpired();
                 return;
             }
-            if (!isOffline()) toast.error(t.resetPasscode.toasts.submitAnswersFailed);
+            if (!isOffline()) showError(t.resetPasscode.toasts.submitAnswersFailed);
             return;
         }
         // A dropped connection is not a wrong answer: stay on the quiz.
@@ -290,8 +299,9 @@ export default function ResetPasscodeFlow() {
         // with no way out — restart from the intro instead.
         if (!q.questions.length) {
             if (isOffline()) return;
-            toast.error(t.resetPasscode.toasts.resetExpired);
             goTo('intro', -1);
+            // After goTo, which clears the line — this one is for the intro.
+            showError(t.resetPasscode.toasts.resetExpired);
             return;
         }
         setQuestions(q.questions);
@@ -311,7 +321,7 @@ export default function ResetPasscodeFlow() {
     // proof (X-Face-Step-Token header). PIN verification is server-side bcrypt
     // — there is no local hash to update, and `/sessions/passcode/set` would
     // reject with ALREADY_SET. A 403 (replayed/expired proof) surfaces as
-    // `success: false` → onSaveFailed toast; the user restarts from the intro.
+    // `success: false` → the set-passcode label turns red; the user restarts from the intro.
     const handleSaveNewPasscode = async (passcode: string): Promise<boolean> => {
         try {
             const res = await api.complete(passcode, resetTokenRef.current, faceTokenRef.current);
@@ -330,8 +340,8 @@ export default function ResetPasscodeFlow() {
             // Mid-login: the session isn't ACTIVE yet. Per doc §0.1, return the
             // user to the login passcode step — entering the NEW passcode there
             // submits to /sessions/step/passcode/verify and finishes the login.
-            close();
-            toast.success(t.resetPasscode.toasts.passcodeUpdated);
+            // The overlay unmounts; the uncovered /auth passcode step shows the line.
+            close(t.resetPasscode.toasts.passcodeUpdated);
             return;
         }
         confirmUnlock();
@@ -361,6 +371,7 @@ export default function ResetPasscodeFlow() {
                         <ForgetPasscodeIntro
                             loading={initLoading || !isOnline}
                             onStart={handleStart}
+                            feedback={feedback}
                             onClose={close}
                         />
                     )}
@@ -383,6 +394,7 @@ export default function ResetPasscodeFlow() {
                             loading={methodLoading}
                             disabled={!isOnline}
                             onClose={close}
+                            feedback={feedback}
                         />
                     )}
 
@@ -400,6 +412,7 @@ export default function ResetPasscodeFlow() {
                             changeMethod={() => goTo('select-method', -1)}
                             onClose={close}
                             disabled={!isOnline}
+                            feedback={feedback}
                         />
                     )}
 
@@ -409,6 +422,7 @@ export default function ResetPasscodeFlow() {
                             onComplete={handleSubmitAnswers}
                             onClose={close}
                             disabled={!isOnline}
+                            feedback={feedback}
                         />
                     )}
 
@@ -432,11 +446,6 @@ export default function ResetPasscodeFlow() {
                         <ResetSetPasscode
                             onSavePasscode={handleSaveNewPasscode}
                             onDone={handleNewPasscodeDone}
-                            onSaveFailed={() => {
-                                if (!isOffline()) {
-                                    toast.error(t.resetPasscode.toasts.setPasscodeFailed);
-                                }
-                            }}
                             disabled={!isOnline}
                         />
                     )}

@@ -4,6 +4,8 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Image from 'next/image';
 import PinInputs from '@/components/ui/PinInputs';
+import InlineFeedback from '@/components/ui/InlineFeedback';
+import type { Feedback } from '@/hooks/useInlineFeedback';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useTranslation } from '@/context/I18nContext';
 import { useAuth } from '@/context/AuthContext';
@@ -36,6 +38,13 @@ type PasscodeScreenProps = {
      * switch-account / biometric shortcuts) is inert. Digits already typed stay.
      */
     disabled?: boolean;
+    /**
+     * A result line from the host (a failed save, a failed biometric unlock, an
+     * expired session, "passcode updated"). Enter mode shows it in place of the
+     * "Enter your passcode" label; set mode in the PIN label on the 'set' step,
+     * or under the welcome text on the done view. Nothing moves either way.
+     */
+    feedback?: Feedback | null;
 } & (
     | {
           mode: 'set';
@@ -65,6 +74,7 @@ export default function PasscodeScreen(props: PasscodeScreenProps) {
     const { t } = useTranslation();
     const { userData, partialUserPhone, loginStep } = useAuth();
     const disabled = props.disabled ?? false;
+    const feedback = props.feedback ?? null;
 
     // ── Set mode state ──────────────────────────────────────────────
     const [setStep, setSetStep] = useState<SetStep>('set');
@@ -192,7 +202,13 @@ export default function PasscodeScreen(props: PasscodeScreenProps) {
                             </p>
                             <FlexibleSpace size={80} />
                         </div>
-                        <div className="h-1/2 flex flex-col items-center px-xd-40">
+                        {/* `relative` so a late failure (the cookie save after the
+                            passcode) hangs in this empty half without moving anything. */}
+                        <div className="relative w-full h-1/2 flex flex-col items-center px-xd-40">
+                            <InlineFeedback
+                                feedback={feedback}
+                                className="absolute inset-x-xd-40 top-xd-40"
+                            />
                             <FlexibleSpace grow />
                         </div>
                     </div>
@@ -235,8 +251,18 @@ export default function PasscodeScreen(props: PasscodeScreenProps) {
                                             onComplete={handleSetComplete}
                                             disabled={false}
                                             isValidPin=""
-                                            label={setError || t.auth.setPasscode.setLabel}
-                                            labelTone={setError ? 'error' : 'default'}
+                                            label={
+                                                setError ||
+                                                feedback?.text ||
+                                                t.auth.setPasscode.setLabel
+                                            }
+                                            labelTone={
+                                                setError
+                                                    ? 'error'
+                                                    : feedback
+                                                      ? feedback.tone
+                                                      : 'default'
+                                            }
                                         />
                                     )}
                                     {(setStep === 'reenter' || setStep === 'saving') && (
@@ -332,10 +358,27 @@ export default function PasscodeScreen(props: PasscodeScreenProps) {
                         <p className="text-xd-18 text-[#1D1D1D] mb-xd-14">{displayName}</p>
                     )}
 
-                    {/* Label above inputs */}
-                    <p className="text-xd-12 font-bold text-[#1D1D1D] mb-xd-3">
-                        {t.auth.enterPasscode.label}
-                    </p>
+                    {/* Label above inputs. A feedback line takes its place: the
+                        label keeps its box (invisible) and the line sits over it,
+                        bottom-aligned and wider, so a second line of TR/AR copy
+                        grows up into the gap under the name instead of pushing
+                        the inputs down. */}
+                    <div className="relative flex justify-center">
+                        <p
+                            className={`text-xd-12 font-bold text-[#1D1D1D] mb-xd-3 ${
+                                feedback ? 'invisible' : ''
+                            }`}
+                        >
+                            {t.auth.enterPasscode.label}
+                        </p>
+                        <InlineFeedback
+                            feedback={feedback}
+                            // Without a name above, the verified badge sits right
+                            // over the label: no room for a second line.
+                            lines={displayName ? 2 : 1}
+                            className="absolute bottom-xd-3 left-1/2 w-xd-380 -translate-x-1/2"
+                        />
+                    </div>
 
                     {/* PIN inputs */}
                     <PinInputs

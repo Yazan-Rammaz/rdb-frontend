@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useRef, useState } from 'react';
-import { useToast } from '@/context/ToastContext';
+import { useInlineFeedback } from '@/hooks/useInlineFeedback';
+import InlineFeedback from '@/components/ui/InlineFeedback';
 import TransferDoneIcon from '@/assets/icons/home/transfer/transferdone.svg';
 import SuccessIcon from '@/assets/icons/home/transfer/success.svg';
 import ShareIcon from '@/assets/icons/home/qr/share.svg';
@@ -28,7 +29,8 @@ interface SuccessReceiptProps {
 }
 
 const SuccessReceipt: React.FC<SuccessReceiptProps> = ({ data, onClose }) => {
-    const { toast } = useToast();
+    // Download / share results, in the action bar's empty top padding.
+    const { feedback, success: showSuccess, error: showError } = useInlineFeedback();
     const { t, language, tr } = useTranslation();
     const downloadRef = useRef<HTMLDivElement>(null);
     const [showPreview, setShowPreview] = useState(false);
@@ -83,9 +85,9 @@ const SuccessReceipt: React.FC<SuccessReceiptProps> = ({ data, onClose }) => {
             link.download = `transfer-receipt-${data.referenceCode}.png`;
             link.href = canvas.toDataURL('image/png');
             link.click();
-            toast.success(t.transfer.receipt.downloaded);
+            showSuccess(t.transfer.receipt.downloaded);
         } catch {
-            toast.error(t.transfer.receipt.downloadFailed);
+            showError(t.transfer.receipt.downloadFailed);
         }
     };
 
@@ -102,12 +104,12 @@ const SuccessReceipt: React.FC<SuccessReceiptProps> = ({ data, onClose }) => {
                 }),
             );
             if (result === 'shared') {
-                toast.success(t.transfer.receipt.shared);
+                showSuccess(t.transfer.receipt.shared);
             } else if (result === 'copied') {
-                toast.success(t.transfer.receipt.sharedCopied);
+                showSuccess(t.transfer.receipt.sharedCopied);
             }
         } catch {
-            toast.error(t.transfer.receipt.shareFailed);
+            showError(t.transfer.receipt.shareFailed);
         }
     };
 
@@ -209,6 +211,12 @@ const SuccessReceipt: React.FC<SuccessReceiptProps> = ({ data, onClose }) => {
 
             {/* Action buttons */}
             <div className="flex bg-[#F4FFFA] absolute bottom-0 max-w-xd-370 items-center justify-around w-full m-xd-16 pt-xd-16 border-t border-gray-100">
+                {/* The bar's empty pt-xd-16: out of flow, nothing moves. */}
+                <InlineFeedback
+                    feedback={feedback}
+                    lines={1}
+                    className="absolute inset-x-0 top-0 h-xd-16 items-center"
+                />
                 <ActionButton
                     icon={DoneIcon}
                     label={t.transfer.receipt.done}

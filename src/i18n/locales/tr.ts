@@ -280,6 +280,7 @@ const tr: TranslationSchema = {
             sendingButton: 'Gönderiliyor...',
             expiredButton: 'Süresi Dolmuş Kod ( Süre Doldu )',
             cancelled: 'İptal Edilmiş Kod',
+            requestCancelled: 'Ödeme talebi iptal edildi',
             amountToBeSent: 'Gönderilecek Tutar',
             referenceId: 'Referans | Kimlik',
             purposeOfRequest: 'Para İsteği Amacı',

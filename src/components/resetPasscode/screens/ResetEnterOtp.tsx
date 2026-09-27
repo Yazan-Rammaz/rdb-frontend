@@ -5,6 +5,8 @@ import Image from 'next/image';
 import OtpInputs from '@/components/ui/OtpInputs';
 import { useTranslation } from '@/context/I18nContext';
 import { FlexibleSpace } from '@/scaling';
+import InlineFeedback from '@/components/ui/InlineFeedback';
+import type { Feedback } from '@/hooks/useInlineFeedback';
 import shieldSvg from '@/assets/icons/auth/shield.svg';
 import closeSvg from '@/assets/icons/auth/close.svg';
 
@@ -23,6 +25,8 @@ interface ResetEnterOtpProps {
     timerSeconds?: number;
     /** Offline: the code stays typed but cannot be submitted or resent. */
     disabled?: boolean;
+    /** "Code sent" / post-OTP failure line, shown under the OTP boxes. */
+    feedback?: Feedback | null;
 }
 
 /**
@@ -43,6 +47,7 @@ export default function ResetEnterOtp({
     onClose,
     timerSeconds = 120,
     disabled = false,
+    feedback = null,
 }: ResetEnterOtpProps) {
     const { t } = useTranslation();
     const [timeLeft, setTimeLeft] = useState(timerSeconds);
@@ -196,11 +201,26 @@ export default function ResetEnterOtp({
                         isValidPin={isValidPin}
                         isExpired={isExpired}
                     />
-                    {isExpired && (
-                        <p className="text-xd-11 pt-1 font-medium text-[#1D1D1D]">
-                            {t.auth.enterPin.codeExpired}
-                        </p>
-                    )}
+                    {/* The codeExpired slot. The feedback line sits over it
+                        (absolute, spilling into the grow spacer), and wins while
+                        present — so neither one moves anything. It sits right
+                        under the boxes, above the top of the touch keypad. */}
+                    <div className="relative w-full">
+                        {isExpired && (
+                            <p
+                                className={`text-center text-xd-11 pt-1 font-medium text-[#1D1D1D] ${
+                                    feedback ? 'invisible' : ''
+                                }`}
+                            >
+                                {t.auth.enterPin.codeExpired}
+                            </p>
+                        )}
+                        <InlineFeedback
+                            feedback={feedback}
+                            lines={2}
+                            className="absolute inset-x-0 top-0 pt-1 px-xd-20"
+                        />
+                    </div>
                     <FlexibleSpace grow />
                 </div>
             </div>

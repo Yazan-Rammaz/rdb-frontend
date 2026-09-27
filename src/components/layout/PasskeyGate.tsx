@@ -6,6 +6,8 @@ import { useResetPasscode } from '@/context/ResetPasscodeContext';
 import { useSessionTakeover } from '@/context/SessionTakeoverContext';
 import { useRouter } from 'next/navigation';
 import { useIdleTimer } from '@/hooks/useIdleTimer';
+import { useInlineFeedback } from '@/hooks/useInlineFeedback';
+import { setAuthNotice } from '@/lib/authNotice';
 import { useLogout } from '@/hooks/useLogout';
 import { useToast } from '@/context/ToastContext';
 import { useTranslation } from '@/context/I18nContext';
@@ -44,7 +46,6 @@ const IDLE_TIMEOUT_MS = process.env.NEXT_PUBLIC_IDLE_TIMEOUT_MS
  */
 export default function PasskeyGate({ children }: PasskeyGateProps) {
     const router = useRouter();
-    const { toast } = useToast();
     const { t } = useTranslation();
     const { start: startPasscodeReset } = useResetPasscode();
     const { takeoverSince } = useSessionTakeover();
@@ -64,6 +65,12 @@ export default function PasskeyGate({ children }: PasskeyGateProps) {
         initialize,
     } = usePasskey();
     const isOnline = useIsOnline();
+    // Biometric failures on the lock screen, shown in its passcode label.
+    const {
+        feedback: lockFeedback,
+        error: showLockError,
+        clear: clearLockFeedback,
+    } = useInlineFeedback();
 
     // SETUP_REQUIRED can be the product of an offline boot: the device-status
     // read failed and was taken as "no PIN". Re-check once the connection is
@@ -115,8 +122,10 @@ export default function PasskeyGate({ children }: PasskeyGateProps) {
     useEffect(() => {
         if (lockStatus === 'LOCKED') {
             setLockoutUntil(null);
+            // A line left from the previous lock would describe an old attempt.
+            clearLockFeedback();
         }
-    }, [lockStatus]);
+    }, [lockStatus, clearLockFeedback]);
 
     // ── Auto-trigger biometric on LOCKED if credential already enrolled ──
     useEffect(() => {
@@ -167,10 +176,10 @@ export default function PasskeyGate({ children }: PasskeyGateProps) {
             console.error('[PasskeyGate] biometric unlock failed:', result.error);
             // The service reports a dropped connection as a WebAuthn failure.
             if (isOffline()) return;
-            toast.error(t.passkeyGate.biometricFailed);
+            showLockError(t.passkeyGate.biometricFailed);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [unlockWithBiometric, toast, t]);
+    }, [unlockWithBiometric, showLockError, t]);
 
     // ── PIN verify handler (T010 + T011) ─────────────────────────────────
     const handleVerifyPin = useCallback(
@@ -191,7 +200,8 @@ export default function PasskeyGate({ children }: PasskeyGateProps) {
             if (result.error === 'STEP_EXPIRED' || result.error === 'SESSION_EXPIRED') {
                 // Step token expired (mid-login) or the session is gone (token refresh
                 // failed) — restart login rather than showing a wrong-PIN error.
-                toast.error(t.common.sessionExpired);
+                // The lock screen is about to go away, so /auth says why.
+                setAuthNotice('sessionExpired');
                 router.push('/auth');
                 return false;
             }
@@ -202,7 +212,7 @@ export default function PasskeyGate({ children }: PasskeyGateProps) {
 
             return false;
         },
-        [unlockWithPin, router, toast, t],
+        [unlockWithPin, router],
     );
 
     // ── SESSION TAKEOVER: a newer web login replaced this session ────────
@@ -272,6 +282,7 @@ export default function PasskeyGate({ children }: PasskeyGateProps) {
                                 onForgotPasscode={() => startPasscodeReset('idle')}
                                 onSwitchAccount={logout}
                                 disabled={!isOnline}
+                                feedback={lockFeedback}
                                 onUseBiometric={
                                     biometricAvailable
                                         ? async () => {
@@ -285,7 +296,9 @@ export default function PasskeyGate({ children }: PasskeyGateProps) {
                                                       enrollResult.error !== 'WEBAUTHN_CANCELLED' &&
                                                       !isOffline()
                                                   ) {
-                                                      toast.error(t.passkeyGate.biometricSetupFailed);
+                                                      showLockError(
+                                                          t.passkeyGate.biometricSetupFailed,
+                                                      );
                                                   }
                                               }
                                           }

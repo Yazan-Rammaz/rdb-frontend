@@ -10,7 +10,7 @@ import type { SupportedLanguage } from '@/i18n';
 import Image from 'next/image';
 import { useTranslation } from '@/context/I18nContext';
 import ConfirmDialog from '../ui/ConfirmDialog';
-import { useToast } from '@/context/ToastContext';
+import InlineFeedback from '../ui/InlineFeedback';
 import Skeleton from 'react-loading-skeleton';
 import PhoneSvg from '@/assets/icons/profile/phone.svg';
 import settingsIcon from '@/assets/icons/profile/settings.svg';
@@ -40,14 +40,18 @@ import { KycVerificationStatus, type KycStatusResponse } from '@/core/types/auth
 import { api, isNetworkError } from '@/api';
 import { isOffline } from '@/lib/networkStatus';
 import { useIsOnline } from '@/hooks/useIsOnline';
+import { useInlineFeedback } from '@/hooks/useInlineFeedback';
 import { useLogout } from '@/hooks/useLogout';
-
 const ProfileContent = () => {
     const { userData, refreshUser, isLoading } = useAuth();
     const logout = useLogout();
     const isOnline = useIsOnline();
     const { account } = useStore();
-    const { toast } = useToast();
+    // Photo save / remove result: shown on the photo screen while it is open,
+    // under the avatar here once the user has left it.
+    const photoFeedback = useInlineFeedback();
+    // "Name updated": shown on the client information screen the name editor returns to.
+    const nameFeedback = useInlineFeedback();
     const router = useRouter();
     const { t, tr, language, setLanguage } = useTranslation();
     const [showLogoutDialog, setShowLogoutDialog] = useState(false);
@@ -78,22 +82,26 @@ const ProfileContent = () => {
         await logout();
     };
 
-    const handlePhotoSave = async (dataUrl: string) => {
+    /** Resolves whether the change was stored, so the photo screen can revert its preview. */
+    const handlePhotoSave = async (dataUrl: string): Promise<boolean> => {
         const user = userData?.user;
-        if (!user || isOffline()) return;
+        if (!user || isOffline()) return false;
 
         if (!dataUrl) {
+            const previousUrl = localPhotoUrl;
             setLocalPhotoUrl(undefined);
             setImgError(false);
             // Empty string clears it — undefined would be dropped from the JSON
             // and leave the existing photo in place.
             const delRes = await api.profile.update({ profilePictureURL: '' });
             if (delRes.ok) {
-                toast.success(t.profile.photo.removed);
-            } else if (!isNetworkError(delRes.error)) {
-                toast.error(delRes.error.message);
+                photoFeedback.success(t.profile.photo.removed);
+                return true;
             }
-            return;
+            // Offline failures stay silent here — the network banner says why.
+            if (!isNetworkError(delRes.error)) photoFeedback.error(delRes.error.message);
+            setLocalPhotoUrl(previousUrl);
+            return false;
         }
 
         // Convert the cropper's dataUrl back into a File for the multipart upload.
@@ -103,8 +111,8 @@ const ProfileContent = () => {
 
         const uploadRes = await api.profile.uploadPhoto(file);
         if (!uploadRes.ok) {
-            if (!isNetworkError(uploadRes.error)) toast.error(uploadRes.error.message);
-            return;
+            if (!isNetworkError(uploadRes.error)) photoFeedback.error(uploadRes.error.message);
+            return false;
         }
         const imageUrl = uploadRes.data.url;
 
@@ -115,13 +123,14 @@ const ProfileContent = () => {
             language: user.language,
         });
         if (!updateRes.ok) {
-            if (!isNetworkError(updateRes.error)) toast.error(updateRes.error.message);
-            return;
+            if (!isNetworkError(updateRes.error)) photoFeedback.error(updateRes.error.message);
+            return false;
         }
 
         setLocalPhotoUrl(imageUrl);
         setImgError(false);
-        toast.success(t.profile.photo.updated);
+        photoFeedback.success(t.profile.photo.updated);
+        return true;
     };
 
     if (isLoading) {
@@ -187,6 +196,7 @@ const ProfileContent = () => {
                         currentUrl={localPhotoUrl}
                         onBack={() => setShowPhotoScreen(false)}
                         onSave={handlePhotoSave}
+                        feedback={photoFeedback.feedback}
                     />
                 </div>
             )}
@@ -217,6 +227,7 @@ const ProfileContent = () => {
                                     : user
                             }
                             displayId={user.displayId ?? '-'}
+                            feedback={nameFeedback.feedback}
                         />
                     </motion.div>
                 )}
@@ -262,7 +273,10 @@ const ProfileContent = () => {
                                 setShowClientName(false);
                                 router.push('/verification');
                             }}
-                            onSaved={(name) => setLocalFullName(name)}
+                            onSaved={(name) => {
+                                setLocalFullName(name);
+                                nameFeedback.success(t.profile.clientName.updateSuccess);
+                            }}
                             fullName={
                                 localFullName ??
                                 ([user.firstName, user.lastName].filter(Boolean).join(' ') ||
@@ -293,7 +307,7 @@ const ProfileContent = () => {
 
             <div className="flex flex-col w-full h-full overflow-hidden bg-white">
                 {/* ── Profile Header ── */}
-                <div className="flex items-start justify-between px-xd-24 pt-xd-32 pb-xd-16">
+                <div className="relative flex items-start justify-between px-xd-24 pt-xd-32 pb-xd-16">
                     <div className="flex flex-col gap-xd-7 text-left">
                         <div
                             className="relative size-xd-50 cursor-pointer"
@@ -388,6 +402,17 @@ const ProfileContent = () => {
                             </div>
                         )}
                     </button>
+
+                    {/* A save that finishes after the user left the photo screen
+                        reports here, in the header's bottom padding under the
+                        avatar — out of flow, so nothing moves. */}
+                    {!showPhotoScreen && (
+                        <InlineFeedback
+                            feedback={photoFeedback.feedback}
+                            lines={1}
+                            className="absolute inset-x-xd-24 bottom-0 h-xd-16 items-center"
+                        />
+                    )}
                 </div>
 
                 <div className="h-px bg-[#d3d3d35e] mx-xd-25" />

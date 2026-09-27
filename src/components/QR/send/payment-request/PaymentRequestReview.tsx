@@ -3,10 +3,12 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import { useStore } from '@/context/StoreContext';
-import { useToast } from '@/context/ToastContext';
 import { useTranslation } from '@/context/I18nContext';
 import { usePaymentRequestAPI } from '@/hooks/usePaymentRequestAPI';
 import { useIsOnline, useOnReconnect } from '@/hooks/useIsOnline';
+import { useInlineFeedback } from '@/hooks/useInlineFeedback';
+import InlineFeedback from '@/components/ui/InlineFeedback';
+import { reportUserError } from '@/lib/observe';
 import { buildPaymentRequestQr } from '@/lib/paymentRequestQr';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import Input from '@/components/ui/Input';
@@ -62,8 +64,11 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
     onBack,
 }) => {
     const { activeAssetSymbol, balances, account, refreshTransactions } = useStore();
-    const { toast } = useToast();
     const { t } = useTranslation();
+    // Requester: copy / download / share / cancel results, above the action bar.
+    // Payer: the inline-cancel confirmation, above the Send bar. Errors that
+    // belong to the request itself use the red boxes (fetchError, sendError).
+    const { feedback, success: showSuccess, error: showError } = useInlineFeedback();
 
     // Determine mode
     const isRequesterMode = !!directRequestCode;
@@ -80,8 +85,6 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
     apiRef.current = api;
     const onMerchantRef = useRef(onMerchant);
     onMerchantRef.current = onMerchant;
-    const toastRef = useRef(toast);
-    toastRef.current = toast;
     const onBackRef = useRef(onBack);
     onBackRef.current = onBack;
 
@@ -145,6 +148,7 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
                 code = scannedRequestCode;
             } else {
                 setFetchError('Invalid payment request data');
+                reportUserError('Invalid payment request data');
                 setLoading(false);
                 return;
             }
@@ -158,8 +162,9 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
                     lookupPendingRef.current = true;
                     return;
                 }
+                // The hook shows nothing: this screen is the only report.
                 setFetchError(result.error);
-                toastRef.current.error(result.error);
+                reportUserError(result.error);
                 setLoading(false);
                 return;
             }
@@ -195,7 +200,7 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
             setLoading(false);
         } catch {
             setFetchError('Failed to load payment request');
-            toastRef.current.error('Failed to load payment request');
+            reportUserError('Failed to load payment request');
             setLoading(false);
         }
     }, [scannedRequestCode, requesterAccount, directRequestCode, qrAccount]);
@@ -261,7 +266,7 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
 
         if ('error' in result) {
             setSendError(result.error);
-            toastRef.current.error(result.error);
+            reportUserError(result.error);
             setIsSending(false);
             return;
         }
@@ -298,14 +303,15 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
         });
 
         if ('error' in result) {
-            if (!result.network) toastRef.current.error(result.error);
+            if (!result.network) showError(result.error);
             setIsCancelling(false);
             return;
         }
 
+        // No success line: the screen turns into the Cancelled state (badge,
+        // dimmed QR), which is the confirmation.
         setData((prev) => (prev ? { ...prev, status: 'CANCELLED' } : prev));
         setIsCancelling(false);
-        toastRef.current.success('Payment request cancelled');
         refreshTransactions();
     };
 
@@ -314,13 +320,17 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
         if (!requestId || isCancelling || !cancelReason.trim()) return;
 
         setIsCancelling(true);
+        setSendError(null);
         const result = await apiRef.current.cancelPaymentRequest({
             id: requestId,
             reason: cancelReason.trim(),
         });
 
         if ('error' in result) {
-            if (!result.network) toastRef.current.error(result.error);
+            if (!result.network) {
+                setSendError(result.error);
+                reportUserError(result.error);
+            }
             setIsCancelling(false);
             return;
         }
@@ -329,7 +339,8 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
         setShowCancelInput(false);
         setCancelReason('');
         setIsCancelling(false);
-        toastRef.current.success('Payment request cancelled');
+        // Payer mode has no Cancelled badge, so this line is the only confirmation.
+        showSuccess(t.transfer.deposit.requestCancelled);
         refreshTransactions();
     };
 
@@ -363,29 +374,29 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
         if (!qrValue) return;
         try {
             await navigator.clipboard.writeText(qrValue);
-            toastRef.current.success(t.home.qr.messages.qrCopied);
+            showSuccess(t.home.qr.messages.qrCopied);
         } catch {
-            toastRef.current.error(t.home.qr.messages.qrDownloadFailed);
+            showError(t.home.qr.messages.qrCopyFailed);
         }
     };
 
     const handleDownload = async () => {
         const canvas = await captureCanvas();
         if (!canvas) {
-            toastRef.current.error(t.home.qr.messages.qrDownloadFailed);
+            showError(t.home.qr.messages.qrDownloadFailed);
             return;
         }
         const link = document.createElement('a');
         link.download = `payment-request-${data?.requestCode || requestId}.png`;
         link.href = canvas.toDataURL('image/png');
         link.click();
-        toastRef.current.success(t.home.qr.messages.qrDownloadSuccess);
+        showSuccess(t.home.qr.messages.qrDownloadSuccess);
     };
 
     const handleShareQR = async () => {
         const canvas = await captureCanvas();
         if (!canvas) {
-            toastRef.current.error(t.home.qr.messages.qrDownloadFailed);
+            showError(t.home.qr.messages.qrDownloadFailed);
             return;
         }
         const result = await shareQRImage(
@@ -394,9 +405,9 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
             `Amount: ${data?.amount} ${data?.assetSymbol}`,
         );
         if (result === 'shared') {
-            toastRef.current.success(t.home.qr.messages.qrShareSuccess);
+            showSuccess(t.home.qr.messages.qrShareSuccess);
         } else if (result === 'copied') {
-            toastRef.current.success(t.home.qr.messages.qrCopied);
+            showSuccess(t.home.qr.messages.qrCopied);
         }
     };
 
@@ -424,7 +435,7 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
         return (
             <div className="w-full h-full flex items-center justify-center">
                 <div className="flex flex-col items-center gap-3 px-6 text-center">
-                    <p className="text-[13px] text-[#FF4D4D]">
+                    <p aria-live="polite" className="text-[13px] text-[#FF5F61]">
                         {fetchError || t.home.qr.loadRequestFailed}
                     </p>
                     <button
@@ -631,6 +642,12 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
                 {/* Bottom action bar — only when ACTIVE */}
                 {isActive && (
                     <div className="absolute bottom-0 left-0 right-0 bg-background border-0 border-[#F2F2F2]">
+                        {/* The row's empty py-4 top padding: out of flow, nothing moves. */}
+                        <InlineFeedback
+                            feedback={feedback}
+                            lines={1}
+                            className="absolute inset-x-0 top-0 h-xd-16 items-center px-6"
+                        />
                         <div className="flex items-center justify-center gap-13 px-6 py-4">
                             <ActionButton
                                 icon={CopySvg}
@@ -753,8 +770,11 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
                         )}
 
                         {sendError && (
-                            <div className="bg-[#FFF0F0] border border-[#FF4D4D]/20 rounded-lg p-3 mt-2">
-                                <p className="text-[12px] text-[#FF4D4D]">{sendError}</p>
+                            <div
+                                aria-live="polite"
+                                className="bg-[#FFF0F0] border border-[#FF5F61]/20 rounded-lg p-3 mt-2"
+                            >
+                                <p className="text-[12px] text-[#FF5F61]">{sendError}</p>
                             </div>
                         )}
 
@@ -796,6 +816,12 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
 
                 {/* Action buttons */}
                 <div className="absolute bottom-0 w-full bg-white">
+                    {/* SendButton's empty py-6 top padding: out of flow, nothing moves. */}
+                    <InlineFeedback
+                        feedback={feedback}
+                        lines={1}
+                        className="absolute inset-x-0 top-0 h-6 items-center px-4"
+                    />
                     <div className="flex flex-col gap-2 px-4">
                         <SendButton
                             isExpired={isExpired || data.status === 'EXPIRED'}

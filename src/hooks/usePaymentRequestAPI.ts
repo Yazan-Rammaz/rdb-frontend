@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { useToast } from '@/context/ToastContext';
 import { useTranslation } from '@/context/I18nContext';
 import { api, isNetworkError } from '@/api';
 import type { ApiResult } from '@/api';
@@ -18,9 +17,10 @@ import type {
 } from '@/core/types';
 
 /**
- * A failed call. `network` is set when no response arrived (connection or
- * timeout) — nothing was toasted, and callers must stay silent too: the
- * offline pill is the message.
+ * A failed call. The hook shows nothing itself: the caller renders `error`
+ * inline, once, on the screen that made the call. `network` is set when no
+ * response arrived (connection or timeout) — callers must stay silent then:
+ * the offline pill is the message.
  */
 export type PaymentRequestFailure = { error: string; network?: true };
 
@@ -32,9 +32,11 @@ const RETRY_CONFIG = {
 /**
  * Payment-request calls with automatic retry on transient failures.
  *
- * Retries up to 3 times with backoff (1s, 2s, 4s), then toasts and gives up.
- * The public shape is `T | { error: string; network?: true }`; `network` marks
- * a failure with no response, which is never toasted.
+ * Retries up to 3 times with backoff (1s, 2s, 4s), then gives up and returns
+ * the error. The public shape is `T | { error: string; network?: true }`;
+ * `network` marks a failure with no response, which no screen reports.
+ * Rendering (and reporting) `error` is the caller's job — the hook used to
+ * toast it too, which reported every failure twice.
  *
  * ─── What migrating to @/api fixed here ─────────────────────────────────────
  * Retry used to be driven by thrown exceptions, and "don't retry a client
@@ -50,7 +52,6 @@ const RETRY_CONFIG = {
  * The API layer returns a real status, so the decision is now made on the status.
  */
 export function usePaymentRequestAPI() {
-    const { toast } = useToast();
     const { t, tr } = useTranslation();
     const [isLoading, setIsLoading] = useState(false);
 
@@ -72,7 +73,7 @@ export function usePaymentRequestAPI() {
 
                 lastMessage = res.error.message;
 
-                // A network failure is never toasted — the offline pill says it.
+                // A network failure is never shown — the offline pill says it.
                 // No retry on a timeout (a POST may have landed; only the user
                 // re-sends it) nor once offline (it would fail the same way).
                 if (res.error.status === 0) {
@@ -93,7 +94,6 @@ export function usePaymentRequestAPI() {
                 const isRetryable = res.error.status === 0 || res.error.status >= 500;
                 if (!isRetryable) {
                     setIsLoading(false);
-                    toast.error(lastMessage);
                     return { error: lastMessage };
                 }
 
@@ -107,10 +107,9 @@ export function usePaymentRequestAPI() {
             setIsLoading(false);
             const message =
                 lastMessage || tr('home.qr.operations.failed', { operation: operationName });
-            toast.error(message);
             return { error: message };
         },
-        [toast, tr],
+        [tr],
     );
 
     return {
@@ -138,9 +137,7 @@ export function usePaymentRequestAPI() {
 
             const resolved = resolvePaymentRequestLookup(res);
             if (!resolved) {
-                const message = t.home.qr.operations.unreadable;
-                toast.error(message);
-                return { error: message };
+                return { error: t.home.qr.operations.unreadable };
             }
             return resolved;
         },

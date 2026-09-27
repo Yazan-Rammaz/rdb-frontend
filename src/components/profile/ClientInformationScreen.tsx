@@ -10,6 +10,7 @@ import ClientInfoSvg from '@/assets/icons/profile/clientinfo.svg';
 import notVerifiedIcon from '@/assets/icons/verification/not-verified.svg';
 import { useTranslation } from '@/context/I18nContext';
 import Image from 'next/image';
+import type { Feedback } from '@/hooks/useInlineFeedback';
 
 interface ClientInformationScreenProps {
     onBack: () => void;
@@ -26,6 +27,8 @@ interface ClientInformationScreenProps {
         kycVerification?: { status?: string };
     };
     displayId?: string;
+    /** Shown in place of the Client Name label (e.g. "name updated" after an edit). */
+    feedback?: Feedback | null;
 }
 
 type Translate = (key: string, params?: Record<string, unknown>) => string;
@@ -52,6 +55,7 @@ export default function ClientInformationScreen({
     onShowPhone,
     user,
     displayId,
+    feedback = null,
 }: ClientInformationScreenProps) {
     const { t, tr, rtl } = useTranslation();
     // Pull the full KYC record (status + the uploaded ID/face images), which the
@@ -198,9 +202,20 @@ export default function ClientInformationScreen({
 
                 {/* Client Name */}
                 <div className="border border-[#E5E5E5]/50 w-xd-406 bg-[#FCFCFC] h-xd-55 rounded-xd-15 px-xd-12 pt-xd-7 pb-xd-8 flex items-center justify-between">
-                    <div className="flex flex-col gap-xd-8">
-                        <span className="text-xd-12 text-[#8D8D8D] leading-none">
-                            {t.profile.clientInfo.clientName}
+                    <div className="flex flex-col gap-xd-8 flex-1 min-w-0">
+                        {/* A message about the name borrows its label: one line in a
+                            fixed-height card, so nothing moves. */}
+                        <span
+                            aria-live="polite"
+                            className={`text-xd-12 leading-none truncate ${
+                                !feedback
+                                    ? 'text-[#8D8D8D]'
+                                    : feedback.tone === 'error'
+                                      ? 'text-[#FF5F61]'
+                                      : 'text-[#388CFF]'
+                            }`}
+                        >
+                            {feedback ? feedback.text : t.profile.clientInfo.clientName}
                         </span>
                         <span className="text-xd-14 text-[#1D1D1D] font-medium leading-none">
                             {fullName}

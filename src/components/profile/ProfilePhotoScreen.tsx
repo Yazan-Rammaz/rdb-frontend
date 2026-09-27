@@ -11,19 +11,25 @@ import addPhotoIcon from '@/assets/icons/profile/add_photo.svg';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useTranslation } from '@/context/I18nContext';
 import { useIsOnline } from '@/hooks/useIsOnline';
+import type { Feedback } from '@/hooks/useInlineFeedback';
+import InlineFeedback from '@/components/ui/InlineFeedback';
 
 type PhotoView = 'display' | 'crop' | 'review';
 
 interface ProfilePhotoScreenProps {
     currentUrl?: string;
     onBack: () => void;
-    onSave: (dataUrl: string) => void;
+    /** Resolves `false` when nothing was saved, so the preview goes back to what is stored. */
+    onSave: (dataUrl: string) => Promise<boolean> | void;
+    /** Result of the last save / remove, shown above the photo. */
+    feedback?: Feedback | null;
 }
 
 export default function ProfilePhotoScreen({
     currentUrl,
     onBack,
     onSave,
+    feedback = null,
 }: ProfilePhotoScreenProps) {
     const { t, rtl } = useTranslation();
     const isOnline = useIsOnline();
@@ -157,8 +163,16 @@ export default function ProfilePhotoScreen({
     // Confirm review → actually save
     const handleConfirm = () => {
         if (!croppedDataUrl || !isOnline) return;
+        const previous = photoUrl;
         setPhotoUrl(croppedDataUrl);
-        onSave(croppedDataUrl);
+        // A failed upload must not leave the unsaved picture on display next
+        // to the error that says it wasn't saved.
+        void Promise.resolve(onSave(croppedDataUrl)).then(
+            (ok) => {
+                if (ok === false) setPhotoUrl(previous);
+            },
+            () => setPhotoUrl(previous),
+        );
         setView('display');
         setShowOptions(false);
         setCroppedDataUrl(null);
@@ -166,8 +180,14 @@ export default function ProfilePhotoScreen({
 
     const handleDelete = () => {
         if (!isOnline) return;
+        const previous = photoUrl;
         setPhotoUrl(undefined);
-        onSave('');
+        void Promise.resolve(onSave('')).then(
+            (ok) => {
+                if (ok === false) setPhotoUrl(previous);
+            },
+            () => setPhotoUrl(previous),
+        );
         setShowOptions(false);
         setShowDeleteConfirm(false);
     };
@@ -343,7 +363,14 @@ export default function ProfilePhotoScreen({
                 </div>
 
                 {/* Photo area */}
-                <div className="flex-1 flex flex-col items-center justify-start pt-xd-35">
+                <div className="relative flex-1 flex flex-col items-center justify-start pt-xd-35">
+                    {/* Save / remove result, in the empty gap above the photo —
+                        out of flow, so the photo doesn't move. */}
+                    <InlineFeedback
+                        feedback={feedback}
+                        lines={1}
+                        className="absolute inset-x-xd-20 top-0 h-xd-35 items-center"
+                    />
                     <div className="relative overflow-hidden m-2 size-xd-350 rounded-xd-20">
                         {photoUrl ? (
                             <img

@@ -16,7 +16,7 @@ import { transfers } from './endpoints/transfers';
  *   import { api } from '@/api';
  *
  *   const res = await api.transactions.walletBalance({ currencySymbol: 'USD' });
- *   if (!res.ok) return toast(res.error.message);
+ *   if (!res.ok) return feedback.error(res.error.message);
  *   setBalances(res.data);
  *
  * Calls never throw and never return a bare `any`. `ApiResult` is a

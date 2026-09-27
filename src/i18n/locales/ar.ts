@@ -281,6 +281,7 @@ const ar: TranslationSchema = {
             sendingButton: 'جارٍ الإرسال...',
             expiredButton: 'رمز منتهي الصلاحية ( انتهت المدة )',
             cancelled: 'رمز ملغى',
+            requestCancelled: 'تم إلغاء طلب الدفع',
             amountToBeSent: 'المبلغ المراد إرساله',
             referenceId: 'المرجع | الرقم',
             purposeOfRequest: 'الغرض من طلب المال',

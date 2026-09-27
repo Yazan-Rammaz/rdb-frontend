@@ -9,9 +9,10 @@ import { useIsOnline, useOnReconnect } from '@/hooks/useIsOnline';
 import { resolveRecipient } from '@/api/helpers/resolveRecipient';
 import { lookupAccountByPhoneMock } from '@/api/helpers/lookupAccountByPhone.mock';
 import { useStore } from '@/context/StoreContext';
-import { useToast } from '@/context/ToastContext';
 import { useScanner } from '@/context/ScannerContext';
 import { useStepUp, extractStepUp } from '@/hooks/useStepUp';
+import { useInlineFeedback } from '@/hooks/useInlineFeedback';
+import InlineFeedback from '@/components/ui/InlineFeedback';
 import SenderCard from './SenderCard';
 import RecipientInput from './RecipientInput';
 import AmountInput from './AmountInput';
@@ -37,7 +38,14 @@ const TransferSend: React.FC<TransferSendProps> = ({
 }) => {
     const { activeAssetSymbol, activeAssetType, balances, refreshTransactions, refreshBalances } =
         useStore();
-    const { toast } = useToast();
+    // Send errors, above the Send button. Sticky: on a money screen a vanished
+    // error invites a blind second tap. Cleared by the next Send or any change
+    // to what is being sent.
+    const {
+        feedback: sendFeedback,
+        error: showSendError,
+        clear: clearSendFeedback,
+    } = useInlineFeedback();
     const { openScannerWithCallback } = useScanner();
     const { satisfyStepUp } = useStepUp();
     const { t, tr } = useTranslation();
@@ -447,7 +455,7 @@ const TransferSend: React.FC<TransferSendProps> = ({
             return;
         }
         idempotencyKeyRef.current = null;
-        toast.error(error.message);
+        showSendError(error.message, { sticky: true });
     };
 
     // Send transfer
@@ -455,6 +463,7 @@ const TransferSend: React.FC<TransferSendProps> = ({
         if (!form.recipientDetails || !form.amountConfirmed || !form.selectedPurposeId) return;
         if (isOffline()) return;
 
+        clearSendFeedback();
         setForm((prev) => ({ ...prev, isSending: true }));
 
         try {
@@ -514,7 +523,7 @@ const TransferSend: React.FC<TransferSendProps> = ({
             if (extractStepUp(res.data)) {
                 // Still gated after a satisfied challenge — surface as an error.
                 setForm((prev) => ({ ...prev, isSending: false }));
-                toast.error(t.transfer.error.generic);
+                showSendError(t.transfer.error.generic, { sticky: true });
             } else {
                 const result = res.data as TransferResult;
                 // Refresh transactions and balances in background
@@ -530,7 +539,7 @@ const TransferSend: React.FC<TransferSendProps> = ({
             }
         } catch {
             setForm((prev) => ({ ...prev, isSending: false }));
-            toast.error(t.transfer.error.generic);
+            showSendError(t.transfer.error.generic, { sticky: true });
         }
     };
 
@@ -538,6 +547,17 @@ const TransferSend: React.FC<TransferSendProps> = ({
     useEffect(() => {
         idempotencyKeyRef.current = null;
     }, [
+        form.recipientDetails?.accountNumber,
+        form.amount,
+        form.selectedPurposeId,
+        form.note,
+    ]);
+
+    // ...and an error about the previous one no longer applies.
+    useEffect(() => {
+        clearSendFeedback();
+    }, [
+        clearSendFeedback,
         form.recipientDetails?.accountNumber,
         form.amount,
         form.selectedPurposeId,
@@ -710,6 +730,12 @@ const TransferSend: React.FC<TransferSendProps> = ({
 
                 {/* Send button */}
                 <div className="flex w-full bg-white flex-col absolute bottom-0 items-center py-xd-24 mt-xd-16">
+                    {/* The bar's empty py-xd-24 top padding: out of flow, nothing moves. */}
+                    <InlineFeedback
+                        feedback={sendFeedback}
+                        lines={1}
+                        className="absolute inset-x-0 top-0 h-xd-24 items-center px-xd-25"
+                    />
                     <button
                         onClick={handleSendWithAnimation}
                         disabled={!canSend || form.isSending}
