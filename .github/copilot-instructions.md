@@ -83,7 +83,7 @@ src/rdb/
   types/RDBProps.ts     ← Component prop types
 
 src/components/         ← Internal UI components (layout, home, auth, transactions, etc.)
-src/context/            ← React contexts (Auth, Scanner, Store, Toast, Layout, I18n, Passkey)
+src/context/            ← React contexts (Auth, Scanner, Store, Layout, I18n, Passkey)
 ```
 
 **Context Pattern:**
@@ -115,7 +115,7 @@ npm run lint        # ESLint
 | Framework | Next.js ≥14, React 19                                                        |
 | Language  | TypeScript 5 (strict)                                                        |
 | Bundler   | tsup 8.5+                                                                    |
-| State     | React Context (Auth, Scanner, Store, Toast, Layout, I18n, Passkey)           |
+| State     | React Context (Auth, Scanner, Store, Layout, I18n, Passkey)           |
 | Styling   | Tailwind CSS 4, CSS variables via `generateThemeVariables()`                 |
 | Routing   | react-router-dom 7 (MemoryRouter inside library)                             |
 | QR        | qr-scanner, html2canvas                                                      |
@@ -350,7 +350,6 @@ ana={name}&anu={number}&cu={currency}
   (BOOTING/SETUP_REQUIRED/LOCKED/UNLOCKED)
 - `ScannerContext` — QR scanner state, transfer scan callbacks
 - `StoreContext` — In-app data store (balances, transactions, account, purposes)
-- `ToastContext` — Toast notifications
 - `LayoutContext` — Layout/navigation state
 - `I18nContext` — Internationalization (exported for consumers)
 - `RDBContext` — Root library configuration

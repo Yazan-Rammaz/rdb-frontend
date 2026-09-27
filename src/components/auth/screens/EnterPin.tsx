@@ -6,6 +6,8 @@ import Image from 'next/image';
 import OtpInputs from '@/components/ui/OtpInputs';
 import { useTranslation } from '@/context/I18nContext';
 import { FlexibleSpace } from '@/scaling';
+import InlineFeedback from '@/components/ui/InlineFeedback';
+import type { Feedback } from '@/hooks/useInlineFeedback';
 import simSvg from '@/assets/icons/auth/sim.svg';
 import shieldSvg from '@/assets/icons/auth/shield.svg';
 import InfoSvg from '@/assets/icons/auth/info.svg';
@@ -33,6 +35,8 @@ interface EnterPinScreenProps {
     onResend?: () => void; // custom resend handler; hides phone-resend logic when provided
     /** Offline: the code stays typed but cannot be submitted or resent. */
     disabled?: boolean;
+    /** A result line (code sent, wrong code…) — shown under the boxes, over "code expired". */
+    feedback?: Feedback | null;
 }
 
 export default function EnterPin({
@@ -54,6 +58,7 @@ export default function EnterPin({
     timerSeconds = 120,
     onResend,
     disabled = false,
+    feedback = null,
 }: EnterPinScreenProps) {
     const { t } = useTranslation();
     const [timeLeft, setTimeLeft] = useState(timerSeconds);
@@ -275,11 +280,18 @@ export default function EnterPin({
                         isValidPin={isValidPin}
                         isExpired={isExpired}
                     />
-                    {isExpired && (
-                        <p className="text-xd-11 pt-1 font-medium text-[#1D1D1D]">
-                            {t.auth.enterPin.codeExpired}
-                        </p>
-                    )}
+                    {/* One slot under the boxes: a feedback line wins over "code
+                        expired" while it is up. Only the grow spacer is below it,
+                        so nothing on screen moves. It sits well above the custom
+                        keypad, which rises from the bottom edge on touch devices. */}
+                    <div className="w-full flex flex-col items-center pt-1 px-xd-20">
+                        {isExpired && !feedback && (
+                            <p className="text-xd-11 font-medium text-[#1D1D1D]">
+                                {t.auth.enterPin.codeExpired}
+                            </p>
+                        )}
+                        <InlineFeedback feedback={feedback} className="w-full" />
+                    </div>
                     <FlexibleSpace grow />
                 </div>
             </div>

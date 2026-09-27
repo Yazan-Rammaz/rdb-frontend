@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import { useStore } from '@/context/StoreContext';
-import { useToast } from '@/context/ToastContext';
 import Image from 'next/image';
 import DollarIcon from '@/assets/icons/home/dollar.svg';
 import RefreshIcon from '@/assets/icons/home/transfer/refresh.svg';
@@ -26,7 +25,6 @@ const SenderCard: React.FC<SenderCardProps> = ({ selectedAssetSymbol, displayAmo
         setBalanceHidden,
         refreshBalances,
     } = useStore();
-    const { toast } = useToast();
     const { t, rtl, language } = useTranslation();
     const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -47,10 +45,10 @@ const SenderCard: React.FC<SenderCardProps> = ({ selectedAssetSymbol, displayAmo
     const handleRefresh = async () => {
         if (isRefreshing) return;
         setIsRefreshing(true);
+        // refreshBalances handles its own failures (it never throws) and a
+        // stale balance simply stays on screen, so there is nothing to report.
         try {
             await refreshBalances(fallbackSymbol);
-        } catch {
-            toast.error(t.transfer.sender.refreshBalance);
         } finally {
             setIsRefreshing(false);
         }

@@ -4,6 +4,8 @@ import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { FlexibleSpace } from '@/scaling';
 import { useTranslation } from '@/context/I18nContext';
+import InlineFeedback from '@/components/ui/InlineFeedback';
+import type { Feedback } from '@/hooks/useInlineFeedback';
 import shieldSvg from '@/assets/icons/verification/shield.svg';
 import closeSvg from '@/assets/icons/auth/close.svg';
 
@@ -11,6 +13,8 @@ interface ForgetPasscodeIntroProps {
     onStart: () => void;
     loading?: boolean;
     onClose?: () => void;
+    /** Start-failure line, shown under the intro copy. */
+    feedback?: Feedback | null;
 }
 
 /**
@@ -21,6 +25,7 @@ export default function ForgetPasscodeIntro({
     onStart,
     loading,
     onClose,
+    feedback = null,
 }: ForgetPasscodeIntroProps) {
     const { t } = useTranslation();
     return (
@@ -49,6 +54,7 @@ export default function ForgetPasscodeIntro({
                     initial={{ opacity: 0, y: 14 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+                    className="relative"
                 >
                     <h2 className="text-xd-30 font-bold text-[#1D1D1D]">
                         {t.resetPasscode.intro.title}
@@ -59,6 +65,12 @@ export default function ForgetPasscodeIntro({
                     <p className="text-xd-12 text-[#1D1D1D] mt-xd-8 leading-relaxed">
                         {t.resetPasscode.intro.description}
                     </p>
+                    {/* Out of flow, in the FlexibleSpace below — nothing moves. */}
+                    <InlineFeedback
+                        feedback={feedback}
+                        align="start"
+                        className="absolute inset-x-0 top-full mt-xd-14"
+                    />
                 </motion.div>
                 <FlexibleSpace size={60} share={0.4} />
             </div>

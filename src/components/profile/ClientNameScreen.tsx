@@ -6,11 +6,11 @@ import Image from 'next/image';
 import verifiedBigIcon from '@/assets/icons/verification/verified-big.svg';
 import warnSvg from '@/assets/icons/profile/warn.svg';
 import infoSvg from '@/assets/icons/profile/info.svg';
-import { useToast } from '@/context/ToastContext';
 import { useTranslation } from '@/context/I18nContext';
 import { unwrapKycRequest } from '@/api/helpers/kyc';
 import { api, isNetworkError } from '@/api';
 import { useIsOnline } from '@/hooks/useIsOnline';
+import { useInlineFeedback } from '@/hooks/useInlineFeedback';
 import {
     NAME_MAX_LENGTH,
     type NameIssue,
@@ -39,7 +39,8 @@ export default function ClientNameScreen({
     fullName,
     isVerified,
 }: ClientNameScreenProps) {
-    const { toast } = useToast();
+    // Errors take the name card's label in place (same line, red), so nothing moves.
+    const { feedback, error: showError, clear: clearFeedback } = useInlineFeedback();
     const { t, tr, rtl } = useTranslation();
     const isOnline = useIsOnline();
     const nameErrors: Record<NameIssue, string> = {
@@ -77,12 +78,12 @@ export default function ClientNameScreen({
 
     const handleSave = async () => {
         // Same field, same endpoint as the sign-up screen — validating only
-        // there would leave the identical hole one screen away. Returns before
-        // `onBack()` below, so the user stays on the field they have to fix;
-        // an empty value used to return silently, with Save doing nothing.
+        // there would leave the identical hole one screen away. The user stays
+        // on the field they have to fix; an empty value used to return
+        // silently, with Save doing nothing.
         const issue = nameIssue(name);
         if (issue) {
-            toast.error(nameErrors[issue]);
+            showError(nameErrors[issue]);
             return;
         }
 
@@ -99,20 +100,23 @@ export default function ClientNameScreen({
                 lastName ? { firstName, lastName } : { firstName },
             );
             if (res.ok) {
+                // The parent confirms the change on the client information
+                // screen this one returns to.
                 onSaved?.(trimmed);
-                toast.success(t.profile.clientName.updateSuccess);
+                onBack();
             } else if (isNetworkError(res.error)) {
                 // Nothing was saved: stay on the field so the user can retry
                 // once the connection is back. The offline pill says why.
                 return;
             } else {
                 // The server's own message beats a generic string — a 429 or a
-                // validation failure now says what actually went wrong.
-                toast.error(res.error.message);
+                // validation failure now says what actually went wrong. Stay on
+                // the screen: nothing was saved, and the field is still there
+                // to fix and retry.
+                showError(res.error.message);
             }
-            onBack();
         } catch {
-            toast.error(t.profile.clientName.updateFailed);
+            showError(t.profile.clientName.updateFailed);
         } finally {
             setSaving(false);
         }
@@ -140,10 +144,21 @@ export default function ClientNameScreen({
 
             <div className="flex-1 overflow-y-auto px-xd-12 pt-xd-16 pb-xd-20 flex flex-col gap-xd-10 items-center">
                 {/* Name field */}
-                <div className="border border-[#C3C3C3]/50 w-xd-406 bg-[#FFFFFF] rounded-xd-15 px-xd-12 pt-xd-7 pb-xd-8 flex items-center justify-between">
-                    <div className="flex flex-col gap-xd-6 flex-1">
-                        <span className="text-xd-12 text-[#8D8D8D] leading-none">
-                            {t.profile.clientName.label}
+                <div
+                    className={`border w-xd-406 bg-[#FFFFFF] rounded-xd-15 px-xd-12 pt-xd-7 pb-xd-8 flex items-center justify-between ${
+                        feedback?.tone === 'error' ? 'border-[#FF5F61]' : 'border-[#C3C3C3]/50'
+                    }`}
+                >
+                    <div className="flex flex-col gap-xd-6 flex-1 min-w-0">
+                        {/* The error borrows this label: same element and type, one
+                            line, so the card keeps its height. */}
+                        <span
+                            aria-live="polite"
+                            className={`text-xd-12 leading-none truncate ${
+                                feedback?.tone === 'error' ? 'text-[#FF5F61]' : 'text-[#8D8D8D]'
+                            }`}
+                        >
+                            {feedback?.tone === 'error' ? feedback.text : t.profile.clientName.label}
                         </span>
                         {isVerified ? (
                             <span className="text-xd-14 text-[#1D1D1D] font-medium leading-none py-xd-4">
@@ -153,7 +168,10 @@ export default function ClientNameScreen({
                             <input
                                 type="text"
                                 value={name}
-                                onChange={(e) => setName(e.target.value)}
+                                onChange={(e) => {
+                                    setName(e.target.value);
+                                    clearFeedback();
+                                }}
                                 dir="auto"
                                 autoComplete="name"
                                 maxLength={NAME_MAX_LENGTH}

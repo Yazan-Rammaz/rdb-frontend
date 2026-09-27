@@ -278,6 +278,7 @@ const en = {
             sendingButton: 'Sending...',
             expiredButton: 'Expired Code ( Time Expired )',
             cancelled: 'Cancelled Code',
+            requestCancelled: 'Payment request cancelled',
             amountToBeSent: 'Amount To Be Sent',
             referenceId: 'Reference | ID',
             purposeOfRequest: 'Purpose Of Money Request',

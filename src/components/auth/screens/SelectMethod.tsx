@@ -3,6 +3,8 @@
 import Image from 'next/image';
 import { useTranslation } from '@/context/I18nContext';
 import { FlexibleSpace } from '@/scaling';
+import InlineFeedback from '@/components/ui/InlineFeedback';
+import type { Feedback } from '@/hooks/useInlineFeedback';
 import shieldSvg from '@/assets/icons/auth/shield.svg';
 import simSvg from '@/assets/icons/auth/sim.svg';
 import smsSvg from '@/assets/icons/auth/sms.svg';
@@ -19,6 +21,8 @@ interface SelectMethodScreenProps {
     /** Offline: neither channel can be requested; the choice stays shown. */
     disabled?: boolean;
     onClose?: () => void;
+    /** A send-code failure — shown under the method buttons. */
+    feedback?: Feedback | null;
 }
 
 export default function SelectMethod({
@@ -30,6 +34,7 @@ export default function SelectMethod({
     loading = false,
     disabled = false,
     onClose,
+    feedback = null,
 }: SelectMethodScreenProps) {
     const { t } = useTranslation();
     const inert = loading || disabled;
@@ -122,7 +127,7 @@ export default function SelectMethod({
                 {/* Bottom half — method buttons */}
                 <div className="h-1/2 flex flex-col items-center">
                     <FlexibleSpace size={37} share={0} />
-                    <div className="flex w-xd-400">
+                    <div className="relative flex w-xd-400">
                         <button
                             onClick={() => !inert && setMethod('whatsapp')}
                             disabled={inert}
@@ -172,6 +177,11 @@ export default function SelectMethod({
                                 {t.auth.selectMethod.sms}
                             </span>
                         </button>
+                        {/* Out of flow, in the empty space under the row. */}
+                        <InlineFeedback
+                            feedback={feedback}
+                            className="absolute inset-x-xd-10 top-full pt-xd-10"
+                        />
                     </div>
                     <FlexibleSpace grow />
                 </div>

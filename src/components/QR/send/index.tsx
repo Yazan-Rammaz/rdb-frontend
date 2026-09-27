@@ -23,7 +23,12 @@ type Page =
 interface QrScannerProps {
     open: boolean;
     onClose: () => void;
-    onScan: (value: string) => void;
+    /**
+     * Handles a decoded QR string. Returns a fixed, translated error to show in
+     * the camera frame, or null when there is nothing new to say (a valid scan,
+     * or a repeat inside the cooldown). Never any part of the payload.
+     */
+    onScan: (value: string) => string | null;
     parsedQR?: ParsedQR | null;
     /** For requester mode: open directly to payment request review with this code */
     paymentRequestCode?: string | null;

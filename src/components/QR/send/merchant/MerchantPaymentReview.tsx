@@ -4,9 +4,9 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useTranslation } from '@/context/I18nContext';
 import { useStore } from '@/context/StoreContext';
-import { useToast } from '@/context/ToastContext';
 import { usePaymentRequestAPI } from '@/hooks/usePaymentRequestAPI';
 import { useIsOnline, useOnReconnect } from '@/hooks/useIsOnline';
+import { reportUserError } from '@/lib/observe';
 import { isMerchantPayable, merchantDescription } from '@/api/helpers/paymentRequests';
 import { formatMoneyString } from '../../shared/formatMoneyString';
 import { formatDateTime } from '../../shared/formatDateTime';
@@ -55,20 +55,19 @@ const MerchantPaymentReview: React.FC<MerchantPaymentReviewProps> = ({
     onBack,
 }) => {
     const { t, language } = useTranslation();
-    const { toast } = useToast();
     const { refreshTransactions } = useStore();
     const api = usePaymentRequestAPI();
 
     const apiRef = useRef(api);
     apiRef.current = api;
-    const toastRef = useRef(toast);
-    toastRef.current = toast;
 
     const [order, setOrder] = useState<MerchantPaymentLookup | null>(prefetched ?? null);
     const [loading, setLoading] = useState(!prefetched);
     const [fetchError, setFetchError] = useState<string | null>(null);
     const [isExpired, setIsExpired] = useState(false);
     const [isPaying, setIsPaying] = useState(false);
+    /** A refused payment, shown in the red box under the order until the next attempt. */
+    const [payError, setPayError] = useState<string | null>(null);
     const [receipt, setReceipt] = useState<MerchantPayResponse | null>(null);
 
     /**
@@ -103,7 +102,9 @@ const MerchantPaymentReview: React.FC<MerchantPaymentReviewProps> = ({
                 lookupPendingRef.current = true;
                 return;
             }
+            // The hook shows nothing: this screen is the only report.
             setFetchError(result.error);
+            reportUserError(result.error);
             setLoading(false);
             return;
         }
@@ -114,6 +115,7 @@ const MerchantPaymentReview: React.FC<MerchantPaymentReviewProps> = ({
         // endpoint, so refuse rather than guess.
         if (result.kind !== 'MERCHANT') {
             setFetchError(t.home.qr.messages.invalidQrCode);
+            reportUserError(t.home.qr.messages.invalidQrCode);
             setLoading(false);
             return;
         }
@@ -156,6 +158,7 @@ const MerchantPaymentReview: React.FC<MerchantPaymentReviewProps> = ({
     const handlePay = useCallback(async () => {
         if (!order || isPaying || !isOnline) return;
         setIsPaying(true);
+        setPayError(null);
 
         const result = await apiRef.current.payMerchantPayment({
             id: order.id,
@@ -163,9 +166,16 @@ const MerchantPaymentReview: React.FC<MerchantPaymentReviewProps> = ({
         });
 
         setIsPaying(false);
-        // The hook has already toasted a server error; a network failure is
-        // silent (the offline pill says it) and keeps the key for the retry.
-        if ('error' in result) return;
+        // A network failure is silent (the offline pill says it) and keeps the
+        // key for the retry. A server refusal is shown here — the hook shows
+        // nothing — and stays until the next tap on Pay.
+        if ('error' in result) {
+            if (!result.network) {
+                setPayError(result.error);
+                reportUserError(result.error);
+            }
+            return;
+        }
 
         setReceipt(result);
         // The payment shows up in the ledger — pull it in now so going back to
@@ -193,7 +203,7 @@ const MerchantPaymentReview: React.FC<MerchantPaymentReviewProps> = ({
         return (
             <div className="w-full h-full flex items-center justify-center">
                 <div className="flex flex-col items-center gap-3 px-6 text-center">
-                    <p className="text-[13px] text-[#FF4D4D]">
+                    <p aria-live="polite" className="text-[13px] text-[#FF5F61]">
                         {fetchError || t.home.qr.messages.invalidQrCode}
                     </p>
                     {/* Retry only helps when there is a code to re-fetch; a
@@ -438,12 +448,17 @@ const MerchantPaymentReview: React.FC<MerchantPaymentReviewProps> = ({
                             </div>
                         )}
 
-                        {!payable && (
-                            <div className="bg-[#FFF0F0] border border-[#FF4D4D]/20 rounded-lg p-3 mt-2">
-                                <p className="text-[12px] text-[#FF4D4D]">
-                                    {isExpired || order.status === 'EXPIRED'
-                                        ? t.merchantPayment.expired
-                                        : t.merchantPayment.notPayable}
+                        {(!payable || payError) && (
+                            <div
+                                aria-live="polite"
+                                className="bg-[#FFF0F0] border border-[#FF5F61]/20 rounded-lg p-3 mt-2"
+                            >
+                                <p className="text-[12px] text-[#FF5F61]">
+                                    {!payable
+                                        ? isExpired || order.status === 'EXPIRED'
+                                            ? t.merchantPayment.expired
+                                            : t.merchantPayment.notPayable
+                                        : payError}
                                 </p>
                             </div>
                         )}

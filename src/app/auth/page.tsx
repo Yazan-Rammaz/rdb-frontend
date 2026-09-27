@@ -23,7 +23,8 @@ import { extractMerchantCode, stashMerchantCode } from '@/lib/merchantPayment';
 import { useAuth, type LoginApiResponse } from '@/context/AuthContext';
 import { usePasskey } from '@/context/PasskeyContext';
 import { api, isNetworkError } from '@/api';
-import { useToast } from '@/context/ToastContext';
+import { useInlineFeedback } from '@/hooks/useInlineFeedback';
+import { takeAuthNotice } from '@/lib/authNotice';
 import { useIsOnline } from '@/hooks/useIsOnline';
 import { isOffline } from '@/lib/networkStatus';
 import { useTranslation } from '@/context/I18nContext';
@@ -104,9 +105,21 @@ function AuthPageInner() {
         setPartialUserPhone,
     } = useAuth();
     const { unlockWithPin: stepUnlockWithPin, confirmSetup, confirmUnlock } = usePasskey();
-    const { start: startPasscodeReset } = useResetPasscode();
-    const { toast } = useToast();
+    const {
+        start: startPasscodeReset,
+        notice: resetNotice,
+        clearNotice: clearResetNotice,
+    } = useResetPasscode();
     const { t, tr } = useTranslation();
+    // One result line for the whole page. Steps are keyed children of
+    // AnimatePresence, so the state lives here and the current step renders it.
+    // `goTo` clears it; anything meant for the next step is set after the goTo.
+    const {
+        feedback,
+        success: showSuccess,
+        error: showError,
+        clear: clearFeedback,
+    } = useInlineFeedback();
     const { preloadData } = useStore();
     const isOnline = useIsOnline();
     // Read cached auth-flow state synchronously so the first render already
@@ -138,6 +151,51 @@ function AuthPageInner() {
     // post-refresh redirect already uses.
     const [navigateHome, setNavigateHome] = useState(false);
     const navigatedHomeRef = useRef(false);
+
+    /**
+     * A notice left by the screen that sent the user here (the lock screen's
+     * "session expired", the reset flow's "login expired" before its reload).
+     * Taken once, shown on whichever step this page lands on, and kept until
+     * the user's first tap or key: it is the only explanation for the bounce.
+     */
+    const authNoticeTakenRef = useRef(false);
+    const authNoticeTextRef = useRef<string | null>(null);
+    useEffect(() => {
+        if (authNoticeTakenRef.current) return;
+        authNoticeTakenRef.current = true;
+        const notice = takeAuthNotice();
+        if (!notice) return;
+        const text =
+            notice === 'loginExpired'
+                ? t.resetPasscode.toasts.loginExpired
+                : t.common.sessionExpired;
+        authNoticeTextRef.current = text;
+        showError(text, { sticky: true });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    useEffect(() => {
+        const noticeText = authNoticeTextRef.current;
+        if (!noticeText || feedback?.text !== noticeText) return;
+        const dismiss = () => {
+            authNoticeTextRef.current = null;
+            clearFeedback();
+        };
+        window.addEventListener('pointerdown', dismiss, { capture: true, once: true });
+        window.addEventListener('keydown', dismiss, { capture: true, once: true });
+        return () => {
+            window.removeEventListener('pointerdown', dismiss, { capture: true });
+            window.removeEventListener('keydown', dismiss, { capture: true });
+        };
+    }, [feedback, clearFeedback]);
+
+    // "Passcode updated" from the reset overlay, which has unmounted by now:
+    // shown on the passcode screen it uncovers.
+    useEffect(() => {
+        if (!resetNotice) return;
+        showSuccess(resetNotice);
+        clearResetNotice();
+    }, [resetNotice, showSuccess, clearResetNotice]);
 
     /**
      * Rescue a merchant payment link that got bounced here.
@@ -323,7 +381,8 @@ function AuthPageInner() {
             } else if (data.status === 'rejected' || data.status === 'expired') {
                 clearInterval(interval);
                 setLoginStep(null);
-                toast.error(t.auth.otp.verificationFailed);
+                // Back on the OTP screen (step is still 'enter-pin').
+                showError(t.auth.otp.verificationFailed);
             }
         }, 2000);
         return () => clearInterval(interval);
@@ -331,6 +390,11 @@ function AuthPageInner() {
     }, [loginStep]);
 
     const goTo = (nextStep: AuthStep, dir = 1) => {
+        // The /auth notice survives step changes the page makes on its own
+        // (hydration); the user's first tap dismisses it.
+        if (!authNoticeTextRef.current || feedback?.text !== authNoticeTextRef.current) {
+            clearFeedback();
+        }
         setDirection(dir);
         setStep(nextStep);
     };
@@ -373,7 +437,8 @@ function AuthPageInner() {
                     preloadHomeData();
                     goTo('enter-name');
                 } else {
-                    toast.error(t.auth.otp.saveAuthFailed);
+                    // Sticky: the success screen has nothing else to explain a dead end.
+                    showError(t.auth.otp.saveAuthFailed, { sticky: true });
                 }
             }
             return;
@@ -395,7 +460,7 @@ function AuthPageInner() {
                 clearAuthFlowState();
                 goHome();
             } else {
-                toast.error(t.auth.otp.saveAuthFailed);
+                showError(t.auth.otp.saveAuthFailed, { sticky: true });
             }
         }
     };
@@ -458,20 +523,21 @@ function AuthPageInner() {
         if (!sendOtpRes.ok) {
             // The connection dropped mid-request: the offline pill says so.
             if (isNetworkError(sendOtpRes.error)) return;
-            toast.error(tr('auth.otp.sendError', { error: sendOtpRes.error.message }));
+            showError(tr('auth.otp.sendError', { error: sendOtpRes.error.message }));
             return;
         }
         if (sendOtpRes.data.sessionInfo) {
             setSessionInfo(sendOtpRes.data.sessionInfo);
             setPin('');
             goTo('enter-pin');
-            toast.success(
+            // After goTo (which clears): the line belongs to the OTP screen.
+            showSuccess(
                 tr('auth.otp.sentSuccess', {
                     method: selectedMethod === 'sms' ? 'SMS' : 'WhatsApp',
                 }),
             );
         } else {
-            toast.warn(t.auth.otp.unexpectedError);
+            showError(t.auth.otp.unexpectedError);
         }
     };
 
@@ -498,7 +564,7 @@ function AuthPageInner() {
             const message = verifyOtpRes.error.message;
             if (message.includes('Invalid') || message.includes('expired')) {
                 setIsValidPin('notvalid');
-                toast.error(t.auth.otp.invalidExpired);
+                showError(t.auth.otp.invalidExpired);
                 setTimeout(() => {
                     setIsValidPin('');
                     setPin('');
@@ -512,7 +578,7 @@ function AuthPageInner() {
             ) {
                 goTo('not-registered');
             } else {
-                toast.error(message || t.auth.otp.verificationFailed);
+                showError(message || t.auth.otp.verificationFailed);
             }
             return;
         }
@@ -585,7 +651,7 @@ function AuthPageInner() {
         } else {
             setLoading('');
             setIsValidPin('notvalid');
-            toast.error(t.auth.otp.verificationFailed);
+            showError(t.auth.otp.verificationFailed);
             setTimeout(() => {
                 setIsValidPin('');
                 setPin('');
@@ -645,8 +711,8 @@ function AuthPageInner() {
             clearAuthFlowState();
             goHome();
         } catch {
-            toast.error(t.auth.otp.saveAuthFailed);
             goTo('get-started', -1);
+            showError(t.auth.otp.saveAuthFailed);
         }
     };
 
@@ -672,7 +738,8 @@ function AuthPageInner() {
         // setupPin reports a dropped connection as a plain failure; the store
         // already knows it is offline by the time we get here.
         if (isOffline()) return;
-        toast.error(t.auth.setPasscode.saveFailed);
+        // Shown in the set-passcode PIN label, which the screen is back on.
+        showError(t.auth.setPasscode.saveFailed);
     };
 
     // After set-passcode completes → save auth and go home
@@ -694,7 +761,8 @@ function AuthPageInner() {
                 clearAuthFlowState();
                 goHome();
             } else {
-                toast.error(t.auth.otp.saveAuthFailed);
+                // Sticky: the done view has nothing else to explain a dead end.
+                showError(t.auth.otp.saveAuthFailed, { sticky: true });
             }
         }
     };
@@ -725,7 +793,11 @@ function AuthPageInner() {
             // 401 = step token missing/expired (not a wrong passcode) → restart login.
             if (!res.ok && res.error.status === 401) {
                 setLoginStep(null);
-                toast.error(t.common.sessionExpired);
+                // The login has to start over, and the passcode screen may be
+                // the intercept that unmounts with the step: say it on the
+                // start screen, which is where the user now has to go.
+                goTo('get-started', -1);
+                showError(t.common.sessionExpired, { sticky: true });
                 return false;
             }
 
@@ -824,6 +896,7 @@ function AuthPageInner() {
                         onSuccess={handlePasscodeSuccess}
                         onForgotPasscode={() => startPasscodeReset('step')}
                         disabled={!isOnline}
+                        feedback={feedback}
                     />
                 </main>
             </Page>
@@ -881,6 +954,7 @@ function AuthPageInner() {
                                     }}
                                     onScanQr={() => goTo('qr-login')}
                                     onLater={() => router.push('/home')}
+                                    feedback={feedback}
                                 />
                             )}
 
@@ -888,6 +962,7 @@ function AuthPageInner() {
                                 <TermsScreen
                                     onAgree={() => goTo('enter-phone')}
                                     onLater={() => router.push('/home')}
+                                    feedback={feedback}
                                 />
                             )}
 
@@ -899,6 +974,7 @@ function AuthPageInner() {
                                     setPhone={setPhone}
                                     loading={loading === 'send-phone'}
                                     onClose={handleClose}
+                                    feedback={feedback}
                                 />
                             )}
 
@@ -912,6 +988,7 @@ function AuthPageInner() {
                                     loading={loading === 'send-pin'}
                                     disabled={!isOnline}
                                     onClose={handleClose}
+                                    feedback={feedback}
                                 />
                             )}
 
@@ -931,6 +1008,7 @@ function AuthPageInner() {
                                     loading={loading}
                                     setLoading={setLoading}
                                     disabled={!isOnline}
+                                    feedback={feedback}
                                 />
                             )}
 
@@ -957,6 +1035,7 @@ function AuthPageInner() {
                                     variant={step === 'login-success' ? 'login' : 'signup'}
                                     onDone={handleAfterSuccess}
                                     delayMs={1500}
+                                    feedback={feedback}
                                 />
                             )}
 
@@ -981,6 +1060,7 @@ function AuthPageInner() {
                                     onDone={handlePasscodeDone}
                                     onSaveFailed={handleSavePasscodeFailed}
                                     disabled={!isOnline}
+                                    feedback={feedback}
                                 />
                             )}
 
@@ -991,6 +1071,7 @@ function AuthPageInner() {
                                     onSuccess={handlePasscodeSuccess}
                                     onForgotPasscode={() => startPasscodeReset('step')}
                                     disabled={!isOnline}
+                                    feedback={feedback}
                                 />
                             )}
                         </motion.div>

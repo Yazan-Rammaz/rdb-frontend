@@ -5,6 +5,8 @@ import Image from 'next/image';
 import { AnimatePresence, motion, type PanInfo } from 'framer-motion';
 import { FlexibleSpace } from '@/scaling';
 import { useTranslation } from '@/context/I18nContext';
+import InlineFeedback from '@/components/ui/InlineFeedback';
+import type { Feedback } from '@/hooks/useInlineFeedback';
 import closeSvg from '@/assets/icons/auth/close.svg';
 import type { QuizQuestion, ResetAnswer } from '@/services/resetPasscode/resetPasscodeApi';
 
@@ -14,6 +16,8 @@ interface QuizScreenProps {
     onClose?: () => void;
     /** Offline: the last answer (which is the submit) cannot be chosen. */
     disabled?: boolean;
+    /** Submit failure line, shown where the swipe hint sits. */
+    feedback?: Feedback | null;
 }
 
 // Slide direction follows navigation: +1 moves forward (card enters from the
@@ -53,6 +57,7 @@ export default function QuizScreen({
     onComplete,
     onClose,
     disabled = false,
+    feedback = null,
 }: QuizScreenProps) {
     const { t, tr } = useTranslation();
     const [[qi, direction], setPage] = useState<[number, number]>([0, 0]);
@@ -213,7 +218,14 @@ export default function QuizScreen({
             </div>
 
             {/* Bottom: review hint (last question) + progress dots */}
-            <div className="px-xd-20 pb-xd-6 flex flex-col items-center gap-xd-14">
+            <div className="relative px-xd-20 pb-xd-6 flex flex-col items-center gap-xd-14">
+                {/* At the swipe hint's position, out of flow. The hint is sent
+                    down before the submit, so the two never overlap. */}
+                <InlineFeedback
+                    feedback={feedback}
+                    lines={2}
+                    className="absolute inset-x-0 bottom-full mb-xd-14 px-xd-30"
+                />
                 <AnimatePresence>
                     {showHint && (
                         <motion.p

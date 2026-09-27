@@ -14,8 +14,11 @@ interface PinInputsProps {
     disabled: boolean;
     isValidPin?: 'valid' | 'notvalid' | 'reenter' | '';
     label?: string;
-    /** Colour of the label under the inputs. 'error' renders it red. */
-    labelTone?: 'default' | 'error';
+    /**
+     * Colour of the label under the inputs. 'error' renders it red, 'success'
+     * blue — for a feedback line shown in the label's place.
+     */
+    labelTone?: 'default' | 'error' | 'success';
     autoFocus?: boolean;
 }
 
@@ -223,9 +226,16 @@ const PinInputs: React.FC<PinInputsProps> = ({
                     ))}
                 </div>
                 {label && (
+                    // `polite`: the label doubles as the error / feedback line,
+                    // so a swapped-in message is announced.
                     <p
+                        aria-live="polite"
                         className={`text-xd-11 mt-xd-8 ${
-                            labelTone === 'error' ? 'text-[#FF5F61] font-medium' : 'text-[#1D1D1D]'
+                            labelTone === 'error'
+                                ? 'text-[#FF5F61] font-medium'
+                                : labelTone === 'success'
+                                  ? 'text-[#388CFF] font-medium'
+                                  : 'text-[#1D1D1D]'
                         }`}
                     >
                         {label}

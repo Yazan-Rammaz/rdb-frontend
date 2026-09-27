@@ -17,7 +17,7 @@
  *
  * What it still cannot see on its own: the error text a user actually read.
  * A handled 400 looks like any other 400 from the outside — see
- * `reportUserError` below, and ToastContext, which calls it for every toast.
+ * `reportUserError` below, and `useInlineFeedback`, which reports every error line.
  *
  * `captureBodies`, `captureHeaders` and `denyBodyPaths` are all pinned here —
  * see the notes on each below.
@@ -125,9 +125,9 @@ export function startObserve(): void {
  *   - a 200 carrying a refusal in the body, which is how the reset-passcode
  *     endpoints answer a wrong answer
  *
- * Error toasts call this already (see ToastContext). Call it by hand wherever
- * an error is rendered inline instead — form fields, full-screen failure
- * states, disabled-with-a-reason buttons.
+ * Error lines shown through `useInlineFeedback` are reported already. Call it
+ * by hand wherever an error is rendered in a slot of its own instead — form
+ * fields, labels, full-screen failure states, disabled-with-a-reason buttons.
  *
  * @param shown  the exact text on screen — this is the sentence the user will
  *               quote back to you

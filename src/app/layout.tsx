@@ -6,9 +6,7 @@ import { LayoutProvider } from '@/context/LayoutContext';
 import { generateThemeVariables } from '@/lib/theme';
 import { StoreProvider } from '@/context/StoreContext';
 import { I18nProvider } from '@/context/I18nContext';
-import { ToastProvider } from '@/context/ToastContext';
 import { ScannerProvider } from '@/context/ScannerContext';
-import ToastContainer from '@/components/ui/Toast/ToastContainer';
 import NetworkBanner from '@/components/layout/NetworkBanner';
 import React from 'react';
 import { PasskeyProvider } from '@/context/PasskeyContext';
@@ -76,11 +74,8 @@ export default function RootLayout({
                                     <RDBLayout>
                                         {/* 4. Feature-specific State Management */}
                                         <LayoutProvider>
-                                            <ToastProvider>
-                                                {children}
-                                                <ToastContainer />
-                                                <NetworkBanner />
-                                            </ToastProvider>
+                                            {children}
+                                            <NetworkBanner />
                                         </LayoutProvider>
                                     </RDBLayout>
                                 </ScannerProvider>
