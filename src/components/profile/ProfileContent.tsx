@@ -40,9 +40,11 @@ import { KycVerificationStatus, type KycStatusResponse } from '@/core/types/auth
 import { api, isNetworkError } from '@/api';
 import { isOffline } from '@/lib/networkStatus';
 import { useIsOnline } from '@/hooks/useIsOnline';
+import { useLogout } from '@/hooks/useLogout';
 
 const ProfileContent = () => {
-    const { userData, removeAuthCookies, refreshUser, isLoading } = useAuth();
+    const { userData, refreshUser, isLoading } = useAuth();
+    const logout = useLogout();
     const isOnline = useIsOnline();
     const { account } = useStore();
     const { toast } = useToast();
@@ -73,11 +75,7 @@ const ProfileContent = () => {
 
     const handleLogout = async () => {
         setShowLogoutDialog(false);
-        await removeAuthCookies();
-        localStorage.clear();
-        localStorage.removeItem('rdb_passcode');
-        localStorage.removeItem('rdb_passkey_locked');
-        window.location.reload();
+        await logout();
     };
 
     const handlePhotoSave = async (dataUrl: string) => {

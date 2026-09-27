@@ -233,6 +233,7 @@ const ar: TranslationSchema = {
             subtitle: 'أدخل رمز المرور للمتابعة',
             label: 'أدخل رمز المرور',
             forgotLabel: 'نسيت رمز المرور ؟',
+            switchAccountLabel: 'تسجيل الدخول بحساب آخر',
         },
     },
 
