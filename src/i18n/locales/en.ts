@@ -230,6 +230,7 @@ const en = {
             subtitle: 'Enter Your Passcode To Continue',
             label: 'Enter Your Passcode',
             forgotLabel: 'Forget Passcode ?',
+            switchAccountLabel: 'Sign in with another account',
         },
     },
 

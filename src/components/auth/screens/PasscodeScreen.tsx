@@ -6,6 +6,7 @@ import Image from 'next/image';
 import PinInputs from '@/components/ui/PinInputs';
 import InlineFeedback from '@/components/ui/InlineFeedback';
 import type { Feedback } from '@/hooks/useInlineFeedback';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useTranslation } from '@/context/I18nContext';
 import { useAuth } from '@/context/AuthContext';
 import { FlexibleSpace } from '@/scaling';
@@ -34,7 +35,7 @@ function detectBiometricType(): BiometricType {
 type PasscodeScreenProps = {
     /**
      * Offline: every input that would send the passcode (and the forgot /
-     * biometric shortcuts) is inert. Digits already typed stay.
+     * switch-account / biometric shortcuts) is inert. Digits already typed stay.
      */
     disabled?: boolean;
     /**
@@ -59,6 +60,11 @@ type PasscodeScreenProps = {
           onUseBiometric?: () => void;
           /** When provided, the "Forget Passcode ?" label becomes a button that opens the reset flow */
           onForgotPasscode?: () => void;
+          /**
+           * When provided, renders a "use another account" link under the forgot
+           * action. Confirmed first, then called — expected to be a full logout.
+           */
+          onSwitchAccount?: () => void;
       }
 );
 
@@ -84,6 +90,7 @@ export default function PasscodeScreen(props: PasscodeScreenProps) {
     const [enterValue, setEnterValue] = useState('');
     const [enterIsValid, setEnterIsValid] = useState<'valid' | 'notvalid' | ''>('');
     const [loading, setLoading] = useState(false);
+    const [showSwitchDialog, setShowSwitchDialog] = useState(false);
 
     // ── Set mode handlers ───────────────────────────────────────────
     const handleSetComplete = (value: string) => {
@@ -397,12 +404,34 @@ export default function PasscodeScreen(props: PasscodeScreenProps) {
                             {t.auth.enterPasscode.forgotLabel}
                         </p>
                     )}
+                    {props.onSwitchAccount && (
+                        <button
+                            onClick={() => setShowSwitchDialog(true)}
+                            disabled={disabled}
+                            className="text-xd-11 font-medium text-[#388CFF] mb-xd-3 underline disabled:opacity-50"
+                        >
+                            {t.auth.enterPasscode.switchAccountLabel}
+                        </button>
+                    )}
                     {props.mode === 'enter' && props.onUseBiometric && (
                         <BiometricButton onPress={props.onUseBiometric} disabled={disabled} />
                     )}
                     <FlexibleSpace size={60} />
                 </div>
             </div>
+
+            <ConfirmDialog
+                open={showSwitchDialog}
+                onConfirm={() => {
+                    setShowSwitchDialog(false);
+                    props.onSwitchAccount?.();
+                }}
+                onCancel={() => setShowSwitchDialog(false)}
+                title={t.auth.enterPasscode.switchAccountLabel}
+                message={t.profile.logoutConfirmation}
+                confirmLabel={t.profile.logout}
+                cancelLabel={t.common.cancel}
+            />
         </div>
     );
 }

@@ -41,9 +41,10 @@ import { api, isNetworkError } from '@/api';
 import { isOffline } from '@/lib/networkStatus';
 import { useIsOnline } from '@/hooks/useIsOnline';
 import { useInlineFeedback } from '@/hooks/useInlineFeedback';
-
+import { useLogout } from '@/hooks/useLogout';
 const ProfileContent = () => {
-    const { userData, removeAuthCookies, refreshUser, isLoading } = useAuth();
+    const { userData, refreshUser, isLoading } = useAuth();
+    const logout = useLogout();
     const isOnline = useIsOnline();
     const { account } = useStore();
     // Photo save / remove result: shown on the photo screen while it is open,
@@ -78,11 +79,7 @@ const ProfileContent = () => {
 
     const handleLogout = async () => {
         setShowLogoutDialog(false);
-        await removeAuthCookies();
-        localStorage.clear();
-        localStorage.removeItem('rdb_passcode');
-        localStorage.removeItem('rdb_passkey_locked');
-        window.location.reload();
+        await logout();
     };
 
     /** Resolves whether the change was stored, so the photo screen can revert its preview. */
