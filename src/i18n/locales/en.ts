@@ -47,7 +47,7 @@ const en = {
         sessionExpired: 'Session expired. Please log in again.',
         network: {
             offline: 'No internet connection',
-            restored: 'Connection restored',
+            restored: 'Reconnected to the internet',
         },
         camera: {
             startFailed: 'Could not start the camera.',
