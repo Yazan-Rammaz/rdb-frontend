@@ -49,7 +49,7 @@ const tr: TranslationSchema = {
         sessionExpired: 'Oturumun süresi doldu. Lütfen tekrar giriş yapın.',
         network: {
             offline: 'İnternet bağlantısı yok',
-            restored: 'Bağlantı yeniden kuruldu',
+            restored: 'İnternet bağlantısı yeniden kuruldu',
         },
         camera: {
             startFailed: 'Kamera başlatılamadı.',

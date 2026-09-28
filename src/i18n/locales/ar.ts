@@ -49,7 +49,7 @@ const ar: TranslationSchema = {
         sessionExpired: 'انتهت الجلسة. يرجى تسجيل الدخول مرة أخرى.',
         network: {
             offline: 'لا يوجد اتصال بالإنترنت',
-            restored: 'تمت استعادة الاتصال',
+            restored: 'تمت إعادة الاتصال بالإنترنت',
         },
         camera: {
             startFailed: 'تعذّر تشغيل الكاميرا.',
