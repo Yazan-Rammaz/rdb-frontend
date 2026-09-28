@@ -20,9 +20,20 @@ function kycBinding(): { fetch: typeof fetch } | null {
 
 
 /**
+ * KYC paths that skip the Worker and go to NestJS like any other call.
+ *
+ * `status` is a plain read of a NestJS record — the Worker added nothing but a
+ * second hop that re-derived the bearer from the cookie, and that hop answered
+ * 401 for a token NestJS accepts when asked directly. Only reads with no
+ * Worker-side logic (AWS, signing) belong here.
+ */
+const KYC_NEST_DIRECT = new Set(['/api/kyc/status']);
+
+/**
  * Generic API proxy (replaces the Cloudflare Worker's catch-all).
  *
- * - `/api/kyc/*`  → forwarded to the Worker (KYC must run on Cloudflare Workers).
+ * - `/api/kyc/*`  → forwarded to the Worker (KYC must run on Cloudflare Workers),
+ *   except the `KYC_NEST_DIRECT` reads.
  * - everything else → NestJS directly, with `Authorization: Bearer <rdb_at>` injected
  *   from the httpOnly cookie (read server-side here, where the Worker used to do it).
  *
@@ -36,7 +47,9 @@ async function proxy(req: NextRequest): Promise<NextResponse> {
     const body =
         method === 'GET' || method === 'HEAD' ? undefined : await req.arrayBuffer();
 
-    const isKyc = pathname === '/api/kyc' || pathname.startsWith('/api/kyc/');
+    const isKyc =
+        (pathname === '/api/kyc' || pathname.startsWith('/api/kyc/')) &&
+        !KYC_NEST_DIRECT.has(pathname);
 
     const contentType = req.headers.get('content-type');
     const acceptLanguage = req.headers.get('accept-language');
