@@ -3,8 +3,15 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { api, isNetworkError } from '@/api';
-import type { ApiError, TransferResult } from '@/api';
+import type { ApiError, RecipientAccountDetails, TransferResult } from '@/api';
 import { isOffline } from '@/lib/networkStatus';
+import {
+    E164_MAX_DIGITS,
+    findCountry,
+    normalizePhoneDigits,
+    phoneIssue,
+    toE164,
+} from '@/lib/phoneValidation';
 import { useIsOnline, useOnReconnect } from '@/hooks/useIsOnline';
 import { resolveRecipient } from '@/api/helpers/resolveRecipient';
 import { lookupAccountByPhoneMock } from '@/api/helpers/lookupAccountByPhone.mock';
@@ -14,16 +21,55 @@ import { useStepUp, extractStepUp } from '@/hooks/useStepUp';
 import { useInlineFeedback } from '@/hooks/useInlineFeedback';
 import InlineFeedback from '@/components/ui/InlineFeedback';
 import SenderCard from './SenderCard';
+import RecipientModeTabs from './RecipientModeTabs';
 import RecipientInput from './RecipientInput';
+import UnregisteredRecipientFields from './UnregisteredRecipientFields';
 import AmountInput from './AmountInput';
 import PurposeSelect from './PurposeSelect';
 import TransferSuccess from './TransferSuccess';
-import { initialFormState } from './types';
-import type { TransferFormState } from './types';
+import { emptyUnregisteredRecipient, initialFormState } from './types';
+import type { RecipientInputMode, TransferFormState } from './types';
 import TitleIcon from '@/assets/icons/home/qr/sendT.svg';
 import TransferIcon from '@/assets/icons/home/transfer/transfer.svg';
 import TransferDisabledIcon from '@/assets/icons/home/transfer/transferdisabled.svg';
 import { useTranslation } from '@/context/I18nContext';
+
+const ACCOUNT_NUMBER_RE = /^\d{4}-\d{4}$/;
+
+/** A phone prefix is only judged once it is as long as the longest dial code. */
+const MIN_PHONE_DIGITS_TO_JUDGE = 3;
+
+/** Whether the value is ready to be looked up without the sender asking. */
+const isCompleteRecipientValue = (mode: RecipientInputMode, value: string): boolean =>
+    mode === 'phone' ? phoneIssue(value) === null : ACCOUNT_NUMBER_RE.test(value);
+
+/**
+ * How long to wait after the last keystroke before looking the recipient up.
+ * A phone number can be valid and still unfinished — a Syrian number is 8 or 9
+ * digits — so one that could still grow waits longer.
+ */
+const recipientLookupDelay = (mode: RecipientInputMode, value: string): number => {
+    if (mode !== 'phone') return 500;
+    const country = findCountry(value);
+    const isFullLength =
+        !!country && value.length === country.dialCode.length + country.maxLocal;
+    return isFullLength ? 500 : 1000;
+};
+
+/** Everything that hangs off a resolved recipient; cleared whenever it is. */
+const clearedRecipient = {
+    accountConfirmed: false,
+    recipientDetails: null,
+    recipientNotFound: false,
+    unregisteredRecipient: emptyUnregisteredRecipient,
+    accountError: null,
+    currencyWarning: null,
+    amount: '',
+    amountConfirmed: false,
+    amountError: null,
+    selectedPurposeId: null,
+    verifyResult: null,
+} satisfies Partial<TransferFormState>;
 
 interface TransferSendProps {
     onClose: () => void;
@@ -83,13 +129,54 @@ const TransferSend: React.FC<TransferSendProps> = ({
     // Account number validation (client-side) - strict format: xxxx-xxxx
     const validateAccountFormat = (value: string): string | null => {
         if (!value) return null;
-        if (!/^\d{4}-\d{4}$/.test(value)) {
+        if (!ACCOUNT_NUMBER_RE.test(value)) {
             return t.transfer.error.incorrectFormat;
         }
         return null;
     };
 
-    // Validate account by number (used for QR scan)
+    // Why a phone number cannot be looked up, in the sender's language.
+    const validatePhoneFormat = (value: string): string | null => {
+        switch (phoneIssue(value)) {
+            case 'missing-country-code':
+                return t.auth.enterPhone.errors.missingCountryCode;
+            case 'unsupported-country':
+                return t.auth.enterPhone.errors.unsupportedCountry;
+            case 'wrong-length':
+                return t.transfer.recipient.errors.invalidPhone;
+            default:
+                return null;
+        }
+    };
+
+    const startRecipientLookup = () =>
+        setForm((prev) => ({
+            ...prev,
+            isValidatingAccount: true,
+            accountError: null,
+            currencyWarning: null,
+        }));
+
+    const confirmRecipient = (recipient: RecipientAccountDetails) =>
+        setForm((prev) => ({
+            ...prev,
+            isValidatingAccount: false,
+            recipientDetails: recipient,
+            accountConfirmed: true,
+            accountError: null,
+            currencyWarning: null,
+        }));
+
+    const rejectRecipient = (message: string) =>
+        setForm((prev) => ({
+            ...prev,
+            isValidatingAccount: false,
+            accountError: message,
+            recipientDetails: null,
+            accountConfirmed: false,
+        }));
+
+    // Validate account by number (typed, pasted or scanned)
     const validateAccountByNumber = useCallback(
         async (accountNumber: string) => {
             const value = accountNumber.trim();
@@ -103,17 +190,10 @@ const TransferSend: React.FC<TransferSendProps> = ({
             // Offline: the lookup runs on reconnect instead (see useOnReconnect).
             if (isOffline()) return;
 
-            setForm((prev) => ({
-                ...prev,
-                isValidatingAccount: true,
-                accountError: null,
-                currencyWarning: null,
-            }));
+            startRecipientLookup();
 
             try {
-                const cleaned = value.replace(/-/g, '');
-                const formatted = `${cleaned.slice(0, 4)}-${cleaned.slice(4)}`;
-                const result = await resolveRecipient(formatted);
+                const result = await resolveRecipient(value);
 
                 // resolveRecipient keeps only the message; the api client has
                 // already settled the connectivity state, so ask it instead.
@@ -122,33 +202,61 @@ const TransferSend: React.FC<TransferSendProps> = ({
                     return;
                 }
 
-                if (!result.ok) {
-                    setForm((prev) => ({
-                        ...prev,
-                        isValidatingAccount: false,
-                        accountError: result.message,
-                        recipientDetails: null,
-                        accountConfirmed: false,
-                    }));
-                } else {
-                    setForm((prev) => ({
-                        ...prev,
-                        isValidatingAccount: false,
-                        recipientDetails: result.recipient,
-                        accountConfirmed: true,
-                        accountError: null,
-                        currencyWarning: null,
-                    }));
-                }
+                if (!result.ok) rejectRecipient(result.message);
+                else confirmRecipient(result.recipient);
             } catch {
-                setForm((prev) => ({
-                    ...prev,
-                    isValidatingAccount: false,
-                    accountError: t.transfer.error.validateAccount,
-                }));
+                rejectRecipient(t.transfer.error.validateAccount);
             }
         },
         [t],
+    );
+
+    // Look a phone number up. Found: the recipient is confirmed exactly as an
+    // account number would be. Not found: the sender names the recipient.
+    const validatePhoneNumber = useCallback(
+        async (phoneNumber: string) => {
+            const value = normalizePhoneDigits(phoneNumber);
+            if (!value) return;
+
+            const formatError = validatePhoneFormat(value);
+            if (formatError) {
+                setForm((prev) => ({ ...prev, accountError: formatError }));
+                return;
+            }
+            if (isOffline()) return;
+
+            startRecipientLookup();
+
+            try {
+                // A mock, not an API call — there is no phone-lookup endpoint
+                // yet. See the file for what to do when one exists.
+                const result = await lookupAccountByPhoneMock(toE164(value));
+
+                if (result.status === 'error' && isOffline()) {
+                    setForm((prev) => ({ ...prev, isValidatingAccount: false }));
+                    return;
+                }
+
+                if (result.status === 'found') confirmRecipient(result.recipient);
+                else if (result.status === 'error') rejectRecipient(result.message);
+                else {
+                    setForm((prev) => ({
+                        ...prev,
+                        isValidatingAccount: false,
+                        recipientNotFound: true,
+                    }));
+                }
+            } catch {
+                rejectRecipient(t.transfer.error.validateAccount);
+            }
+        },
+        [t],
+    );
+
+    const lookupRecipient = useCallback(
+        (mode: RecipientInputMode, value: string) =>
+            mode === 'phone' ? validatePhoneNumber(value) : validateAccountByNumber(value),
+        [validateAccountByNumber, validatePhoneNumber],
     );
 
     // Effect to handle pending QR validation
@@ -162,10 +270,10 @@ const TransferSend: React.FC<TransferSendProps> = ({
     // Effect to handle pending paste validation
     useEffect(() => {
         if (pendingPasteValidation) {
-            validateAccountByNumber(pendingPasteValidation);
+            lookupRecipient(form.recipientInputMode, pendingPasteValidation);
             setPendingPasteValidation(null);
         }
-    }, [pendingPasteValidation, validateAccountByNumber]);
+    }, [pendingPasteValidation, form.recipientInputMode, lookupRecipient]);
 
     // Pre-fill account number when opened from regular account QR scan
     useEffect(() => {
@@ -180,9 +288,11 @@ const TransferSend: React.FC<TransferSendProps> = ({
         }
     }, [prefillAccountNumber]);
 
-    // Auto-validate 0.5 seconds after user types a complete account number (xxxx-xxxx = 9 chars)
+    // Auto-validate shortly after the user types a complete account number
+    // (xxxx-xxxx) or a valid phone number
     useEffect(() => {
         const value = form.recipientAccountNumber;
+        const mode = form.recipientInputMode;
 
         if (recipientValidateDebounceRef.current) {
             clearTimeout(recipientValidateDebounceRef.current);
@@ -193,14 +303,14 @@ const TransferSend: React.FC<TransferSendProps> = ({
             form.accountConfirmed ||
             form.isValidatingAccount ||
             form.editingAfterConfirm ||
-            form.accountError
+            form.accountError ||
+            form.recipientNotFound
         )
             return;
-        if (form.recipientInputMode !== 'account') return;
-        if (/^\d{4}-\d{4}$/.test(value)) {
+        if (isCompleteRecipientValue(mode, value)) {
             recipientValidateDebounceRef.current = setTimeout(() => {
-                validateAccountByNumber(value);
-            }, 500);
+                lookupRecipient(mode, value);
+            }, recipientLookupDelay(mode, value));
         }
 
         return () => {
@@ -215,76 +325,15 @@ const TransferSend: React.FC<TransferSendProps> = ({
         form.isValidatingAccount,
         form.editingAfterConfirm,
         form.accountError,
+        form.recipientNotFound,
         form.recipientInputMode,
-        validateAccountByNumber,
+        lookupRecipient,
     ]);
 
-    // Validate recipient account via API
-    const handleValidateAccount = useCallback(async () => {
-        const value = form.recipientAccountNumber.trim();
-        if (!value) return;
-
-        // In account mode, require xxxx-xxxx format before any API lookup.
-        if (form.recipientInputMode === 'account') {
-            const formatError = validateAccountFormat(value);
-            if (formatError) {
-                setForm((prev) => ({ ...prev, accountError: formatError }));
-                return;
-            }
-        }
-        if (isOffline()) return;
-
-        setForm((prev) => ({
-            ...prev,
-            isValidatingAccount: true,
-            accountError: null,
-            currencyWarning: null,
-        }));
-
-        try {
-            let result: Awaited<ReturnType<typeof resolveRecipient>>;
-            if (form.recipientInputMode === 'phone') {
-                // A mock, not an API call — there is no phone-lookup endpoint
-                // yet. See the file for what to do when one exists.
-                result = await lookupAccountByPhoneMock(value);
-            } else {
-                // Format as xxxx-xxxx for the API
-                const cleaned = value.replace(/-/g, '');
-                const formatted = `${cleaned.slice(0, 4)}-${cleaned.slice(4)}`;
-                result = await resolveRecipient(formatted);
-            }
-
-            if (!result.ok && isOffline()) {
-                setForm((prev) => ({ ...prev, isValidatingAccount: false }));
-                return;
-            }
-
-            if (!result.ok) {
-                setForm((prev) => ({
-                    ...prev,
-                    isValidatingAccount: false,
-                    accountError: result.message,
-                    recipientDetails: null,
-                    accountConfirmed: false,
-                }));
-            } else {
-                setForm((prev) => ({
-                    ...prev,
-                    isValidatingAccount: false,
-                    recipientDetails: result.recipient,
-                    accountConfirmed: true,
-                    accountError: null,
-                    currencyWarning: null,
-                }));
-            }
-        } catch {
-            setForm((prev) => ({
-                ...prev,
-                isValidatingAccount: false,
-                accountError: t.transfer.error.validateAccount,
-            }));
-        }
-    }, [form.recipientAccountNumber, form.recipientInputMode]);
+    // Validate the recipient on demand (Enter)
+    const handleValidateAccount = useCallback(() => {
+        lookupRecipient(form.recipientInputMode, form.recipientAccountNumber);
+    }, [form.recipientAccountNumber, form.recipientInputMode, lookupRecipient]);
 
     // Validate amount via verify API
     const handleValidateAmount = useCallback(async () => {
@@ -381,18 +430,20 @@ const TransferSend: React.FC<TransferSendProps> = ({
 
     // Edit handlers with cascade reset
     const handleEditAccount = () => {
+        setForm((prev) => ({ ...prev, ...clearedRecipient, editingAfterConfirm: true }));
+    };
+
+    // Switching tabs starts the recipient over: an account number is not a
+    // phone number, and neither is whoever the last one resolved to.
+    const handleRecipientModeChange = (mode: RecipientInputMode) => {
+        if (mode === form.recipientInputMode) return;
         setForm((prev) => ({
             ...prev,
-            accountConfirmed: false,
-            recipientDetails: null,
-            accountError: null,
-            currencyWarning: null,
-            amount: '',
-            amountConfirmed: false,
-            amountError: null,
-            selectedPurposeId: null,
-            editingAfterConfirm: true,
-            verifyResult: null,
+            ...clearedRecipient,
+            recipientInputMode: mode,
+            recipientAccountNumber: '',
+            inputMethod: 'MANUAL',
+            editingAfterConfirm: false,
         }));
     };
 
@@ -412,15 +463,25 @@ const TransferSend: React.FC<TransferSendProps> = ({
         try {
             const text = await navigator.clipboard.readText();
             if (text) {
-                const trimmed = text.trim();
+                const isPhone = form.recipientInputMode === 'phone';
+                const pasted = isPhone ? normalizePhoneDigits(text) : text.trim();
+                // Too long to be a phone number at all: say so rather than
+                // cut it down to a number that belongs to someone else.
+                if (isPhone && pasted.length > E164_MAX_DIGITS) {
+                    setForm((prev) => ({
+                        ...prev,
+                        accountError: t.transfer.recipient.errors.invalidPhone,
+                    }));
+                    return;
+                }
                 setForm((prev) => ({
                     ...prev,
-                    recipientAccountNumber: trimmed,
+                    recipientAccountNumber: pasted,
                     accountError: null,
                     inputMethod: 'MANUAL',
                 }));
                 // Trigger validation after paste
-                setPendingPasteValidation(trimmed);
+                setPendingPasteValidation(pasted);
             }
         } catch {
             // Clipboard access denied — silently ignore
@@ -575,10 +636,10 @@ const TransferSend: React.FC<TransferSendProps> = ({
             !form.accountConfirmed &&
             !form.isValidatingAccount &&
             !form.accountError &&
-            form.recipientInputMode === 'account' &&
-            /^\d{4}-\d{4}$/.test(form.recipientAccountNumber)
+            !form.recipientNotFound &&
+            isCompleteRecipientValue(form.recipientInputMode, form.recipientAccountNumber)
         ) {
-            void validateAccountByNumber(form.recipientAccountNumber);
+            void lookupRecipient(form.recipientInputMode, form.recipientAccountNumber);
         } else if (
             form.recipientDetails &&
             form.amount &&
@@ -597,6 +658,15 @@ const TransferSend: React.FC<TransferSendProps> = ({
         if (!canSend || form.isSending) return;
         handleSend();
     };
+
+    // A phone prefix that matches no country is wrong as soon as it is typed —
+    // no need to wait for Enter. A number that is merely unfinished is not.
+    const phoneTypingError =
+        form.recipientInputMode === 'phone' &&
+        form.recipientAccountNumber.length >= MIN_PHONE_DIGITS_TO_JUDGE &&
+        phoneIssue(form.recipientAccountNumber) !== 'wrong-length'
+            ? validatePhoneFormat(form.recipientAccountNumber)
+            : null;
 
     // Get purpose label for receipt
     const purposeLabel = selectedPurposeName || form.selectedPurposeId || '';
@@ -644,10 +714,14 @@ const TransferSend: React.FC<TransferSendProps> = ({
                 </div>
                 {/* Sender balance card */}
                 <SenderCard selectedAssetSymbol={assetSymbol} />
-                {/* Send To section */}
-                <p className="text-xd-11 text-[#1D1D1D] font-medium text-center mt-xd-8 mb-xd-8">
-                    {t.transfer.sendTo}
-                </p>
+                {/* Send To section — how the recipient is identified */}
+                <div className="mt-xd-8 mb-xd-8">
+                    <RecipientModeTabs
+                        mode={form.recipientInputMode}
+                        onModeChange={handleRecipientModeChange}
+                        disabled={form.isValidatingAccount || form.isSending}
+                    />
+                </div>
                 <div className="overflow-auto pb-xd-80">
                     {/* Recipient input */}
                     <RecipientInput
@@ -658,6 +732,8 @@ const TransferSend: React.FC<TransferSendProps> = ({
                                 recipientAccountNumber: value,
                                 accountError: null,
                                 currencyWarning: null,
+                                recipientNotFound: false,
+                                unregisteredRecipient: emptyUnregisteredRecipient,
                                 inputMethod: 'MANUAL',
                                 editingAfterConfirm: false,
                             }))
@@ -665,25 +741,32 @@ const TransferSend: React.FC<TransferSendProps> = ({
                         onValidate={handleValidateAccount}
                         recipientDetails={form.recipientDetails}
                         isValidating={form.isValidatingAccount}
-                        error={form.accountError}
+                        error={form.accountError ?? phoneTypingError}
                         currencyWarning={form.currencyWarning}
+                        notice={
+                            form.recipientNotFound ? t.transfer.recipient.notRegistered : null
+                        }
                         accountConfirmed={form.accountConfirmed}
                         onEdit={handleEditAccount}
                         inputMode={form.recipientInputMode}
-                        onModeChange={(mode) =>
-                            setForm((prev) => ({
-                                ...prev,
-                                recipientInputMode: mode,
-                                recipientAccountNumber: '',
-                                accountError: null,
-                            }))
-                        }
-                        editingAfterConfirm={form.editingAfterConfirm}
                         onPaste={handlePaste}
                         onScanQR={handleScanQR}
                         inputMethod={form.inputMethod}
                         disabled={form.isValidatingAccount || form.isSending}
                     />
+
+                    {/* No account on this phone number: who the money is for */}
+                    {form.recipientNotFound && (
+                        <div className="mt-xd-4">
+                            <UnregisteredRecipientFields
+                                value={form.unregisteredRecipient}
+                                onChange={(unregisteredRecipient) =>
+                                    setForm((prev) => ({ ...prev, unregisteredRecipient }))
+                                }
+                                disabled={form.isSending}
+                            />
+                        </div>
+                    )}
 
                     {/* Amount input */}
                     <div className="mt-xd-4">

@@ -262,14 +262,24 @@ const ar: TranslationSchema = {
         },
         recipient: {
             edit: 'تعديل',
-            enter: 'أدخل',
             recipientAccount: 'حساب المستلم',
             recipientAccountNumber: 'رقم حساب المستلم',
-            or: 'أو',
-            phoneNumber: 'رقم الهاتف',
+            recipientPhoneNumber: 'رقم هاتف المستلم',
             paste: 'لصق',
             placeholderPhone: 'رقم الهاتف مثل 963980033496',
             placeholderAccount: 'رقم حساب المستلم مثل 0000-0016',
+            notRegistered: 'لا يوجد حساب على هذا الرقم. أدخل بيانات المستلم.',
+            fullName: 'اسم وكنية المستلم كما في الهوية',
+            fullNamePlaceholder: 'أدخل الاسم والكنية كما في الهوية',
+            idNumber: 'رقم هوية المستلم',
+            idNumberPlaceholder: 'أدخل رقم الهوية كما في الوثيقة',
+            errors: {
+                invalidPhone:
+                    'رقم هاتف غير صحيح. أدخل الرقم كاملاً مع رمز الدولة.',
+                nameNeedsSurname: 'أدخل الاسم والكنية معاً.',
+                idTooShort: 'يجب ألا يقل رقم الهوية عن 6 خانات.',
+                idTooLong: 'يجب ألا يزيد رقم الهوية عن 20 خانة.',
+            },
         },
         sender: {
             label: 'حساب المرسل',

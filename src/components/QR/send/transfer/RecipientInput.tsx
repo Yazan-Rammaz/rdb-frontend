@@ -5,10 +5,11 @@ import type { RecipientAccountDetails } from '@/core/types/transfer';
 import Image from 'next/image';
 import ScanIcon from '@/assets/icons/home/transfer/qrscaninput.svg';
 import QrInputMethodIcon from '@/assets/icons/home/transfer/qrinputmethod.svg';
-import PhoneIcon from '@/assets/icons/home/transfer/phone.svg';
 import InfoIcon from '@/assets/icons/home/transfer/info.svg';
 import CloseIcon from '@/assets/icons/home/transfer/close.svg';
 import { useTranslation } from '@/context/I18nContext';
+import { E164_MAX_DIGITS, normalizePhoneDigits } from '@/lib/phoneValidation';
+import type { RecipientInputMode } from './types';
 
 interface RecipientInputProps {
     value: string;
@@ -18,11 +19,11 @@ interface RecipientInputProps {
     isValidating: boolean;
     error: string | null;
     currencyWarning: string | null;
+    /** A neutral note under the field — not an error, the value stands. */
+    notice?: string | null;
     accountConfirmed: boolean;
     onEdit: () => void;
-    inputMode: 'account' | 'phone';
-    onModeChange: (mode: 'account' | 'phone') => void;
-    editingAfterConfirm: boolean;
+    inputMode: RecipientInputMode;
     onPaste?: () => void;
     onScanQR?: () => void;
     inputMethod?: 'MANUAL' | 'QR';
@@ -37,10 +38,10 @@ const RecipientInput: React.FC<RecipientInputProps> = ({
     isValidating,
     error,
     currencyWarning,
+    notice,
     accountConfirmed,
     onEdit,
     inputMode,
-    onModeChange,
     onPaste,
     onScanQR,
     inputMethod,
@@ -119,8 +120,10 @@ const RecipientInput: React.FC<RecipientInputProps> = ({
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const nextValue = e.target.value;
 
-        if (inputMode !== 'account') {
-            onChange(nextValue);
+        if (inputMode === 'phone') {
+            const digits = normalizePhoneDigits(nextValue);
+            // Refused, not truncated: a number cut to fit is someone else's.
+            if (digits.length <= E164_MAX_DIGITS) onChange(digits);
             return;
         }
 
@@ -188,47 +191,27 @@ const RecipientInput: React.FC<RecipientInputProps> = ({
         );
     }
 
+    const isPhone = inputMode === 'phone';
+    const hasMessage = !!(error || currencyWarning || notice);
+
     // Editable state
     return (
         <div className="flex  flex-col gap-1">
             <div
                 onClick={() => inputRef.current?.focus()}
-                className={`flex flex-col w-full  ${error ? 'min-h-xd-54' : 'h-xd-54'} rounded-xd-15 px-xd-12 py-xd-6 bg-white border border-[#d3d3d35e] focus-within:border-[#388CFF] transition-colors ${error ? 'border-[#FF5F61]!' : ''} ${currencyWarning && !error ? 'border-amber-300!' : ''}`}
+                className={`flex flex-col w-full  ${hasMessage ? 'min-h-xd-54' : 'h-xd-54'} rounded-xd-15 px-xd-12 py-xd-6 bg-white border border-[#d3d3d35e] focus-within:border-[#388CFF] transition-colors ${error ? 'border-[#FF5F61]!' : ''} ${currencyWarning && !error ? 'border-amber-300!' : ''}`}
             >
                 {/* Top row: label + input + actions */}
                 <div className="flex flex-row items-center gap-xd-8">
                     {/* Left: label + input stacked */}
                     <div className="flex flex-col gap-xd-6 pb-xd-1 flex-1 min-w-0">
-                        {/* Label row with mode toggle */}
-                        <div className="flex items-center gap-xd-4 h-xd-15 flex-wrap">
-                            <span
-                                className={`text-xd-11 font-medium transition-colors shrink-0 ${inputMode === 'account' ? 'text-[#1D1D1D]' : 'text-[#d3d3d35e] cursor-pointer underline'}`}
-                            >
-                                {t.transfer.recipient.enter}
+                        {/* Label row */}
+                        <div className="flex items-center gap-xd-4 h-xd-15">
+                            <span className="text-xd-11 text-[#8D8D8D] font-medium truncate">
+                                {isPhone
+                                    ? t.transfer.recipient.recipientPhoneNumber
+                                    : t.transfer.recipient.recipientAccountNumber}
                             </span>
-                            <button
-                                onClick={() => onModeChange('account')}
-                                className={`text-xd-11 font-medium transition-colors shrink-0 ${inputMode === 'account' ? 'text-[#1D1D1D]' : 'text-[#d3d3d35e] cursor-pointer underline'}`}
-                            >
-                                {t.transfer.recipient.recipientAccount}
-                            </button>
-                            <span className="text-xd-11 text-[#8D8D8D] font-medium shrink-0">
-                                {t.transfer.recipient.or}
-                            </span>
-                            {/* Phone icon */}
-                            <Image
-                                width={14}
-                                height={14}
-                                src={PhoneIcon}
-                                alt="Phone Input"
-                                className="size-xd-14 shrink-0"
-                            />
-                            <button
-                                onClick={() => onModeChange('phone')}
-                                className={`text-xd-11 font-medium transition-colors shrink-0 ${inputMode === 'phone' ? 'text-[#388CFF]' : 'text-[#d3d3d35e] cursor-pointer underline'}`}
-                            >
-                                {t.transfer.recipient.phoneNumber}
-                            </button>
                             {/* Info icon */}
                             <Image
                                 width={14}
@@ -239,20 +222,25 @@ const RecipientInput: React.FC<RecipientInputProps> = ({
                             />
                         </div>
                         {/* Input row */}
-                        <div className="flex items-center gap-xd-4 pb-xd-2">
-                            {inputMode === 'phone' && (
+                        {/* A phone number reads left-to-right in every language. */}
+                        <div
+                            dir={isPhone ? 'ltr' : undefined}
+                            className="flex items-center gap-xd-4 pb-xd-2"
+                        >
+                            {isPhone && (
                                 <span className="text-xd-13 font-medium text-[#1D1D1D]">+</span>
                             )}
                             <input
                                 ref={inputRef}
                                 inputMode="numeric"
-                                type={inputMode === 'phone' ? 'tel' : 'text'}
+                                type={isPhone ? 'tel' : 'text'}
+                                autoComplete="off"
                                 value={value}
                                 onChange={handleInputChange}
                                 onKeyDown={handleKeyDown}
                                 disabled={disabled}
                                 placeholder={
-                                    inputMode === 'phone'
+                                    isPhone
                                         ? t.transfer.recipient.placeholderPhone
                                         : t.transfer.recipient.placeholderAccount
                                 }
@@ -265,33 +253,32 @@ const RecipientInput: React.FC<RecipientInputProps> = ({
                         {isValidating ? (
                             <div className="size-xd-16 border-2 border-gray-200 border-t-[#3C3C3C] rounded-full animate-spin" />
                         ) : !value ? (
-                            inputMode === 'account' && (
-                                <div className="flex items-center gap-xd-12">
-                                    {onPaste && (
-                                        <button
-                                            onClick={onPaste}
-                                            className="cursor-pointer text-xd-11 underline text-[#388CFF] font-medium"
-                                        >
-                                            {t.transfer.recipient.paste}
-                                        </button>
-                                    )}
-                                    {onScanQR && (
-                                        <button
-                                            onClick={onScanQR}
-                                            className="cursor-pointer text-[#8D8D8D] hover:text-[#1D1D1D] transition-colors flex items-center justify-center"
-                                            aria-label={t.common.accessibility.scanQrCode}
-                                        >
-                                            <Image
-                                                width={14}
-                                                height={14}
-                                                src={ScanIcon}
-                                                alt={'scan qr'}
-                                                className="size-xd-14 object-contain"
-                                            />
-                                        </button>
-                                    )}
-                                </div>
-                            )
+                            <div className="flex items-center gap-xd-12">
+                                {onPaste && (
+                                    <button
+                                        onClick={onPaste}
+                                        className="cursor-pointer text-xd-11 underline text-[#388CFF] font-medium"
+                                    >
+                                        {t.transfer.recipient.paste}
+                                    </button>
+                                )}
+                                {/* A QR carries an account number, never a phone. */}
+                                {!isPhone && onScanQR && (
+                                    <button
+                                        onClick={onScanQR}
+                                        className="cursor-pointer text-[#8D8D8D] hover:text-[#1D1D1D] transition-colors flex items-center justify-center"
+                                        aria-label={t.common.accessibility.scanQrCode}
+                                    >
+                                        <Image
+                                            width={14}
+                                            height={14}
+                                            src={ScanIcon}
+                                            alt={'scan qr'}
+                                            className="size-xd-14 object-contain"
+                                        />
+                                    </button>
+                                )}
+                            </div>
                         ) : (
                             <button
                                 onClick={handleClear}
@@ -322,6 +309,15 @@ const RecipientInput: React.FC<RecipientInputProps> = ({
                     <div className="bg-amber-50 rounded-xd-12 px-xd-16 py-xd-10 mt-xd-4">
                         <p className="text-xd-11 text-amber-600 font-medium text-center">
                             {currencyWarning}
+                        </p>
+                    </div>
+                )}
+
+                {/* Notice — inside container */}
+                {notice && !error && !currencyWarning && (
+                    <div className="bg-[#F7F7F7] rounded-xd-12 px-xd-16 py-xd-10 mt-xd-4">
+                        <p className="text-xd-11 text-[#8D8D8D] font-medium text-center">
+                            {notice}
                         </p>
                     </div>
                 )}
