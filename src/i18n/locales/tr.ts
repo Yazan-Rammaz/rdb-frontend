@@ -261,14 +261,24 @@ const tr: TranslationSchema = {
         },
         recipient: {
             edit: 'Düzenle',
-            enter: 'Gir',
             recipientAccount: 'Alıcı Hesabı',
             recipientAccountNumber: 'Alıcı Hesap Numarası',
-            or: 'Veya',
-            phoneNumber: 'Telefon Numarası',
+            recipientPhoneNumber: 'Alıcı Telefon Numarası',
             paste: 'Yapıştır',
             placeholderPhone: 'Telefon Numarası örn. 905xxxxxxxxx',
             placeholderAccount: 'Alıcı Hesap Numarası örn. 0000-0016',
+            notRegistered: 'Bu Numarada Hesap Yok. Alıcı Bilgilerini Girin.',
+            fullName: 'Alıcının Kimlikteki Adı ve Soyadı',
+            fullNamePlaceholder: 'Adı ve Soyadı Kimlikteki Gibi Girin',
+            idNumber: 'Alıcı Kimlik Numarası',
+            idNumberPlaceholder: 'Kimlik Numarasını Kimlikteki Gibi Girin',
+            errors: {
+                invalidPhone:
+                    'Hatalı Telefon Numarası. Numarayı Ülke Koduyla Birlikte Eksiksiz Girin.',
+                nameNeedsSurname: 'Ad ve soyadı birlikte girin.',
+                idTooShort: 'Kimlik numarası en az 6 karakter olmalıdır.',
+                idTooLong: 'Kimlik numarası en fazla 20 karakter olmalıdır.',
+            },
         },
         sender: {
             label: 'Gönderen Hesabı',

@@ -260,14 +260,24 @@ const en = {
         },
         recipient: {
             edit: 'Edit',
-            enter: 'Enter',
             recipientAccount: 'Recipient Account',
             recipientAccountNumber: 'Recipient Account Number',
-            or: 'Or',
-            phoneNumber: 'Phone Number',
+            recipientPhoneNumber: 'Recipient Phone Number',
             paste: 'Paste',
             placeholderPhone: 'Phone Number like 963980033496',
             placeholderAccount: 'Recipient Account Number like 0000-0016',
+            notRegistered: 'No Account On This Number. Enter The Recipient Details.',
+            fullName: 'Recipient Name & Surname Exact ID',
+            fullNamePlaceholder: 'Enter Name & Surname As On The ID',
+            idNumber: 'Recipient ID Number',
+            idNumberPlaceholder: 'Enter ID Number As On The ID',
+            errors: {
+                invalidPhone:
+                    'Incorrect Phone Number. Enter The Full Number With The Country Code.',
+                nameNeedsSurname: 'Enter both name and surname.',
+                idTooShort: 'ID number must be at least 6 characters.',
+                idTooLong: 'ID number must be 20 characters or fewer.',
+            },
         },
         sender: {
             label: 'Sender Account',
