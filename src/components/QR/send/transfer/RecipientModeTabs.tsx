@@ -36,7 +36,13 @@ const RecipientModeTabs: React.FC<RecipientModeTabsProps> = ({ mode, onModeChang
     };
 
     return (
-        <div role="tablist" aria-label={t.transfer.sendTo} className="flex w-full gap-xd-8">
+        // One joined control: the frame carries the border and the corners,
+        // the tabs inside only fill it.
+        <div
+            role="tablist"
+            aria-label={t.transfer.sendTo}
+            className="flex w-full overflow-hidden rounded-xd-12 border border-[#3C3C3C]"
+        >
             {RECIPIENT_MODES.map(({ mode: tabMode, label }, index) => {
                 const isActive = tabMode === mode;
                 return (
@@ -52,9 +58,9 @@ const RecipientModeTabs: React.FC<RecipientModeTabsProps> = ({ mode, onModeChang
                         disabled={disabled}
                         onClick={() => onModeChange(tabMode)}
                         onKeyDown={(e) => handleKeyDown(e, index)}
-                        className={`flex-1 min-w-0 min-h-xd-36 rounded-xd-12 border border-[#3C3C3C] px-xd-8 py-xd-6 text-xd-11 font-medium leading-tight text-center transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
-                            isActive ? 'bg-[#3C3C3C] text-white' : 'bg-white text-[#1D1D1D]'
-                        }`}
+                        className={`flex-1 min-w-0 min-h-xd-36 px-xd-8 py-xd-6 text-xd-11 font-medium leading-tight text-center transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
+                            index > 0 ? 'border-s border-[#3C3C3C]' : ''
+                        } ${isActive ? 'bg-[#3C3C3C] text-white' : 'bg-white text-[#1D1D1D]'}`}
                     >
                         {label(t)}
                     </button>

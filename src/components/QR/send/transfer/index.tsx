@@ -122,6 +122,7 @@ const TransferSend: React.FC<TransferSendProps> = ({
         balances[resolvedAssetSymbol] ||
         (activeAssetSymbol ? balances[activeAssetSymbol] : undefined);
     const assetSymbol = resolvedAssetSymbol;
+    const availableBalance = senderBalance?.available ?? 0;
     const assetType = activeAssetType?.toUpperCase() || 'CURRENCY';
     const senderAccountNumber = senderBalance?.accountNumber || '1000-1128';
     const senderMaskedName = 'M***** A*****';
@@ -338,11 +339,29 @@ const TransferSend: React.FC<TransferSendProps> = ({
     // Validate amount via verify API
     const handleValidateAmount = useCallback(async () => {
         const value = form.amount.trim();
-        if (!value || !form.recipientDetails) return;
+        if (!value || (!form.recipientDetails && !form.recipientNotFound)) return;
 
         const numAmount = parseFloat(value);
         if (isNaN(numAmount) || numAmount <= 0) {
             setForm((prev) => ({ ...prev, amountError: t.transfer.error.invalidAmount }));
+            return;
+        }
+
+        // An unregistered recipient has no account for /transfers/verify to
+        // check against, so the amount is held to the balance on screen. The
+        // server still has the last word when the transfer is sent.
+        if (!form.recipientDetails) {
+            const isAffordable = numAmount <= availableBalance;
+            setForm((prev) => ({
+                ...prev,
+                amountConfirmed: isAffordable,
+                amountError: isAffordable
+                    ? null
+                    : tr('transfer.amountInput.error.insufficient', {
+                          amount: availableBalance,
+                          currency: assetSymbol,
+                      }),
+            }));
             return;
         }
         if (isOffline()) return;
@@ -426,7 +445,14 @@ const TransferSend: React.FC<TransferSendProps> = ({
                 amountError: t.transfer.error.verifyTransfer,
             }));
         }
-    }, [form.amount, form.recipientDetails, assetSymbol, assetType]);
+    }, [
+        form.amount,
+        form.recipientDetails,
+        form.recipientNotFound,
+        availableBalance,
+        assetSymbol,
+        assetType,
+    ]);
 
     // Edit handlers with cascade reset
     const handleEditAccount = () => {
@@ -668,6 +694,9 @@ const TransferSend: React.FC<TransferSendProps> = ({
             ? validatePhoneFormat(form.recipientAccountNumber)
             : null;
 
+    // Resolved to an account, or a phone number whose owner is being named.
+    const hasRecipient = form.accountConfirmed || form.recipientNotFound;
+
     // Get purpose label for receipt
     const purposeLabel = selectedPurposeName || form.selectedPurposeId || '';
 
@@ -729,11 +758,12 @@ const TransferSend: React.FC<TransferSendProps> = ({
                         onChange={(value) =>
                             setForm((prev) => ({
                                 ...prev,
+                                // A different number is a different recipient:
+                                // what was entered for the last one goes too.
+                                ...(prev.recipientNotFound ? clearedRecipient : null),
                                 recipientAccountNumber: value,
                                 accountError: null,
                                 currencyWarning: null,
-                                recipientNotFound: false,
-                                unregisteredRecipient: emptyUnregisteredRecipient,
                                 inputMethod: 'MANUAL',
                                 editingAfterConfirm: false,
                             }))
@@ -788,7 +818,7 @@ const TransferSend: React.FC<TransferSendProps> = ({
                             currency={assetSymbol}
                             focusTrigger={amountFocusTrigger}
                             disabled={
-                                !form.accountConfirmed || form.isValidatingAccount || form.isSending
+                                !hasRecipient || form.isValidatingAccount || form.isSending
                             }
                         />
                     </div>
