@@ -8,7 +8,7 @@ import { useTranslation } from '@/context/I18nContext';
 import CreatePaymentRequest from '../receive/CreatePaymentRequest';
 import { useStore } from '@/context/StoreContext';
 import { validateQR } from '../send/utils';
-import type { ParsedQR } from '../send/types';
+import type { ParsedQR, QRValidationError } from '../send/types';
 import { Page } from '@/scaling';
 
 const GlobalQrScanner: React.FC = () => {
@@ -19,8 +19,10 @@ const GlobalQrScanner: React.FC = () => {
     const lastInvalidScanRef = useRef<number>(0);
     const lastHandledScanRef = useRef<number>(0);
 
-    const errorMessages: Record<string, string> = {
+    // Keyed by the error union, so a new rejection reason cannot ship without a message.
+    const errorMessages: Record<QRValidationError, string> = {
         invalid_format: t.home.qr.messages.invalidQrCode,
+        client_id_qr: t.home.qr.messages.clientIdQr,
         missing_both: t.home.qr.messages.missingWalletIdAndCurrency,
         missing_account_info: t.home.qr.messages.missingAccountInfo,
         missing_account_name: t.home.qr.messages.missingAccountName,
@@ -45,7 +47,7 @@ const GlobalQrScanner: React.FC = () => {
             // same bad code many times a second.
             if (now - lastInvalidScanRef.current > 3000) {
                 lastInvalidScanRef.current = now;
-                return errorMessages[result.error] || t.home.qr.messages.invalidQrCode;
+                return errorMessages[result.error];
             }
             return null;
         }

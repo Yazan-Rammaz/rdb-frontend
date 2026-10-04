@@ -435,6 +435,7 @@ const ar: TranslationSchema = {
                 qrPreviewSuccess: 'تم إنشاء معاينة رمز الاستجابة السريعة بنجاح!',
                 qrShareFailed: 'فشل في مشاركة رمز الاستجابة السريعة. يرجى المحاولة مرة أخرى.',
                 invalidQrCode: 'رمز الاستجابة السريعة غير صالح — ليس رابط RDB صالح',
+                clientIdQr: 'هذا رمز معرّف العميل، وليس رمز المحفظة.',
                 missingCurrency: 'رمز الاستجابة السريعة غير صالح — العملة مفقودة',
                 missingWalletId: 'رمز الاستجابة السريعة غير صالح — معرف المحفظة مفقود',
                 missingWalletIdAndCurrency:

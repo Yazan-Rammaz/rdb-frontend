@@ -433,6 +433,7 @@ const tr: TranslationSchema = {
                 qrShareSuccess: 'QR Kodu başarıyla paylaşıldı!',
                 qrShareFailed: 'QR Kodu paylaşılamadı. Lütfen tekrar deneyin.',
                 invalidQrCode: 'Geçersiz QR kodu — geçerli bir RDB bağlantısı değil',
+                clientIdQr: 'Bu bir Müşteri ID kodu, cüzdan QR kodu değil.',
                 missingWalletIdAndCurrency: 'Geçersiz QR kodu — Cüzdan ID ve para birimi eksik',
                 missingWalletId: 'Geçersiz QR kodu — Cüzdan ID eksik',
                 missingCurrency: 'Geçersiz QR kodu — para birimi eksik',

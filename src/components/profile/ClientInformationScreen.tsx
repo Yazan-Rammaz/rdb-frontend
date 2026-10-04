@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { QRCodeDisplay } from '../QR/send/shared/QRCodeDisplay';
+import { buildClientIdQr } from '@/lib/clientIdQr';
 import { api } from '@/api';
 import { unwrapKycRequest } from '@/api/helpers/kyc';
 import verifiedBigIcon from '@/assets/icons/verification/verified-big.svg';
@@ -140,7 +141,7 @@ export default function ClientInformationScreen({
                         onClick={onShowQR}
                         className="relative size-xd-39 shrink-0"
                     >
-                        <QRCodeDisplay value={displayId ?? ''} size={39} />
+                        <QRCodeDisplay value={displayId ? buildClientIdQr(displayId) : ''} size={39} />
                     </button>
                 </div>
 
