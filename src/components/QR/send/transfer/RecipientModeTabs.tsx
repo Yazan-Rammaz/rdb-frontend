@@ -36,12 +36,13 @@ const RecipientModeTabs: React.FC<RecipientModeTabsProps> = ({ mode, onModeChang
     };
 
     return (
-        // A pill toggle: the light track carries the border, the active tab is
-        // a pill sliding inside it — no divider between the two.
+        // One joined control: the frame carries the border and the corners.
+        // There is no straight divider — the active tab is rounded like a
+        // switch knob, so its curved edge is what separates the two.
         <div
             role="tablist"
             aria-label={t.transfer.sendTo}
-            className="flex w-full gap-xd-3 rounded-full border border-[#E8E8E8] bg-[#F8F8F8] p-xd-3"
+            className="flex w-full overflow-hidden rounded-xd-12 border border-[#3C3C3C] bg-white"
         >
             {RECIPIENT_MODES.map(({ mode: tabMode, label }, index) => {
                 const isActive = tabMode === mode;
@@ -58,8 +59,8 @@ const RecipientModeTabs: React.FC<RecipientModeTabsProps> = ({ mode, onModeChang
                         disabled={disabled}
                         onClick={() => onModeChange(tabMode)}
                         onKeyDown={(e) => handleKeyDown(e, index)}
-                        className={`flex-1 min-w-0 min-h-xd-32 px-xd-8 py-xd-6 rounded-full text-xd-11 font-medium leading-tight text-center transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
-                            isActive ? 'bg-[#3C3C3C] text-white shadow-sm' : 'bg-transparent text-[#1D1D1D] hover:bg-[#EEEEEE]'
+                        className={`flex-1 min-w-0 min-h-xd-36 px-xd-8 py-xd-6 rounded-xd-11 text-xd-11 font-medium leading-tight text-center transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
+                            isActive ? 'bg-[#3C3C3C] text-white' : 'bg-white text-[#1D1D1D]'
                         }`}
                     >
                         {label(t)}
