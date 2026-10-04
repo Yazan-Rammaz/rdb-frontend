@@ -35,6 +35,7 @@ import ClientNameScreen from './ClientNameScreen';
 import ClientPhoneScreen from './ClientPhoneScreen';
 import LoginHistoryScreen from './LoginHistoryScreen';
 import { QRCodeDisplay } from '../QR/send/shared/QRCodeDisplay';
+import { buildClientIdQr } from '@/lib/clientIdQr';
 
 import { KycVerificationStatus, type KycStatusResponse } from '@/core/types/auth';
 import { api, isNetworkError } from '@/api';
@@ -316,7 +317,10 @@ const ProfileContent = () => {
                                 setShowClientQR(true);
                             }}
                         >
-                            <QRCodeDisplay value={user.displayId ?? '-'} size={50} />
+                            <QRCodeDisplay
+                                value={user.displayId ? buildClientIdQr(user.displayId) : '-'}
+                                size={50}
+                            />
                         </div>
                         <div className="flex items-baseline gap-0">
                             {/* <span className="text-[#1D1D1D] text-xd-13 leading-none">ID</span> */}

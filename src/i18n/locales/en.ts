@@ -432,6 +432,7 @@ const en = {
                 qrShareSuccess: 'QR Code shared successfully!',
                 qrShareFailed: 'Failed to share QR Code. Please try again.',
                 invalidQrCode: 'Invalid QR code — not a valid RDB link',
+                clientIdQr: 'This is a Client ID QR, not a wallet QR.',
                 missingWalletIdAndCurrency: 'Invalid QR code — missing Wallet ID and currency',
                 missingWalletId: 'Invalid QR code — missing Wallet ID',
                 missingCurrency: 'Invalid QR code — missing currency',

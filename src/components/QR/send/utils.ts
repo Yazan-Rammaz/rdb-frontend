@@ -1,6 +1,7 @@
 import type { ParsedQR, QRValidationResult } from './types';
 import { PAYREQ_PREFIX } from '@/lib/paymentRequestQr';
 import { extractMerchantCode } from '@/lib/merchantPayment';
+import { isClientIdQr } from '@/lib/clientIdQr';
 
 /**
  * Parse a scanned QR string into structured data.
@@ -87,6 +88,13 @@ export function validateQR(raw: string): QRValidationResult {
             requesterAccount,
         };
         return { valid: true, data: parsed };
+    }
+
+    // --- Client ID QR (profile screen): looks like a payment QR, isn't one ---
+    // Checked before the address parser, which would reject it as a vague
+    // "missing Wallet ID and currency" and leave the client guessing why.
+    if (isClientIdQr(raw)) {
+        return { valid: false, error: 'client_id_qr' };
     }
 
     // --- Regular account QR: query params ---

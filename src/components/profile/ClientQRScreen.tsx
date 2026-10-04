@@ -12,6 +12,7 @@ import { ActionButton } from '@/components/QR/shared/ActionButton';
 import { shareQRImage } from '@/components/QR/shared/shareQRImage';
 import { useTranslation } from '@/context/I18nContext';
 import Image from 'next/image';
+import { buildClientIdQr } from '@/lib/clientIdQr';
 
 interface ClientQRScreenProps {
     onBack: () => void;
@@ -90,7 +91,7 @@ export default function ClientQRScreen({
                 {/* QR code */}
                 <div ref={qrRef} className="bg-white p-xd-10">
                     <QRCodeDisplay
-                        value={displayId && displayId !== '—' ? `ID ${displayId}` : '—'}
+                        value={displayId && displayId !== '—' ? buildClientIdQr(displayId) : '—'}
                         size={250}
                     />
 
