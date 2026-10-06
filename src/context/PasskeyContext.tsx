@@ -111,7 +111,13 @@ interface PasskeyProviderProps {
 }
 
 export function PasskeyProvider({ children }: PasskeyProviderProps) {
-    const { userData, loginStep, setLoginStep, handleLoginResponse } = useAuth();
+    const {
+        userData,
+        isLoading: isAuthLoading,
+        loginStep,
+        setLoginStep,
+        handleLoginResponse,
+    } = useAuth();
     const userId = userData?.user?.id || userData?.id || undefined;
 
     const [lockStatus, setLockStatus] = useState<LockStatus>('BOOTING');
@@ -320,14 +326,31 @@ export function PasskeyProvider({ children }: PasskeyProviderProps) {
     // while the user is already unlocked.
     // ---------------------------------------------------------------------------
 
-    // Use a sentinel that can never match a real userId so first mount always runs initialize().
-    const prevUserIdRef = useRef<string | undefined>('__unset__');
+    // The last user initialize() ran for; undefined while signed out.
+    const prevUserIdRef = useRef<string | undefined>(undefined);
     useEffect(() => {
         const newUserId = userData?.user?.id ?? (userData as any)?.id ?? undefined;
+        if (!newUserId) {
+            // Signed out, or /me still loading: there is no session to ask
+            // about. Asking anyway 401s, the refresh 401s, and apiFetch's
+            // hardLogout() then deletes rdb_step and fires session-expired —
+            // which wiped a half-done login on every reload, dropping the
+            // user back to Get Started.
+            if (prevUserIdRef.current) {
+                // A user just signed out: forget their lock state.
+                setAccessTokenState(null);
+                setHasPin(false);
+                setHasBiometrics(false);
+                setLockStatus('BOOTING');
+            }
+            prevUserIdRef.current = undefined;
+            if (!isAuthLoading) setBootReady(true);
+            return;
+        }
         if (prevUserIdRef.current === newUserId) return;
         prevUserIdRef.current = newUserId;
         initialize();
-    }, [initialize, userData]);
+    }, [initialize, userData, isAuthLoading]);
 
     // ---------------------------------------------------------------------------
     // Context value
