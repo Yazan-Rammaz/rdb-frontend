@@ -14,6 +14,16 @@ import InfoSvg from '@/assets/icons/auth/info.svg';
 import closeSvg from '@/assets/icons/auth/close.svg';
 import { toE164 } from '@/lib/phoneValidation';
 
+/**
+ * Seconds from a successful send until "resend" unlocks. The backend returns no
+ * expiry, so the countdown is measured from the moment the send succeeded. It
+ * is UX only — the server decides whether a code is still valid.
+ */
+export const OTP_TIMER_SECONDS = 120;
+
+const secondsUntil = (deadline: number) =>
+    Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+
 interface EnterPinScreenProps {
     onSubmit: (pin: string) => void;
     changeMethod?: () => void;
@@ -31,8 +41,10 @@ interface EnterPinScreenProps {
     // Override props for non-phone OTP flows (e.g. IP verification)
     overrideTitle?: string;
     overrideSubtitle?: string;
-    timerSeconds?: number; // default 120; pass 600 for 10-min IP OTP
-    onResend?: () => void; // custom resend handler; hides phone-resend logic when provided
+    /** When "resend" unlocks (epoch ms). Owned by the page so a reload resumes it. */
+    expiresAt: number;
+    /** A resend succeeded: the new deadline. */
+    onExpiresAtChange: (expiresAt: number) => void;
     /** Offline: the code stays typed but cannot be submitted or resent. */
     disabled?: boolean;
     /** A result line (code sent, wrong code…) — shown under the boxes, over "code expired". */
@@ -55,24 +67,37 @@ export default function EnterPin({
     isValidPin = '',
     overrideTitle,
     overrideSubtitle,
-    timerSeconds = 120,
-    onResend,
+    expiresAt,
+    onExpiresAtChange,
     disabled = false,
     feedback = null,
 }: EnterPinScreenProps) {
     const { t } = useTranslation();
-    const [timeLeft, setTimeLeft] = useState(timerSeconds);
-    const [canResend, setCanResend] = useState(false);
+    const [timeLeft, setTimeLeft] = useState(() => secondsUntil(expiresAt));
 
+    // Read from the clock on every tick, never decremented: a reload, a
+    // background tab or a locked phone cannot make the countdown fall behind.
+    // 500 ms so timer jitter never skips a second; same-second ticks don't render.
     useEffect(() => {
-        if (timeLeft <= 0) {
-            setCanResend(true);
-            return;
-        }
-        if (loading === 'resend-pin') return;
-        const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
-        return () => clearTimeout(timer);
-    }, [timeLeft, loading]);
+        const tick = () => {
+            const left = secondsUntil(expiresAt);
+            setTimeLeft(left);
+            return left;
+        };
+        if (tick() === 0) return;
+        const interval = setInterval(() => {
+            if (tick() === 0) clearInterval(interval);
+        }, 500);
+        // A hidden tab's timers are throttled: catch up the moment it shows.
+        const onVisible = () => {
+            if (!document.hidden) tick();
+        };
+        document.addEventListener('visibilitychange', onVisible);
+        return () => {
+            clearInterval(interval);
+            document.removeEventListener('visibilitychange', onVisible);
+        };
+    }, [expiresAt]);
 
     const formatTime = (seconds: number) => {
         const mins = Math.floor(seconds / 60);
@@ -87,16 +112,7 @@ export default function EnterPin({
 
     const handleResend = async () => {
         if (disabled) return;
-        if (onResend) {
-            onResend();
-            setTimeLeft(timerSeconds);
-            setCanResend(false);
-            setPin('');
-            return;
-        }
-        // `phone` is optional on this screen — the non-phone OTP flows pass an
-        // `onResend` instead and returned above. Reaching here without one was
-        // previously a request for `+undefined`.
+        // Without a valid number this would be a request for `+undefined`.
         const phoneNumber = toE164(phone ?? '');
         if (!phoneNumber) return;
         setLoading?.('resend-pin');
@@ -107,14 +123,14 @@ export default function EnterPin({
         setLoading?.('');
         if (!res.ok) return;
         if (res.data.sessionInfo) {
-            setTimeLeft(timerSeconds);
-            setCanResend(false);
+            // Only a confirmed send restarts the countdown.
+            onExpiresAtChange(Date.now() + OTP_TIMER_SECONDS * 1000);
             setPin('');
             setSessionInfo?.(res.data.sessionInfo);
         }
     };
 
-    const isExpired = canResend && !loading;
+    const isExpired = timeLeft <= 0 && !loading;
     const methodLabel = method === 'whatsapp' ? t.auth.enterPin.whatsapp : t.auth.enterPin.sms;
 
     return (

@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import EnterPhoneScreen from '@/components/auth/screens/EnterPhone';
 import GetStartedScreen from '@/components/auth/screens/GetStarted';
 import SelectMethod from '@/components/auth/screens/SelectMethod';
-import EnterPin from '@/components/auth/screens/EnterPin';
+import EnterPin, { OTP_TIMER_SECONDS } from '@/components/auth/screens/EnterPin';
 import TermsScreen from '@/components/auth/screens/Terms';
 import AuthSuccessScreen from '@/components/auth/screens/AuthSuccess';
 import PasscodeScreen from '@/components/auth/screens/PasscodeScreen';
@@ -70,6 +70,22 @@ const POST_AUTH_STEPS: readonly AuthStep[] = [
     'already-registered',
 ];
 
+/**
+ * The OTP countdown's deadline from a restored record. Trusted only inside the
+ * window a real send produces; anything else (tampered, NaN) counts as expired
+ * so the screen offers "resend" rather than a countdown that never ends. A
+ * record from before deadlines were kept starts a fresh countdown, as it used to.
+ */
+function restoredOtpDeadline(saved: unknown): number {
+    const now = Date.now();
+    if (saved === undefined) return now + OTP_TIMER_SECONDS * 1000;
+    const plausible =
+        typeof saved === 'number' &&
+        Number.isFinite(saved) &&
+        saved <= now + OTP_TIMER_SECONDS * 1000;
+    return plausible ? saved : now;
+}
+
 const transition = { duration: 0.35, ease: [0.4, 0, 0.2, 1] as [number, number, number, number] };
 
 /**
@@ -132,6 +148,9 @@ function AuthPageInner() {
     const [phone, setPhone] = useState(normalizePhoneDigits(initial?.phone ?? ''));
     const [sessionInfo, setSessionInfo] = useState(initial?.sessionInfo ?? '');
     const [method, setMethod] = useState<'sms' | 'whatsapp' | ''>(initial?.method ?? '');
+    const [otpExpiresAt, setOtpExpiresAt] = useState(() =>
+        restoredOtpDeadline(initial?.otpExpiresAt),
+    );
     const [pin, setPin] = useState('');
     const [loading, setLoading] = useState<
         'send-phone' | 'send-pin' | 'resend-pin' | 'verify-pin' | ''
@@ -310,6 +329,7 @@ function AuthPageInner() {
                 authType,
                 method: method || undefined,
                 sessionInfo: sessionInfo || undefined,
+                otpExpiresAt,
                 approval:
                     approvalId && approvalExpiresAt
                         ? { requestId: approvalId, expiresAt: approvalExpiresAt }
@@ -318,7 +338,7 @@ function AuthPageInner() {
         } else {
             clearAuthFlowState();
         }
-    }, [step, phone, authType, method, sessionInfo, approvalId, approvalExpiresAt]);
+    }, [step, phone, authType, method, sessionInfo, otpExpiresAt, approvalId, approvalExpiresAt]);
 
     // Back to the approval-waiting screen after a reload. The step token is not
     // in the record: polling falls back to the httpOnly rdb_step cookie. Layout
@@ -552,6 +572,7 @@ function AuthPageInner() {
         }
         if (sendOtpRes.data.sessionInfo) {
             setSessionInfo(sendOtpRes.data.sessionInfo);
+            setOtpExpiresAt(Date.now() + OTP_TIMER_SECONDS * 1000);
             setPin('');
             goTo('enter-pin');
             // After goTo (which clears): the line belongs to the OTP screen.
@@ -1037,6 +1058,8 @@ function AuthPageInner() {
                                 authType={authType}
                                 setPin={setPin}
                                 setSessionInfo={setSessionInfo}
+                                expiresAt={otpExpiresAt}
+                                onExpiresAtChange={setOtpExpiresAt}
                                 loading={loading}
                                 setLoading={setLoading}
                                 disabled={!isOnline}

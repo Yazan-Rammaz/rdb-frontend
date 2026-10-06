@@ -26,6 +26,8 @@ export interface AuthFlowState {
     authType?: 'signIn' | 'signUp';
     method?: 'sms' | 'whatsapp';
     sessionInfo?: string;
+    /** When the OTP screen's "resend" unlocks (epoch ms). */
+    otpExpiresAt?: number;
     /** A login waiting for approval from the phone app. */
     approval?: { requestId: string; expiresAt: string };
 }
