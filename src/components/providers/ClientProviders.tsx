@@ -6,14 +6,6 @@ import { usePasskey } from '@/context/PasskeyContext';
 import { useStore } from '@/context/StoreContext';
 import { useRouter } from 'next/navigation';
 import SplashScreen from '@/components/SplashScreen';
-import { preloadAuthFlowState } from '@/lib/authFlowCookie';
-
-// Decrypt the auth-flow cookie eagerly (as soon as this module loads) so the
-// result is cached before AuthPage mounts after the splash — no flash on
-// /auth refresh.
-if (typeof window !== 'undefined') {
-    preloadAuthFlowState();
-}
 
 // Override toLocaleString to use English digits as requested in main.tsx
 if (typeof window !== 'undefined') {

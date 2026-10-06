@@ -6,7 +6,7 @@ import { useResetPasscode } from '@/context/ResetPasscodeContext';
 import { useStepUp } from '@/hooks/useStepUp';
 import { usePasskey } from '@/context/PasskeyContext';
 import { useAuth } from '@/context/AuthContext';
-import { clearAuthFlowState } from '@/lib/authFlowCookie';
+import { clearAuthFlowState } from '@/lib/authFlowState';
 import { toE164 } from '@/lib/phoneValidation';
 import { useInlineFeedback } from '@/hooks/useInlineFeedback';
 import { setAuthNotice } from '@/lib/authNotice';

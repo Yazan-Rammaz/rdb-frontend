@@ -90,8 +90,11 @@ export async function request<T>(spec: {
 
     try {
         const hasJsonBody = body !== undefined;
+        // skipRefresh → plain fetch: the 401 comes back as-is, with no refresh
+        // and no hardLogout (see RequestOptions.skipRefresh).
+        const transport = options?.skipRefresh ? fetch : apiFetch;
         const res = await Promise.race([
-            apiFetch(buildUrl(path, query), {
+            transport(buildUrl(path, query), {
                 method,
                 headers: {
                     // Never set Content-Type for FormData — the browser must
