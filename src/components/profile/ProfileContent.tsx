@@ -21,6 +21,7 @@ import shareappIcon from '@/assets/icons/profile/shareapp.svg';
 import warnSvg from '@/assets/icons/profile/warn.svg';
 import infoSvg from '@/assets/icons/profile/info.svg';
 import languageIcon from '@/assets/icons/profile/language.svg';
+import kurdistanFlag from '@/assets/icons/profile/flag-kurdistan.svg';
 import loginhistoryIcon from '@/assets/icons/profile/loginhistory.svg';
 import logoutIcon from '@/assets/icons/profile/logout.svg';
 import unprotectedIcon from '@/assets/icons/profile/unprotected.svg';
@@ -702,11 +703,10 @@ const ProfileContent = () => {
                                 native: 'Türkçe',
                             },
                             {
-                                // No flag: flagcdn has none for Kurdish, and a
-                                // regional flag is a product call — a neutral
-                                // badge holds the slot instead.
+                                // flagcdn has no Kurdistan flag (no ISO 3166
+                                // code), so this one row ships its own SVG.
                                 code: 'ckb' as SupportedLanguage,
-                                flag: null,
+                                flagSrc: kurdistanFlag.src,
                                 label: t.languageSelector.kurdish,
                                 native: 'کوردی',
                             },
@@ -721,20 +721,11 @@ const ProfileContent = () => {
                                 className="flex items-center justify-between w-full px-xd-24 h-xd-58 border-b border-[#d3d3d35e] last:border-b-0"
                             >
                                 <div className="flex items-center gap-xd-14">
-                                    {lang.flag ? (
-                                        <img
-                                            src={`https://flagcdn.com/w40/${lang.flag}.png`}
-                                            alt={lang.native}
-                                            className="w-xd-24 h-xd-16 object-cover rounded-sm"
-                                        />
-                                    ) : (
-                                        <span
-                                            aria-hidden
-                                            className="w-xd-24 h-xd-16 rounded-sm bg-[#EEF2FA] text-[#3066CC] text-xd-9 font-semibold flex items-center justify-center"
-                                        >
-                                            {lang.code.toUpperCase()}
-                                        </span>
-                                    )}
+                                    <img
+                                        src={lang.flagSrc ?? `https://flagcdn.com/w40/${lang.flag}.png`}
+                                        alt={lang.native}
+                                        className="w-xd-24 h-xd-16 object-cover rounded-sm"
+                                    />
                                     <div className="flex flex-col items-start">
                                         <span className="text-xd-13 font-medium text-[#1D1D1D]">
                                             {lang.label}

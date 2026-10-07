@@ -359,6 +359,8 @@ const tr: TranslationSchema = {
         transactions: {
             transferSend: 'Transfer | Gönder',
             transferReceive: 'Transfer | Al',
+            paymentRequestSend: 'Ödeme Talebi | Gönder',
+            paymentRequestReceive: 'Ödeme Talebi | Al',
             deposit: 'Yatırma',
             withdrawal: 'Çekme',
             defaultTitle: 'İşlem',

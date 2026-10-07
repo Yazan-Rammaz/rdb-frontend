@@ -280,6 +280,14 @@ const TransactionsHome = ({
                 : t.home.transactions.transferReceive;
         }
 
+        // The backend title for these rows is English-only text,
+        // so the label is ours, keyed on type + direction like a transfer's.
+        if (ledger.ledgerType === 'PAYMENT_REQUEST') {
+            return ledger.direction === 'OUT'
+                ? t.home.transactions.paymentRequestSend
+                : t.home.transactions.paymentRequestReceive;
+        }
+
         // Use the title from the ledger (WS sends title as {en,ar} object; API sends string)
         const raw = ledger.title as unknown;
         if (raw && typeof raw === 'object') {
