@@ -294,7 +294,7 @@ const en = {
             referenceId: 'Reference | ID',
             purposeOfRequest: 'Purpose Of Money Request',
             type: 'Type',
-            paymentRequest: 'Payement Request',
+            paymentRequest: 'Payment Request',
             validUntil: 'Valid Until',
             expiryWarning: 'Will Not Be Able To Use The Code After Its Expiry Time',
             minutesUntil: '{{minutes}} Minutes Until {{time}} | {{date}}',
@@ -358,6 +358,8 @@ const en = {
         transactions: {
             transferSend: 'Transfer | Send',
             transferReceive: 'Transfer | Receive',
+            paymentRequestSend: 'Payment Request | Send',
+            paymentRequestReceive: 'Payment Request | Receive',
             deposit: 'Deposit',
             withdrawal: 'Withdrawal',
             defaultTitle: 'Transaction',
@@ -386,7 +388,7 @@ const en = {
             enterReference: 'Reference | ID',
             selectPurpose: 'Purpose of Money Request',
             type: 'Type',
-            paymentRequest: 'Payement Request',
+            paymentRequest: 'Payment Request',
             validUntil: 'Valid Until',
             optional: 'optional',
             validation: {

@@ -360,6 +360,8 @@ const ar: TranslationSchema = {
         transactions: {
             transferSend: 'تحويل | إرسال',
             transferReceive: 'تحويل | استلام',
+            paymentRequestSend: 'طلب دفع | إرسال',
+            paymentRequestReceive: 'طلب دفع | استلام',
             deposit: 'إيداع',
             withdrawal: 'سحب',
             defaultTitle: 'معاملة',

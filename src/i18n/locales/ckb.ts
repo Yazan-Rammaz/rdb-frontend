@@ -371,6 +371,8 @@ const ckb: TranslationSchema = {
         transactions: {
             transferSend: 'گواستنەوە | ناردن',
             transferReceive: 'گواستنەوە | وەرگرتن',
+            paymentRequestSend: 'داواکاریی پارەدان | ناردن',
+            paymentRequestReceive: 'داواکاریی پارەدان | وەرگرتن',
             deposit: 'دانانی پارە',
             withdrawal: 'ڕاکێشانی پارە',
             defaultTitle: 'مامەڵە',
