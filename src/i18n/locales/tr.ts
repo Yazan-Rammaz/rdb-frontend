@@ -506,6 +506,7 @@ const tr: TranslationSchema = {
         english: 'English',
         arabic: 'العربية',
         turkish: 'Türkçe',
+        kurdish: 'کوردی',
     },
 
     // ─── Profile ──────────────────────────────────────────

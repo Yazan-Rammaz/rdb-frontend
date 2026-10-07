@@ -6,6 +6,7 @@ import Image from 'next/image';
 import Skeleton from 'react-loading-skeleton';
 import loginhistoryIcon from '@/assets/icons/profile/loginhistory.svg';
 import { useTranslation } from '@/context/I18nContext';
+import { contentLanguage } from '@/i18n';
 import { createLoginHistoryService } from '@/services/login-history';
 import { formatLoginTime } from '@/lib/formatLoginTime';
 import { isOffline } from '@/lib/networkStatus';
@@ -47,7 +48,7 @@ export default function LoginHistoryScreen({ onBack }: LoginHistoryScreenProps) 
         let active = true;
         setItems(null);
         setError(false);
-        const lang = language === 'ar' ? 'ar' : 'en';
+        const lang = contentLanguage(language);
         createLoginHistoryService()
             .getRecentLogins({ limit: 20, lang })
             .then((data) => {

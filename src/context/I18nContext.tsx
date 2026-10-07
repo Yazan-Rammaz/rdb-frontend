@@ -85,7 +85,7 @@ export function I18nProvider({ children, locale }: I18nProviderProps) {
 
     // Apply dir attribute on <html> element
     // Policy:
-    // - 'ar' -> rtl
+    // - 'ar', 'ckb' -> rtl
     // - 'en' -> ltr
     // - 'tr' -> ltr
     // Components should inherit this unless displaying inherently LTR data (e.g. phone numbers).

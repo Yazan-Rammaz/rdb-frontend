@@ -510,6 +510,7 @@ const ar: TranslationSchema = {
         english: 'English',
         arabic: 'العربية',
         turkish: 'Türkçe',
+        kurdish: 'کوردی',
     },
 
     // ─── Profile ──────────────────────────────────────────
