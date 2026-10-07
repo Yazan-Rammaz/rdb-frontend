@@ -505,6 +505,7 @@ const en = {
         english: 'English',
         arabic: 'العربية',
         turkish: 'Türkçe',
+        kurdish: 'کوردی',
     },
 
     // ─── Profile ──────────────────────────────────────────

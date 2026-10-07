@@ -1,16 +1,18 @@
 import type { TranslationSchema } from './locales/en';
-import { en, ar, tr } from './locales';
+import { en, ar, tr, ckb } from './locales';
 
 // ─── Supported Languages ──────────────────────────────────
-export type SupportedLanguage = 'en' | 'ar' | 'tr';
+/** `ckb` = Central Kurdish (Sorani), Arabic script. */
+export type SupportedLanguage = 'en' | 'ar' | 'tr' | 'ckb';
 
-export const RTL_LANGUAGES: SupportedLanguage[] = ['ar'];
+export const RTL_LANGUAGES: SupportedLanguage[] = ['ar', 'ckb'];
 
 // ─── Translations Map ─────────────────────────────────────
 const translations: Record<SupportedLanguage, TranslationSchema> = {
     en,
     ar,
     tr,
+    ckb,
 };
 
 // ─── Locale Parsing ───────────────────────────────────────
@@ -18,15 +20,15 @@ const translations: Record<SupportedLanguage, TranslationSchema> = {
 /**
  * Extracts the language code from a locale string.
  * Supports both "country-language" and "language-country"
- * (e.g., "sy-en", "lb-ar", "en-US", "ar-SA").
- * Falls back to 'en' for unknown languages.
+ * (e.g., "sy-en", "lb-ar", "en-US", "ar-SA", "iq-ckb").
+ * `ku` (as in "ku-Arab-IQ") is read as Sorani — the only Kurdish we ship.
+ * Falls back to 'ar' for unknown languages.
  */
 export function parseLanguageFromLocale(locale: string): SupportedLanguage {
     if (!locale) return 'ar';
     const normalized = locale.toLowerCase().replace(/_/g, '-');
     const parts = normalized.split('-');
-    const first = parts[0] ?? '';
-    const second = parts[1] ?? '';
+    const [first = '', second = ''] = parts.map((p) => (p === 'ku' ? 'ckb' : p));
 
     if (isSupportedLanguage(first)) return first;
     if (isSupportedLanguage(second)) return second;
@@ -42,10 +44,11 @@ export function getBrowserLanguage(): SupportedLanguage {
 }
 
 /**
- * Type guard for supported languages
+ * Type guard for supported languages. Own keys only: `in` would also accept
+ * `constructor` / `__proto__` from a host `locale` or a tampered localStorage.
  */
 export function isSupportedLanguage(lang: string): lang is SupportedLanguage {
-    return lang in translations;
+    return Object.prototype.hasOwnProperty.call(translations, lang);
 }
 
 /**
@@ -53,6 +56,15 @@ export function isSupportedLanguage(lang: string): lang is SupportedLanguage {
  */
 export function isRTL(language: SupportedLanguage): boolean {
     return RTL_LANGUAGES.includes(language);
+}
+
+/**
+ * The language to read backend content in, where the backend only localises
+ * into `{ en, ar }`. The RTL languages here are Arabic-script, so a Sorani
+ * reader gets Arabic rather than an English fragment inside an RTL screen.
+ */
+export function contentLanguage(language: SupportedLanguage): 'en' | 'ar' {
+    return isRTL(language) ? 'ar' : 'en';
 }
 
 /**

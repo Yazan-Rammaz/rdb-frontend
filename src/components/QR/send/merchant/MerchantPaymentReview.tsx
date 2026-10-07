@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useTranslation } from '@/context/I18nContext';
+import { contentLanguage } from '@/i18n';
 import { useStore } from '@/context/StoreContext';
 import { usePaymentRequestAPI } from '@/hooks/usePaymentRequestAPI';
 import { useIsOnline, useOnReconnect } from '@/hooks/useIsOnline';
@@ -228,7 +229,7 @@ const MerchantPaymentReview: React.FC<MerchantPaymentReviewProps> = ({
         );
     }
 
-    const description = merchantDescription(order, language);
+    const description = merchantDescription(order, contentLanguage(language));
 
     // ─── Paid ────────────────────────────────────────────────────────────────
 

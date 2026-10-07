@@ -55,6 +55,12 @@ const ProfileContent = () => {
     const nameFeedback = useInlineFeedback();
     const router = useRouter();
     const { t, tr, language, setLanguage } = useTranslation();
+    const languageLabel: Record<SupportedLanguage, string> = {
+        en: t.languageSelector.english,
+        ar: t.languageSelector.arabic,
+        tr: t.languageSelector.turkish,
+        ckb: t.languageSelector.kurdish,
+    };
     const [showLogoutDialog, setShowLogoutDialog] = useState(false);
     const [imgError, setImgError] = useState(false);
     const [kycStatus, setKycStatus] = useState<KycStatusResponse | null | undefined>(undefined);
@@ -603,11 +609,7 @@ const ProfileContent = () => {
                                     />
                                 </div>
                                 <span className="text-[#1D1D1D] text-xd-13 font-medium">
-                                    {language === 'ar'
-                                        ? t.languageSelector.arabic
-                                        : language === 'tr'
-                                          ? t.languageSelector.turkish
-                                          : t.languageSelector.english}
+                                    {languageLabel[language]}
                                 </span>
                             </div>
                             {/* <ChevronRight className="w-xd-16 h-xd-16 text-[#C0C0C0]" /> */}
@@ -699,6 +701,15 @@ const ProfileContent = () => {
                                 label: t.languageSelector.turkish,
                                 native: 'Türkçe',
                             },
+                            {
+                                // No flag: flagcdn has none for Kurdish, and a
+                                // regional flag is a product call — a neutral
+                                // badge holds the slot instead.
+                                code: 'ckb' as SupportedLanguage,
+                                flag: null,
+                                label: t.languageSelector.kurdish,
+                                native: 'کوردی',
+                            },
                         ].map((lang) => (
                             <button
                                 key={lang.code}
@@ -710,11 +721,20 @@ const ProfileContent = () => {
                                 className="flex items-center justify-between w-full px-xd-24 h-xd-58 border-b border-[#d3d3d35e] last:border-b-0"
                             >
                                 <div className="flex items-center gap-xd-14">
-                                    <img
-                                        src={`https://flagcdn.com/w40/${lang.flag}.png`}
-                                        alt={lang.native}
-                                        className="w-xd-24 h-xd-16 object-cover rounded-sm"
-                                    />
+                                    {lang.flag ? (
+                                        <img
+                                            src={`https://flagcdn.com/w40/${lang.flag}.png`}
+                                            alt={lang.native}
+                                            className="w-xd-24 h-xd-16 object-cover rounded-sm"
+                                        />
+                                    ) : (
+                                        <span
+                                            aria-hidden
+                                            className="w-xd-24 h-xd-16 rounded-sm bg-[#EEF2FA] text-[#3066CC] text-xd-9 font-semibold flex items-center justify-center"
+                                        >
+                                            {lang.code.toUpperCase()}
+                                        </span>
+                                    )}
                                     <div className="flex flex-col items-start">
                                         <span className="text-xd-13 font-medium text-[#1D1D1D]">
                                             {lang.label}

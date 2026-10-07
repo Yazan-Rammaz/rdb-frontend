@@ -17,6 +17,7 @@ import TransferReceiveIcon from '../../../assets/icons/home/transfer/recieve.svg
 import { useStore } from '@/context/StoreContext';
 import Skeleton from 'react-loading-skeleton';
 import { useTranslation } from '@/context/I18nContext';
+import { contentLanguage } from '@/i18n';
 
 /**
  * Drops record ids out of a description written for support.
@@ -282,10 +283,8 @@ const TransactionsHome = ({
         // Use the title from the ledger (WS sends title as {en,ar} object; API sends string)
         const raw = ledger.title as unknown;
         if (raw && typeof raw === 'object') {
-            const loc =
-                (raw as Record<string, string>)[language] ??
-                (raw as Record<string, string>).en ??
-                '';
+            const titles = raw as Record<string, string>;
+            const loc = titles[language] ?? titles[contentLanguage(language)] ?? titles.en ?? '';
             return loc || t.home.transactions.defaultTitle;
         }
         return (typeof raw === 'string' ? raw : '') || t.home.transactions.defaultTitle;
