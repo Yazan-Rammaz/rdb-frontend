@@ -235,91 +235,107 @@ const MerchantPaymentReview: React.FC<MerchantPaymentReviewProps> = ({
 
     if (receipt) {
         return (
-            <div className="flex flex-col relative bg-[#F4FFFA] h-full items-center w-full overflow-y-auto pb-xd-80">
-                <div className="mt-xd-16 mb-xd-12">
-                    <Image src={TransferDoneIcon} alt="" className="size-xd-40" />
-                </div>
-
-                <h2 className="text-xd-13 text-[#1D1D1D] font-medium text-center mb-xd-16 uppercase">
-                    {t.merchantPayment.paidSuccess}
-                </h2>
-
-                <div className="mb-xd-8">
-                    <QRCodeDisplay value={receipt.receiptNumber} bg="#F4FFFA" size={120} />
-                </div>
-
-                <p className="text-xd-13 text-[#1D1D1D] font-medium mb-xd-24">
-                    {receipt.receiptNumber}
-                </p>
-
-                <div className="w-xd-370 space-y-xd-16">
-                    <DetailRow
-                        label={t.merchantPayment.merchant}
-                        value={receipt.merchantName}
-                        icon={
-                            <Image
-                                src={OrderIcon}
-                                alt=""
-                                width={14}
-                                height={14}
-                                className="size-xd-14 object-contain"
-                            />
-                        }
-                    />
-
-                    {description && (
-                        <DetailRow label={t.merchantPayment.orderDetails} value={description} />
-                    )}
-
-                    <div className="grid grid-cols-2 gap-y-xd-16 gap-x-xd-48">
-                        <DetailRow
-                            label={t.merchantPayment.amountToPay}
-                            value={`${formatMoneyString(receipt.amount)} ${receipt.assetSymbol}`}
-                            bold
-                        />
-                        <DetailRow
-                            label={t.merchantPayment.receiptNumber}
-                            value={receipt.receiptNumber}
-                        />
-                        <DetailRow
-                            label={t.merchantPayment.paidAt}
-                            value={formatDateTime(receipt.paidAt, language)}
-                        />
-                        <div>
-                            <p className="text-xd-11 text-[#8D8D8D] font-medium">
-                                {t.merchantPayment.status}
-                            </p>
-                            <div className="flex items-center gap-xd-4">
-                                <span className="text-xd-13 text-[#1D1D1D] mt-xd-5 font-medium">
-                                    {statusLabel(receipt.status, t.merchantPayment.statusValue)
-                                        .label}
-                                </span>
-                                <Image
-                                    src={SuccessIcon}
-                                    alt=""
-                                    width={16}
-                                    height={16}
-                                    className="size-xd-16"
-                                />
-                            </div>
-                        </div>
+            <div className="flex flex-col relative bg-[#F4FFFA] h-full w-full">
+                {/* Content scrolls; the action bar below keeps its own space. */}
+                <div className="flex-1 min-h-0 w-full overflow-y-auto flex flex-col items-center">
+                    <div className="mt-xd-16 mb-xd-12">
+                        <Image src={TransferDoneIcon} alt="" className="size-xd-40" />
                     </div>
 
-                    <OrderReference label={t.merchantPayment.orderRef} value={receipt.orderRef} />
+                    <h2 className="text-xd-13 text-[#1D1D1D] font-medium text-center mb-xd-16 uppercase">
+                        {t.merchantPayment.paidSuccess}
+                    </h2>
+
+                    <div className="mb-xd-8">
+                        <QRCodeDisplay value={receipt.receiptNumber} bg="#F4FFFA" size={120} />
+                    </div>
+
+                    <p className="text-xd-13 text-[#1D1D1D] font-medium mb-xd-24">
+                        {receipt.receiptNumber}
+                    </p>
+
+                    <div className="w-xd-370 max-w-full space-y-xd-16">
+                        <DetailRow
+                            label={t.merchantPayment.merchant}
+                            value={receipt.merchantName}
+                            icon={
+                                <Image
+                                    src={OrderIcon}
+                                    alt=""
+                                    width={14}
+                                    height={14}
+                                    className="size-xd-14 object-contain"
+                                />
+                            }
+                        />
+
+                        {description && (
+                            <DetailRow label={t.merchantPayment.orderDetails} value={description} />
+                        )}
+
+                        <div className="grid grid-cols-2 gap-y-xd-16 gap-x-xd-48">
+                            <DetailRow
+                                label={t.merchantPayment.amountToPay}
+                                value={`${formatMoneyString(receipt.amount)} ${receipt.assetSymbol}`}
+                                bold
+                            />
+                            <DetailRow
+                                label={t.merchantPayment.receiptNumber}
+                                value={receipt.receiptNumber}
+                            />
+                            <DetailRow
+                                label={t.merchantPayment.paidAt}
+                                value={formatDateTime(receipt.paidAt, language)}
+                            />
+                            <div>
+                                <p className="text-xd-11 text-[#8D8D8D] font-medium">
+                                    {t.merchantPayment.status}
+                                </p>
+                                <div className="flex items-center gap-xd-4">
+                                    <span className="text-xd-13 text-[#1D1D1D] mt-xd-5 font-medium">
+                                        {
+                                            statusLabel(
+                                                receipt.status,
+                                                t.merchantPayment.statusValue,
+                                            ).label
+                                        }
+                                    </span>
+                                    <Image
+                                        src={SuccessIcon}
+                                        alt=""
+                                        width={16}
+                                        height={16}
+                                        className="size-xd-16"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <OrderReference
+                            label={t.merchantPayment.orderRef}
+                            value={receipt.orderRef}
+                        />
+                    </div>
+
+                    <div className="mt-xd-24 mb-xd-16">
+                        <Image
+                            alt="trydos"
+                            width={80}
+                            height={25}
+                            src={TrydosIcon}
+                            className="w-xd-80 h-xd-25"
+                        />
+                    </div>
                 </div>
 
-                <div className="mt-xd-24 mb-xd-16">
-                    <Image
-                        alt="trydos"
-                        width={80}
-                        height={25}
-                        src={TrydosIcon}
-                        className="w-xd-80 h-xd-25"
+                {/* Action buttons — in the layout flow, so they never cover the content */}
+                <div className="relative shrink-0 flex bg-[#F4FFFA] max-w-xd-370 mx-auto items-center justify-around w-full pt-xd-16 pb-xd-16 border-t border-gray-100">
+                    <ActionButton
+                        icon={DoneIcon}
+                        label={t.common.done}
+                        onClick={onDone}
+                        bounceOnClick
                     />
-                </div>
-
-                <div className="flex bg-[#F4FFFA] absolute bottom-0 max-w-xd-370 items-center justify-around w-full m-xd-16 pt-xd-16 border-t border-gray-100">
-                    <ActionButton icon={DoneIcon} label={t.common.done} onClick={onDone} bounceOnClick />
                     {/*
                       The shop's own "thank you" page. Opened in a new tab and
                       severed with noopener: it is a third-party URL handed to us

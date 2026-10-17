@@ -114,103 +114,111 @@ const SuccessReceipt: React.FC<SuccessReceiptProps> = ({ data, onClose }) => {
     };
 
     return (
-        <div className="flex flex-col relative bg-[#F4FFFA] h-full items-center w-full overflow-y-auto">
-            {/* Success icon */}
-            <div className="mt-xd-16 mb-xd-12">
-                <Image src={TransferDoneIcon} alt="Transfer Done" className="size-xd-40" />
-            </div>
-
-            {/* Success message */}
-            <h2 className="text-xd-13 text-[#1D1D1D] font-medium text-center mb-xd-16 uppercase">
-                {t.transfer.receipt.moneySentSuccess}
-            </h2>
-
-            {/* QR Code */}
-            <div className="mb-xd-8">
-                <QRCodeDisplay value={data.referenceCode} bg={'#F4FFFA'} size={120} />
-            </div>
-
-            {/* Verification code */}
-            <p className="text-xd-13 text-[#1D1D1D] font-medium mb-xd-24">{data.referenceCode}</p>
-
-            {/* Transaction details */}
-            <div className="w-full space-y-xd-16">
-                {/* Sender */}
-                <DetailRow
-                    label={t.transfer.receipt.senderAccountNumber}
-                    value={`${data.senderAccountNumber}  ${data.senderMaskedName}`}
-                />
-
-                {/* Recipient */}
-                <div>
-                    <div className="flex items-center gap-xd-4">
-                        <p className="text-xd-11 text-[#8D8D8D] font-medium">
-                            {t.transfer.receipt.recipientAccountNumber}
-                        </p>
-                        {data.inputMethod === 'QR' && (
-                            <Image
-                                src={QrInputMethodIcon}
-                                alt="QR Input"
-                                width={14}
-                                height={14}
-                                className="size-xd-14 object-contain"
-                            />
-                        )}
-                    </div>
-                    <p className="text-xd-13 text-[#1D1D1D] mt-xd-5 font-medium">
-                        {data.recipientAccountNumber} {data.recipientMaskedName}
-                    </p>
+        <div className="flex flex-col relative bg-[#F4FFFA] h-full w-full">
+            {/* Content scrolls; the action bar below keeps its own space. */}
+            <div className="flex-1 min-h-0 w-full overflow-y-auto flex flex-col items-center">
+                {/* Success icon */}
+                <div className="mt-xd-16 mb-xd-12">
+                    <Image src={TransferDoneIcon} alt="Transfer Done" className="size-xd-40" />
                 </div>
 
-                {/* Receipt grid: 2 cols, rows share same height */}
-                <div className="grid grid-cols-2 gap-y-xd-16 gap-x-xd-48">
+                {/* Success message */}
+                <h2 className="text-xd-13 text-[#1D1D1D] font-medium text-center mb-xd-16 uppercase">
+                    {t.transfer.receipt.moneySentSuccess}
+                </h2>
+
+                {/* QR Code */}
+                <div className="mb-xd-8">
+                    <QRCodeDisplay value={data.referenceCode} bg={'#F4FFFA'} size={120} />
+                </div>
+
+                {/* Verification code */}
+                <p className="text-xd-13 text-[#1D1D1D] font-medium mb-xd-24">
+                    {data.referenceCode}
+                </p>
+
+                {/* Transaction details */}
+                <div className="w-xd-370 max-w-full space-y-xd-16">
+                    {/* Sender */}
                     <DetailRow
-                        label={t.transfer.receipt.amountSent}
-                        value={`${data.amount} ${data.currency}`}
-                        bold
+                        label={t.transfer.receipt.senderAccountNumber}
+                        value={`${data.senderAccountNumber}  ${data.senderMaskedName}`}
                     />
-                    <DetailRow label={t.transfer.receipt.reference} value={data.referenceCode} />
-                    <DetailRow label={t.transfer.receipt.dateTime} value={dateTime} />
-                    <DetailRow
-                        label={t.transfer.receipt.type}
-                        value={t.transfer.receipt.typeValue}
-                    />
-                    <DetailRow label={t.transfer.receipt.purpose} value={data.purposeLabel} />
+
+                    {/* Recipient */}
                     <div>
-                        <p className="text-xd-11 text-[#8D8D8D] font-medium">
-                            {t.transfer.receipt.status}
-                        </p>
                         <div className="flex items-center gap-xd-4">
-                            <span className="text-xd-13 text-[#1D1D1D] mt-xd-5 font-medium">
-                                {displayStatus}
-                            </span>
-                            <Image
-                                src={SuccessIcon}
-                                alt="Success"
-                                width={16}
-                                height={16}
-                                className="size-xd-16"
-                            />
+                            <p className="text-xd-11 text-[#8D8D8D] font-medium">
+                                {t.transfer.receipt.recipientAccountNumber}
+                            </p>
+                            {data.inputMethod === 'QR' && (
+                                <Image
+                                    src={QrInputMethodIcon}
+                                    alt="QR Input"
+                                    width={14}
+                                    height={14}
+                                    className="size-xd-14 object-contain"
+                                />
+                            )}
+                        </div>
+                        <p className="text-xd-13 text-[#1D1D1D] mt-xd-5 font-medium">
+                            {data.recipientAccountNumber} {data.recipientMaskedName}
+                        </p>
+                    </div>
+
+                    {/* Receipt grid: 2 cols, rows share same height */}
+                    <div className="grid grid-cols-2 gap-y-xd-16 gap-x-xd-48">
+                        <DetailRow
+                            label={t.transfer.receipt.amountSent}
+                            value={`${data.amount} ${data.currency}`}
+                            bold
+                        />
+                        <DetailRow
+                            label={t.transfer.receipt.reference}
+                            value={data.referenceCode}
+                        />
+                        <DetailRow label={t.transfer.receipt.dateTime} value={dateTime} />
+                        <DetailRow
+                            label={t.transfer.receipt.type}
+                            value={t.transfer.receipt.typeValue}
+                        />
+                        <DetailRow label={t.transfer.receipt.purpose} value={data.purposeLabel} />
+                        <div>
+                            <p className="text-xd-11 text-[#8D8D8D] font-medium">
+                                {t.transfer.receipt.status}
+                            </p>
+                            <div className="flex items-center gap-xd-4">
+                                <span className="text-xd-13 text-[#1D1D1D] mt-xd-5 font-medium">
+                                    {displayStatus}
+                                </span>
+                                <Image
+                                    src={SuccessIcon}
+                                    alt="Success"
+                                    width={16}
+                                    height={16}
+                                    className="size-xd-16"
+                                />
+                            </div>
                         </div>
                     </div>
                 </div>
+
+                {/* Branding */}
+                <div className="mt-xd-24 mb-xd-16">
+                    <p className="text-xd-18 w-xd-80 font-bold text-[#1D1D1D] tracking-wider">
+                        <Image
+                            alt="trydos"
+                            width={80}
+                            height={25}
+                            src={TrydosIcon}
+                            className="w-xd-80 h-xd-25"
+                        />
+                    </p>
+                </div>
             </div>
 
-            {/* Branding */}
-            <div className="mt-xd-24 mb-xd-16">
-                <p className="text-xd-18 w-xd-80 font-bold text-[#1D1D1D] tracking-wider">
-                    <Image
-                        alt="trydos"
-                        width={80}
-                        height={25}
-                        src={TrydosIcon}
-                        className="w-xd-80 h-xd-25"
-                    />
-                </p>
-            </div>
-
-            {/* Action buttons */}
-            <div className="flex bg-[#F4FFFA] absolute bottom-0 max-w-xd-370 items-center justify-around w-full m-xd-16 pt-xd-16 border-t border-gray-100">
+            {/* Action buttons — in the layout flow, so they never cover the content */}
+            <div className="relative shrink-0 flex bg-[#F4FFFA] max-w-xd-370 mx-auto items-center justify-around w-full pt-xd-16 pb-xd-16 border-t border-gray-100">
                 {/* The bar's empty pt-xd-16: out of flow, nothing moves. */}
                 <InlineFeedback
                     feedback={feedback}

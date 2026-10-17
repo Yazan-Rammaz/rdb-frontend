@@ -382,6 +382,8 @@ const en = {
         },
         qr: {
             addRequest: 'Request',
+            paymentReceived: 'Payment received',
+            paid: 'Paid',
             generateRequest: 'Generate Request',
             generatingRequest: 'Generating Request…',
             enterAmount: 'Amount',

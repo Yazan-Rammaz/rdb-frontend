@@ -4,11 +4,18 @@ import LogoIcon from '@/assets/icons/home/qr/title.svg';
 import Image from 'next/image';
 import { CustomQRCode } from '@/components/ui/CustomQR';
 import { ActionButtons } from './ActionButtons';
+import { PaymentReceived } from './PaymentReceived';
+import { ActionButton } from '../shared/ActionButton';
+import DoneIcon from '@/assets/icons/home/transfer/done.svg';
 import html2canvas from 'html2canvas';
 import { BalancesMap } from '@/context/StoreContext';
 import { useTranslation } from '@/context/I18nContext';
 import { useTransferPurposes } from '@/hooks/useTransferPurposes';
 import { usePaymentRequestAPI } from '@/hooks/usePaymentRequestAPI';
+import {
+    usePaymentRequestStatus,
+    type WatchedPaymentRequest,
+} from '@/hooks/usePaymentRequestStatus';
 import { useIsOnline } from '@/hooks/useIsOnline';
 import { useInlineFeedback } from '@/hooks/useInlineFeedback';
 import InlineFeedback from '@/components/ui/InlineFeedback';
@@ -72,11 +79,7 @@ const CreatePaymentRequest = ({
     const accountName = account?.name || '';
     const accountNumber = account?.number || '';
 
-    const {
-        createPaymentRequest,
-        lookupPaymentRequest,
-        isLoading: isApiLoading,
-    } = usePaymentRequestAPI();
+    const { createPaymentRequest, isLoading: isApiLoading } = usePaymentRequestAPI();
 
     const [mode, setMode] = useState<Mode>('address');
     const [qrValue, setQrValue] = useState<string | null>(null);
@@ -87,8 +90,16 @@ const CreatePaymentRequest = ({
     const [showName, setShowName] = useState(true);
     const [requestExpiresAt, setRequestExpiresAt] = useState<string | null>(null);
     const [requestIsPermanent, setRequestIsPermanent] = useState(false);
-    const [requestCode, setRequestCode] = useState<string | null>(null);
+    const [activeRequest, setActiveRequest] = useState<WatchedPaymentRequest | null>(null);
     const [isExpired, setIsExpired] = useState(false);
+
+    // Watched only while its QR is on screen and the countdown has not run out.
+    const { settled, refresh } = usePaymentRequestStatus(
+        mode === 'review' && !isExpired ? activeRequest : null,
+    );
+    const isPaid = settled?.status === 'FULFILLED';
+    // Paid wins: a request paid in its last seconds is not shown as expired.
+    const isDead = !isPaid && (isExpired || !!settled);
 
     const activeBalance = activeAssetSymbol ? balances[activeAssetSymbol] : undefined;
     const accountType = account?.type || '';
@@ -205,7 +216,7 @@ const CreatePaymentRequest = ({
 
                 setQrValue(buildPaymentRequestQr(result.requestCode, aNu));
                 setHideQR(false);
-                setRequestCode(result.requestCode);
+                setActiveRequest({ id: result.id, requestCode: result.requestCode });
                 setRequestExpiresAt(result.isPermanent ? null : (result.expiresAt ?? null));
                 setRequestIsPermanent(result.isPermanent);
 
@@ -364,23 +375,26 @@ const CreatePaymentRequest = ({
         setFormData((prev) => ({ ...prev, [field]: value }));
     };
 
+    // The countdown ran out: the server decides — it may have been paid just now.
     const handleExpired = useCallback(async () => {
-        if (requestCode) {
-            try {
-                const result = await lookupPaymentRequest(requestCode);
-                if (!('error' in result)) {
-                    // confirmed by server
-                }
-            } catch {
-                // fall through
-            }
-        }
-        setIsExpired(true);
-    }, [requestCode, lookupPaymentRequest]);
+        const result = await refresh();
+        if (result?.status !== 'FULFILLED') setIsExpired(true);
+    }, [refresh]);
+
+    /** Back to the default address QR, ready for a new request. */
+    const handleDone = () => {
+        clearFeedback();
+        setActiveRequest(null);
+        setIsExpired(false);
+        setHideQR(false);
+        setTouched({});
+        setFormData((prev) => ({ ...prev, amount: '', reference: '', note: '' }));
+        setMode('address');
+    };
 
     return (
         <div
-            className={`flex flex-col items-center w-full max-w-xd-430 mx-auto h-full relative overflow-hidden transition-colors duration-500 ${mode === 'review' && isExpired ? 'bg-[#FDF3F3]' : 'bg-background'}`}
+            className={`flex flex-col items-center w-full max-w-xd-430 mx-auto h-full relative overflow-hidden transition-colors duration-500 ${mode !== 'review' ? 'bg-background' : isPaid ? 'bg-[#F4FFFA]' : isDead ? 'bg-[#FDF3F3]' : 'bg-background'}`}
         >
             <div className="flex-1 w-full flex flex-col overflow-hidden">
                 <div className="relative flex flex-col items-center w-full">
@@ -389,19 +403,31 @@ const CreatePaymentRequest = ({
                     </div>
 
                     <div className="flex flex-col items-center shrink-0">
-                        <div
-                            className={hideQR || isExpired ? 'opacity-10 bg-white rounded-xl' : ''}
-                        >
-                            <CustomQRCode
-                                errorCorrectionLevel="L"
-                                value={qrValue || ''}
+                        {isPaid ? (
+                            <PaymentReceived
                                 size={Math.round(250 * scale)}
+                                amount={settled.amount ?? formData.amount}
+                                currency={settled.assetSymbol ?? formData.currency}
                             />
-                        </div>
+                        ) : (
+                            <div
+                                className={hideQR || isDead ? 'opacity-10 bg-white rounded-xl' : ''}
+                            >
+                                <CustomQRCode
+                                    errorCorrectionLevel="L"
+                                    value={qrValue || ''}
+                                    size={Math.round(250 * scale)}
+                                />
+                            </div>
+                        )}
                         <p
                             className={`text-xd-16 leading-xd-16 font-medium text-[#1D1D1D] text-center mt-xd-7 ${mode === 'request' ? 'mb-xd-15' : 'mb-xd-45'}`}
                         >
-                            {isExpired ? 'Expired Code ( Time Expired )' : formData.accountNumber}
+                            {isPaid
+                                ? t.home.qr.paid
+                                : isDead
+                                  ? 'Expired Code ( Time Expired )'
+                                  : formData.accountNumber}
                         </p>
                     </div>
 
@@ -426,6 +452,7 @@ const CreatePaymentRequest = ({
                             expiresAt={requestExpiresAt}
                             isPermanent={requestIsPermanent}
                             onExpired={handleExpired}
+                            paid={isPaid}
                         />
                     ) : (
                         <RequestView
@@ -447,7 +474,9 @@ const CreatePaymentRequest = ({
                     )}
                 </div>
 
-                <div className="absolute bottom-0 left-0 right-0 bg-background border-0 border-[#F2F2F2]">
+                <div
+                    className={`absolute bottom-0 left-0 right-0 border-0 border-[#F2F2F2] ${isPaid ? 'bg-[#F4FFFA]' : 'bg-background'}`}
+                >
                     {/* Slot B (request mode): the action row's empty pt-xd-20, above Generate. */}
                     {mode === 'request' && (
                         <InlineFeedback
@@ -456,7 +485,17 @@ const CreatePaymentRequest = ({
                             className="absolute inset-x-0 top-0 h-xd-20 items-center px-xd-25"
                         />
                     )}
-                    {!isExpired && (
+                    {isPaid && (
+                        <div className="flex items-center justify-center px-xd-60 pt-xd-20 pb-xd-20">
+                            <ActionButton
+                                icon={DoneIcon}
+                                label={t.common.done}
+                                onClick={handleDone}
+                                bounceOnClick
+                            />
+                        </div>
+                    )}
+                    {!isDead && !isPaid && (
                         <ActionButtons
                             // Offline, Generate reads as not ready (grey, disabled).
                             isFormValid={isFormValid && isOnline}
