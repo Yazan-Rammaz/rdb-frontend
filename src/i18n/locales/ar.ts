@@ -384,6 +384,8 @@ const ar: TranslationSchema = {
         },
         qr: {
             addRequest: 'طلب',
+            paymentReceived: 'تم استلام الدفعة',
+            paid: 'مدفوع',
             generateRequest: 'إنشاء طلب',
             generatingRequest: 'جارٍ الإنشاء…',
             enterAmount: 'أدخل المبلغ',

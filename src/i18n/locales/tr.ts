@@ -383,6 +383,8 @@ const tr: TranslationSchema = {
         },
         qr: {
             addRequest: 'Talep Et',
+            paymentReceived: 'Ödeme alındı',
+            paid: 'Ödendi',
             generateRequest: 'Talep Oluştur',
             generatingRequest: 'Talep Oluşturuluyor…',
             enterAmount: 'Tutar',

@@ -395,6 +395,8 @@ const ckb: TranslationSchema = {
         },
         qr: {
             addRequest: 'داواکاری',
+            paymentReceived: 'پارەدان وەرگیرا',
+            paid: 'دراوە',
             generateRequest: 'دروستکردنی داواکاری',
             generatingRequest: 'داواکاری دروست دەکرێت…',
             enterAmount: 'بڕ',
