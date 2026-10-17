@@ -35,6 +35,10 @@ const SenderCard: React.FC<SenderCardProps> = ({ selectedAssetSymbol, displayAmo
     const currencySymbol = balance?.asset?.symbol || assetMeta?.symbol || fallbackSymbol;
     const currencyName =
         balance?.asset?.name || assetMeta?.displayName || assetMeta?.name || fallbackSymbol;
+    // Same image the home BalanceCard shows. `||` (not `??`) on purpose: a
+    // balance built from a WS event carries an empty `symbolImageUrl`.
+    const currencyIcon =
+        assetMeta?.symbolImageUrl || balance?.asset?.symbolImageUrl || DollarIcon;
     const available = balance?.available ?? 0;
     const shownAmount = typeof displayAmount === 'number' ? displayAmount : available;
 
@@ -73,14 +77,10 @@ const SenderCard: React.FC<SenderCardProps> = ({ selectedAssetSymbol, displayAmo
                     />
                 </button>
 
-                {/* Currency symbol */}
-                <Image
-                    src={DollarIcon}
-                    alt="Currency"
-                    width={20}
-                    height={20}
-                    className="size-xd-20"
-                />
+                {/* Currency icon */}
+                <div className="relative size-xd-20">
+                    <Image src={currencyIcon} alt={currencyName} fill className="object-contain" />
+                </div>
 
                 {/* Sender Account label */}
                 <p className="text-white text-xd-11 font-light mt-xd-4">
