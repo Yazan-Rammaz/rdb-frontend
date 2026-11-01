@@ -641,7 +641,6 @@ export default function FaceMatchScreen({
                 {/* `<Icon>`, not `<Image src={svg}>`: the glyphs live in
                     /public/icons and are recoloured by the mask (AGENTS.md §5).
                     Decorative here — the sentence beside them says it. */}
-                <Icon name="kyc/face_detect" width={16} height={16} alt="" />
                 <Icon name="kyc/id_detect" width={16} height={16} alt="" />
                 <span className="fz-12 text-center leading-normal font-medium text-[#1D1D1D]">
                     {serverMessage ?? t(subtitleKey)}
