@@ -315,6 +315,8 @@ const TransactionsHome = ({
                 return t.home.transactionStatus.pending;
             case 'FAILED':
                 return t.home.transactionStatus.failed;
+            case 'EXPIRED':
+                return t.home.transactionStatus.expired;
             default:
                 return status;
         }
