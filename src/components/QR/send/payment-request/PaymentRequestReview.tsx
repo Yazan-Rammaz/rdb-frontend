@@ -497,185 +497,189 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
 
         return (
             <div className="flex flex-col items-center w-full h-full relative overflow-hidden">
-                <div
-                    className={`flex-1 w-full flex flex-col ${isRequesterMode ? ' pb-0' : ' pb-24'} pt-2 overflow-y-auto`}
-                >
-                    {/* Logo header */}
-                    <div className="flex flex-col items-center w-full">
-                        <div className="relative w-25 h-7">
-                            <Image
-                                src={LogoIcon}
-                                alt="Title Icon"
-                                fill
-                                className="object-contain"
-                            />
+                {/* Content scrolls; the action bar below keeps its own space.
+                    `my-auto` on the child (not justify-center on the scroller)
+                    centres it when it fits and never clips its top when it doesn't. */}
+                <div className="flex-1 min-h-0 w-full flex flex-col overflow-y-auto">
+                    <div className="my-auto w-full flex flex-col pt-2 pb-xd-16">
+                        {/* Logo header */}
+                        <div className="flex flex-col items-center w-full">
+                            <div className="relative w-25 h-7">
+                                <Image
+                                    src={LogoIcon}
+                                    alt="Title Icon"
+                                    fill
+                                    className="object-contain"
+                                />
+                            </div>
+
+                            {/* QR Code — faded when cancelled/expired, replaced once paid */}
+                            <div className="w-62.5 mt-3 shrink-0 h-62.5 flex flex-col items-center justify-center gap-2">
+                                {isPaid ? (
+                                    <PaymentReceived
+                                        size={224}
+                                        amount={data.amount}
+                                        currency={data.assetSymbol}
+                                    />
+                                ) : (
+                                    <div
+                                        ref={captureRef}
+                                        className={isRequesterDead ? 'opacity-10' : ''}
+                                    >
+                                        <CustomQRCode
+                                            errorCorrectionLevel="L"
+                                            value={qrValue || ''}
+                                            size={224}
+                                        />
+                                    </div>
+                                )}
+                                <p className="text-4 font-light text-text text-center pt-1">
+                                    {isPaid
+                                        ? t.home.qr.paid
+                                        : isRequesterDead
+                                          ? t.transfer.deposit.expiredButton
+                                          : data.requesterAccountNumber}
+                                </p>
+                            </div>
                         </div>
 
-                        {/* QR Code — faded when cancelled/expired, replaced once paid */}
-                        <div className="w-62.5 mt-3 shrink-0 h-62.5 flex flex-col items-center justify-center gap-2">
-                            {isPaid ? (
-                                <PaymentReceived
-                                    size={224}
-                                    amount={data.amount}
-                                    currency={data.assetSymbol}
+                        {/* Request details — matching CreatePaymentRequest review layout */}
+                        <div className="w-full max-w-xd-420 mx-auto px-xd-25 mt-2 space-y-0 bg-transparent">
+                            {/* Account Name */}
+                            <Input
+                                containerClassName="bg-transparent w-full"
+                                hideRequired
+                                reviewMode
+                                disabled
+                                readOnly
+                                label={t.home.deposit.accountName}
+                                value={data.requesterAccountName}
+                            />
+
+                            {/* Account Number + Currency */}
+                            <Input
+                                hideRequired
+                                reviewMode
+                                disabled
+                                readOnly
+                                containerClassName="bg-transparent w-full"
+                                label={t.home.deposit.accountNumber}
+                                value={`${data.requesterAccountNumber}  ${data.assetSymbol}`}
+                            />
+
+                            {/* Amount + Reference row */}
+                            <div className="flex gap-2 w-full">
+                                <Input
+                                    hideRequired
+                                    reviewMode
+                                    disabled
+                                    label={t.home.qr.enterAmount}
+                                    value={String(data.amount)}
+                                    suffix={data.assetSymbol}
+                                    containerClassName="bg-transparent w-1/2"
                                 />
-                            ) : (
-                                <div
-                                    ref={captureRef}
-                                    className={isRequesterDead ? 'opacity-10' : ''}
-                                >
-                                    <CustomQRCode
-                                        errorCorrectionLevel="L"
-                                        value={qrValue || ''}
-                                        size={224}
+                                {data.reference && (
+                                    <Input
+                                        hideRequired
+                                        reviewMode
+                                        disabled
+                                        label={t.home.qr.enterReference}
+                                        value={data.reference}
+                                        containerClassName="bg-transparent w-1/2"
                                     />
+                                )}
+                            </div>
+
+                            {/* Purpose + Type row */}
+                            <div className="flex gap-2 w-full">
+                                {data.purpose?.name && (
+                                    <Input
+                                        hideRequired
+                                        reviewMode
+                                        disabled
+                                        label={t.home.qr.selectPurpose}
+                                        value={data.purpose.name}
+                                        className="text-[11px]!"
+                                        containerClassName="bg-transparent w-1/2"
+                                    />
+                                )}
+                                <Input
+                                    hideRequired
+                                    reviewMode
+                                    disabled
+                                    label={t.home.qr.type}
+                                    value={t.home.qr.paymentRequest}
+                                    className="text-[11px]!"
+                                    containerClassName="bg-transparent w-1/2"
+                                />
+                            </div>
+
+                            {/* Note */}
+
+                            <div className="flex gap-2 w-full">
+                                {data.note && (
+                                    <Input
+                                        hideRequired
+                                        reviewMode
+                                        disabled
+                                        label={t.common.note}
+                                        value={data.note}
+                                        className="text-[11px]!"
+                                        containerClassName="bg-transparent "
+                                    />
+                                )}
+                            </div>
+                            {/* Valid Until */}
+
+                            <div className="flex gap-2 w-full px-2">
+                                {isPaid ? (
+                                    <Input
+                                        hideRequired
+                                        reviewMode
+                                        disabled
+                                        label={t.transfer.receipt.status}
+                                        value={t.home.qr.paid}
+                                        className="text-[11px]!"
+                                        containerClassName="bg-transparent w-1/2"
+                                    />
+                                ) : data.isPermanent ? (
+                                    <Input
+                                        hideRequired
+                                        reviewMode
+                                        disabled
+                                        label={t.home.qr.validUntil}
+                                        value={t.home.qr.validity.always}
+                                        className="text-[11px]!"
+                                        containerClassName="bg-transparent w-1/2"
+                                    />
+                                ) : data.expiresAt ? (
+                                    <CountdownTimer
+                                        expiryTimestamp={data.expiresAt}
+                                        onExpired={handleExpired}
+                                    />
+                                ) : null}
+                            </div>
+                            {/* Expired / Cancelled badge */}
+                            {isRequesterDead && (
+                                <div className="flex w-full flex-col items-center py-4">
+                                    <button
+                                        disabled
+                                        className="text-center flex items-center justify-center h-7.5 w-full py-3 rounded-xl text-[#FFFFFF] bg-[#FF5F60] text-[11px] font-medium cursor-not-allowed"
+                                    >
+                                        {data.status === 'CANCELLED'
+                                            ? t.transfer.deposit.cancelled
+                                            : t.transfer.deposit.expiredButton}
+                                    </button>
                                 </div>
                             )}
-                            <p className="text-4 font-light text-text text-center pt-1">
-                                {isPaid
-                                    ? t.home.qr.paid
-                                    : isRequesterDead
-                                      ? 'Expired Code ( Time Expired )'
-                                      : data.requesterAccountNumber}
-                            </p>
                         </div>
-                    </div>
-
-                    {/* Request details — matching CreatePaymentRequest review layout */}
-                    <div className="px-xd-25 mt-2 space-y-0 bg-transparent">
-                        {/* Account Name */}
-                        <Input
-                            containerClassName="bg-transparent w-full"
-                            hideRequired
-                            reviewMode
-                            disabled
-                            readOnly
-                            label={t.home.deposit.accountName}
-                            value={data.requesterAccountName}
-                        />
-
-                        {/* Account Number + Currency */}
-                        <Input
-                            hideRequired
-                            reviewMode
-                            disabled
-                            readOnly
-                            containerClassName="bg-transparent w-full"
-                            label={t.home.deposit.accountNumber}
-                            value={`${data.requesterAccountNumber}  ${data.assetSymbol}`}
-                        />
-
-                        {/* Amount + Reference row */}
-                        <div className="flex gap-2 w-full">
-                            <Input
-                                hideRequired
-                                reviewMode
-                                disabled
-                                label={t.home.qr.enterAmount}
-                                value={String(data.amount)}
-                                suffix={data.assetSymbol}
-                                containerClassName="bg-transparent w-1/2"
-                            />
-                            {data.reference && (
-                                <Input
-                                    hideRequired
-                                    reviewMode
-                                    disabled
-                                    label={t.home.qr.enterReference}
-                                    value={data.reference}
-                                    containerClassName="bg-transparent w-1/2"
-                                />
-                            )}
-                        </div>
-
-                        {/* Purpose + Type row */}
-                        <div className="flex gap-2 w-full">
-                            {data.purpose?.name && (
-                                <Input
-                                    hideRequired
-                                    reviewMode
-                                    disabled
-                                    label={t.home.qr.selectPurpose}
-                                    value={data.purpose.name}
-                                    className="text-[11px]!"
-                                    containerClassName="bg-transparent w-1/2"
-                                />
-                            )}
-                            <Input
-                                hideRequired
-                                reviewMode
-                                disabled
-                                label={t.home.qr.type}
-                                value={t.home.qr.paymentRequest}
-                                className="text-[11px]!"
-                                containerClassName="bg-transparent w-1/2"
-                            />
-                        </div>
-
-                        {/* Note */}
-
-                        <div className="flex gap-2 w-full">
-                            {data.note && (
-                                <Input
-                                    hideRequired
-                                    reviewMode
-                                    disabled
-                                    label={t.common.note}
-                                    value={data.note}
-                                    className="text-[11px]!"
-                                    containerClassName="bg-transparent "
-                                />
-                            )}
-                        </div>
-                        {/* Valid Until */}
-
-                        <div className="flex gap-2 w-full px-2">
-                            {isPaid ? (
-                                <Input
-                                    hideRequired
-                                    reviewMode
-                                    disabled
-                                    label={t.transfer.receipt.status}
-                                    value={t.home.qr.paid}
-                                    className="text-[11px]!"
-                                    containerClassName="bg-transparent w-1/2"
-                                />
-                            ) : data.isPermanent ? (
-                                <Input
-                                    hideRequired
-                                    reviewMode
-                                    disabled
-                                    label={t.home.qr.validUntil}
-                                    value={t.home.qr.validity.always}
-                                    className="text-[11px]!"
-                                    containerClassName="bg-transparent w-1/2"
-                                />
-                            ) : data.expiresAt ? (
-                                <CountdownTimer
-                                    expiryTimestamp={data.expiresAt}
-                                    onExpired={handleExpired}
-                                />
-                            ) : null}
-                        </div>
-                        {/* Expired / Cancelled badge */}
-                        {isRequesterDead && (
-                            <div className="flex w-full flex-col items-center py-4">
-                                <button
-                                    disabled
-                                    className="text-center flex items-center justify-center h-7.5 w-full py-3 rounded-xl text-[#FFFFFF] bg-[#FF5F60] text-[11px] font-medium cursor-not-allowed"
-                                >
-                                    {data.status === 'CANCELLED'
-                                        ? t.transfer.deposit.cancelled
-                                        : t.transfer.deposit.expiredButton}
-                                </button>
-                            </div>
-                        )}
                     </div>
                 </div>
 
+                {/* Action bars sit in the layout flow, so they never cover the content. */}
                 {/* Paid: nothing left to share or cancel */}
                 {isPaid && (
-                    <div className="absolute bottom-0 left-0 right-0 flex items-center justify-center px-6 py-4">
+                    <div className="relative shrink-0 w-full flex items-center justify-center px-6 py-4">
                         <ActionButton
                             icon={DoneIcon}
                             label={t.common.done}
@@ -687,7 +691,7 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
 
                 {/* Bottom action bar — only when ACTIVE */}
                 {isActive && (
-                    <div className="absolute bottom-0 left-0 right-0 bg-background border-0 border-[#F2F2F2]">
+                    <div className="relative shrink-0 w-full bg-background border-0 border-[#F2F2F2]">
                         {/* The row's empty py-4 top padding: out of flow, nothing moves. */}
                         <InlineFeedback
                             feedback={feedback}
