@@ -28,7 +28,7 @@ interface I18nContextValue {
     setLanguage: (lang: SupportedLanguage) => void;
 }
 
-const I18nContext = createContext<I18nContextValue | undefined>(undefined);
+export const I18nContext = createContext<I18nContextValue | undefined>(undefined);
 
 // ─── Provider Props ───────────────────────────────────────
 

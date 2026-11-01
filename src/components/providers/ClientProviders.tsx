@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { usePasskey } from '@/context/PasskeyContext';
 import { useStore } from '@/context/StoreContext';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import SplashScreen from '@/components/SplashScreen';
 
 // Override toLocaleString to use English digits as requested in main.tsx
@@ -30,7 +30,12 @@ export function ClientProviders({
     // experience is consistent (4 sec on / and /auth alike). It's only skipped
     // for in-tab client navigation since ClientProviders stays mounted.
     const [splashDone, setSplashDone] = useState(false);
-    const showSplash = isLoading || !bootReady || !splashDone;
+    // The KYC camera hand-off page (/handoff/*) is opened on a PHONE by scanning
+    // a QR shown on the desktop. That phone has no rdb session and is only lending
+    // its camera for a two-minute window — a 4s brand splash (and the auth boot it
+    // waits for) there just delays the camera and reads as the wrong app opening.
+    const isHandoff = usePathname()?.startsWith('/handoff/') ?? false;
+    const showSplash = !isHandoff && (isLoading || !bootReady || !splashDone);
 
     // Preload data whenever userData becomes available (during splash or after auth)
     // Auth state restoration is handled by AuthProvider (standalone) and RDB.tsx (package)

@@ -155,6 +155,26 @@ async function proxy(req: NextRequest): Promise<NextResponse> {
         return NextResponse.json({ error: 'Backend unavailable' }, { status: 502 });
     }
 
+    // A null-body status cannot carry the `{}` NextResponse.json would give it —
+    // constructing that throws, and the route answers 500 instead. The KYC
+    // camera hand-off polls `/api/kyc/signal/*`, which says "not yet" with 204
+    // every second, so pass those through bodiless.
+    if (res.status === 204 || res.status === 205 || res.status === 304) {
+        return new NextResponse(null, { status: res.status });
+    }
+
+    // The KYC Worker's own replies are passed through as they came — body and
+    // Content-Type. Not everything it says is JSON: the camera hand-off answers
+    // with a raw SDP (`application/sdp`), and re-serialising it through
+    // safeJson turned it into "{}", which WebRTC rejects with
+    // "Expect line: v=".
+    if (isKyc && !(res.headers.get('content-type') ?? '').includes('json')) {
+        return new NextResponse(await res.arrayBuffer(), {
+            status: res.status,
+            headers: { 'Content-Type': res.headers.get('content-type') ?? 'application/octet-stream' },
+        });
+    }
+
     const data = await safeJson(res);
     // Diagnostic for the reset-passcode integration: shows which bearer was sent
     // and what NestJS answered (visible in `npm run dev` console).
