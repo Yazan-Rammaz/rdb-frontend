@@ -3,7 +3,6 @@
 import React, { useCallback } from 'react';
 import Image from 'next/image';
 import { useVerification } from '@/context/VerificationContext';
-import { useTranslation } from '@/context/I18nContext';
 import { useRouter } from 'next/navigation';
 import { createKycService } from '@/services/kyc';
 import ExitConfirmDialog from '../ExitConfirmDialog';
@@ -12,7 +11,6 @@ import shieldSvg from '@/assets/icons/verification/shield.svg';
 import FlexibleSpace from '@/scaling/FlexibleSpace';
 
 export default function IDSummaryScreen() {
-    const { t } = useTranslation();
     const {
         goTo,
         idDocument,
@@ -29,19 +27,14 @@ export default function IDSummaryScreen() {
     const isPassport = (idDocument?.idType ?? '').toLowerCase().includes('passport');
 
     const fields = [
+        { label: 'ID Type', value: idDocument?.idName || idDocument?.idType || '—' },
+        { label: 'Country', value: idDocument?.country || '—' },
+        { label: 'Name', value: idDocument?.name || '—' },
         {
-            label: t.verification.fields.idType,
-            value: idDocument?.idName || idDocument?.idType || '—',
-        },
-        { label: t.verification.fields.country, value: idDocument?.country || '—' },
-        { label: t.verification.fields.name, value: idDocument?.name || '—' },
-        {
-            label: isPassport
-                ? t.verification.fields.passportNumber
-                : t.verification.fields.nationalNumber,
+            label: isPassport ? 'Passport Number' : 'National Number',
             value: idDocument?.nationalNumber || idDocument?.documentNumber || '—',
         },
-        { label: t.verification.fields.birthday, value: idDocument?.birthday || '—' },
+        { label: 'Birthday', value: idDocument?.birthday || '—' },
     ];
 
     async function handleSubmit() {
@@ -67,7 +60,7 @@ export default function IDSummaryScreen() {
             setSubmitError(
                 err instanceof Error
                     ? err.message
-                    : t.verification.summary.submitFailed,
+                    : 'Submission failed. Please check your connection and try again.',
             );
         } finally {
             setSubmitting(false);
@@ -89,7 +82,7 @@ export default function IDSummaryScreen() {
             />
 
             {/* Close button */}
-            <div className="flex absolute top-xd-50 end-xd-30 justify-end mb-2">
+            <div className="flex absolute top-xd-50 right-xd-30 justify-end mb-2">
                 <button
                     onClick={() => setShowExitDialog(true)}
                     className="text-red-400 hover:text-red-600"
@@ -108,16 +101,16 @@ export default function IDSummaryScreen() {
             <FlexibleSpace size={100} share={0.4} />
             {/* Header */}
             <h1 className="text-xd-30 font-bold text-center text-[#1D1D1D] mb-xd-5">
-                {t.verification.title}
+                Identity Verification !
             </h1>
             <div className="flex items-center justify-center gap-2 mb-xd-11">
                 <Image
                     src={liveDetectIdSvg}
-                    alt=""
+                    alt="live detect ID"
                     className="object-contain w-xd-20 h-xd-20"
                 />
                 <span className="text-xd-16 font-medium text-[#1D1D1D]">
-                    {t.verification.liveDetection}
+                    Live Detection Your ID
                 </span>
             </div>
 
@@ -125,14 +118,12 @@ export default function IDSummaryScreen() {
             {isPassport ? (
                 <div className="flex justify-center mb-4">
                     <div className="text-center">
-                        <p className="text-xd-12 text-[#8D8D8D] mb-xd-4">
-                            {t.verification.passport}
-                        </p>
+                        <p className="text-xd-12 text-[#8D8D8D] mb-xd-4">Passport</p>
                         <div className="w-xd-193 h-xd-109 rounded-xd-15 overflow-hidden bg-gray-100 border border-gray-100">
                             {idDocument?.frontImageData ? (
                                 <img
                                     src={idDocument.frontImageData}
-                                    alt=""
+                                    alt="Passport"
                                     className="w-full h-full object-cover"
                                 />
                             ) : (
@@ -144,19 +135,15 @@ export default function IDSummaryScreen() {
             ) : (
                 <div className="mb-4">
                     {/* <div className="flex mb-xd-4">
-                        <p className="text-xd-12 text-[#8D8D8D] flex-1 text-center">
-                            {t.verification.frontSide}
-                        </p>
-                        <p className="text-xd-12 text-[#8D8D8D] flex-1 text-center">
-                            {t.verification.backSide}
-                        </p>
+                        <p className="text-xd-12 text-[#8D8D8D] flex-1 text-center">Front Side</p>
+                        <p className="text-xd-12 text-[#8D8D8D] flex-1 text-center">Back Side</p>
                     </div> */}
                     <div className="flex gap-xd-5">
                         <div className=" w-xd-193 h-xd-109 rounded-xd-15 overflow-hidden bg-gray-100 border border-gray-100">
                             {idDocument?.frontImageData ? (
                                 <img
                                     src={idDocument.frontImageData}
-                                    alt=""
+                                    alt="Front ID"
                                     className="w-full h-full object-cover"
                                 />
                             ) : (
@@ -167,7 +154,7 @@ export default function IDSummaryScreen() {
                             {idDocument?.backImageData ? (
                                 <img
                                     src={idDocument.backImageData}
-                                    alt=""
+                                    alt="Back ID"
                                     className="w-full h-full object-cover"
                                 />
                             ) : (
@@ -182,12 +169,10 @@ export default function IDSummaryScreen() {
             <div className="flex justify-center items-center gap-2 mb-4">
                 <Image
                     src={liveDetectIdSvg}
-                    alt=""
+                    alt="information detected"
                     className="object-contain shrink-0 w-xd-20 h-xd-20"
                 />
-                <span className="text-xd-16 font-medium text-[#1D1D1D]">
-                    {t.verification.informationDetected}
-                </span>
+                <span className="text-xd-16 font-medium text-[#1D1D1D]">Information Detected</span>
             </div>
 
             {/* Fields */}
@@ -208,11 +193,11 @@ export default function IDSummaryScreen() {
                 <div className="flex items-center flex-col justify-center gap-2 mb-xd-12">
                     <Image
                         src={shieldSvg}
-                        alt=""
+                        alt="shield"
                         className="w-xd-15 h-xd-15 object-contain"
                     />
                     <span className="text-xd-12 text-[#388CFF]">
-                        {t.verification.privacySafe}
+                        Your Privacy Is Completely Safe
                     </span>
                 </div>
 
@@ -227,14 +212,14 @@ export default function IDSummaryScreen() {
                     disabled={submitting}
                     className="mb-xd-30 w-xd-390 h-xd-60 py-4 rounded-xd-20 border border-dashed border-[#5D5C5D]/50 text-[#1D1D1D] text-xd-16 font-medium disabled:opacity-50"
                 >
-                    {t.verification.summary.correctNext}
+                    {'Correct, Next'}
                 </button>
                 <button
                     onClick={handleFailure}
                     disabled={submitting}
                     className="w-full text-center text-sm text-[#388CFF] hover:underline mb-2 disabled:opacity-40"
                 >
-                    {t.verification.summary.incorrectRetry}
+                    Incorrect, Try Again
                 </button>
             </div>
             <FlexibleSpace size={35} share={0} />

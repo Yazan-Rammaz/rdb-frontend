@@ -15,7 +15,6 @@ interface ReviewViewProps {
     expiresAt?: string | null;
     isPermanent?: boolean;
     onExpired?: () => void;
-    paid?: boolean;
 }
 
 export function ReviewView({
@@ -26,9 +25,8 @@ export function ReviewView({
     expiresAt,
     isPermanent,
     onExpired,
-    paid = false,
 }: ReviewViewProps) {
-    const isExpired = !paid && !isPermanent && expiresAt ? new Date(expiresAt) < new Date() : false;
+    const isExpired = !isPermanent && expiresAt ? new Date(expiresAt) < new Date() : false;
 
     const { t } = useTranslation();
     return (
@@ -53,7 +51,6 @@ export function ReviewView({
                     expiresAt={expiresAt}
                     isPermanent={isPermanent}
                     onExpired={onExpired}
-                    paid={paid}
                 />
 
                 {isExpired && (

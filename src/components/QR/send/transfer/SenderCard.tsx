@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useStore } from '@/context/StoreContext';
+import { useToast } from '@/context/ToastContext';
 import Image from 'next/image';
 import DollarIcon from '@/assets/icons/home/dollar.svg';
 import RefreshIcon from '@/assets/icons/home/transfer/refresh.svg';
@@ -25,6 +26,7 @@ const SenderCard: React.FC<SenderCardProps> = ({ selectedAssetSymbol, displayAmo
         setBalanceHidden,
         refreshBalances,
     } = useStore();
+    const { toast } = useToast();
     const { t, rtl, language } = useTranslation();
     const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -35,10 +37,6 @@ const SenderCard: React.FC<SenderCardProps> = ({ selectedAssetSymbol, displayAmo
     const currencySymbol = balance?.asset?.symbol || assetMeta?.symbol || fallbackSymbol;
     const currencyName =
         balance?.asset?.name || assetMeta?.displayName || assetMeta?.name || fallbackSymbol;
-    // Same image the home BalanceCard shows. `||` (not `??`) on purpose: a
-    // balance built from a WS event carries an empty `symbolImageUrl`.
-    const currencyIcon =
-        assetMeta?.symbolImageUrl || balance?.asset?.symbolImageUrl || DollarIcon;
     const available = balance?.available ?? 0;
     const shownAmount = typeof displayAmount === 'number' ? displayAmount : available;
 
@@ -49,10 +47,10 @@ const SenderCard: React.FC<SenderCardProps> = ({ selectedAssetSymbol, displayAmo
     const handleRefresh = async () => {
         if (isRefreshing) return;
         setIsRefreshing(true);
-        // refreshBalances handles its own failures (it never throws) and a
-        // stale balance simply stays on screen, so there is nothing to report.
         try {
             await refreshBalances(fallbackSymbol);
+        } catch {
+            toast.error(t.transfer.sender.refreshBalance);
         } finally {
             setIsRefreshing(false);
         }
@@ -77,10 +75,14 @@ const SenderCard: React.FC<SenderCardProps> = ({ selectedAssetSymbol, displayAmo
                     />
                 </button>
 
-                {/* Currency icon */}
-                <div className="relative size-xd-20">
-                    <Image src={currencyIcon} alt={currencyName} fill className="object-contain" />
-                </div>
+                {/* Currency symbol */}
+                <Image
+                    src={DollarIcon}
+                    alt="Currency"
+                    width={20}
+                    height={20}
+                    className="size-xd-20"
+                />
 
                 {/* Sender Account label */}
                 <p className="text-white text-xd-11 font-light mt-xd-4">

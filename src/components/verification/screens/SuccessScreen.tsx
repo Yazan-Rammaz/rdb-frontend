@@ -3,7 +3,6 @@
 import React, { useEffect } from 'react';
 import Image from 'next/image';
 import { useVerification } from '@/context/VerificationContext';
-import { useTranslation } from '@/context/I18nContext';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { api } from '@/api';
@@ -11,7 +10,6 @@ import { KycVerificationStatus } from '@/core/types/auth';
 import verifiedBigSvg from '@/assets/icons/verification/verified-big.svg';
 
 export default function SuccessScreen() {
-    const { t } = useTranslation();
     const { markCompleted, idDocument } = useVerification();
     const { userData, refreshUser, updateUser } = useAuth();
     const router = useRouter();
@@ -108,24 +106,22 @@ export default function SuccessScreen() {
             onClick={() => router.push('/home')}
         >
             <h1 className="text-xd-30 font-bold text-center text-[#1D1D1D]">
-                {t.verification.success.title}
+                Success Verification !
             </h1>
             <p className="text-xd-16 font-medium text-center text-[#1D1D1D] mb-xd-33 mt-xd-11">
-                {t.verification.success.subtitle}
+                You Have Enjoy With Our Full Access
             </p>
 
             {/* Blue rosette verification badge */}
             <div className="mb-xd-20">
                 <Image
                     src={verifiedBigSvg}
-                    alt=""
+                    alt="verified"
                     className="object-contain w-xd-150 h-xd-150"
                 />
             </div>
 
-            <p className="text-xd-18 font-medium text-[#1D1D1D]">
-                {userName || t.verification.success.fallbackName}
-            </p>
+            <p className="text-xd-18 font-medium text-[#1D1D1D]">{userName || 'RDB User'}</p>
         </div>
     );
 }

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type QrScannerLib from 'qr-scanner';
 import { useTranslation } from '@/context/I18nContext';
 import Image from 'next/image';
@@ -8,8 +8,7 @@ import ReceiveIcon from '@/assets/icons/layout/header/receive.svg';
 import ScanIcon from '@/assets/icons/home/qr/smallscanner.svg';
 import GalleryIcon from '@/assets/icons/profile/gallery.svg';
 import { useScanner } from '@/context/ScannerContext';
-import { useInlineFeedback } from '@/hooks/useInlineFeedback';
-import InlineFeedback from '@/components/ui/InlineFeedback';
+import { useToast } from '@/context/ToastContext';
 
 /** Scanner line animation duration */
 const SCAN_LINE_DURATION = 2.0;
@@ -17,8 +16,7 @@ const SCAN_LINE_DURATION = 2.0;
 /** Default camera facing mode */
 const DEFAULT_CAMERA: QrScannerLib.FacingMode = 'environment';
 const QrScanner: React.FC<{
-    /** Returns a fixed translated error to show, or null (nothing new to say). */
-    onScan: (value: string) => string | null;
+    onScan: (value: string) => void;
     onClose: () => void;
     onSend?: () => void;
 }> = ({ onScan, onClose, onSend }) => {
@@ -26,16 +24,7 @@ const QrScanner: React.FC<{
 
     // ========== REFS & STATE ==========
     const { t } = useTranslation();
-    // Scan results show in the camera frame, over the "read code" caption.
-    // The state lives here, not in the parent, so a new message re-renders only
-    // this screen — never a parent whose callbacks would restart the camera.
-    const { feedback, error: showError } = useInlineFeedback();
-    // Read through a ref: the camera effect must not restart because the
-    // parent handed down a new function identity.
-    const onScanRef = useRef(onScan);
-    useLayoutEffect(() => {
-        onScanRef.current = onScan;
-    });
+    const { toast } = useToast();
     const videoRef = useRef<HTMLVideoElement>(null);
     const scannerRef = useRef<any>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -72,7 +61,7 @@ const QrScanner: React.FC<{
                 return; // picker cancelled — leave the live camera as-is
             }
             if (!file.type.startsWith('image/')) {
-                showError(t.home.qr.messages.notAnImageFile);
+                toast.error(t.home.qr.messages.notAnImageFile);
                 return;
             }
 
@@ -84,23 +73,22 @@ const QrScanner: React.FC<{
                     alsoTryWithoutScanRegion: true,
                 });
                 if (result?.data) {
-                    const scanError = onScanRef.current(result.data);
-                    if (scanError) showError(scanError);
+                    onScan(result.data);
                 } else {
-                    showError(t.home.qr.messages.noQrInImage);
+                    toast.error(t.home.qr.messages.noQrInImage);
                 }
             } catch (err) {
                 const msg = typeof err === 'string' ? err : (err as Error)?.message || '';
                 if (msg.includes('No QR code found')) {
-                    showError(t.home.qr.messages.noQrInImage);
+                    toast.error(t.home.qr.messages.noQrInImage);
                 } else {
-                    showError(t.home.qr.messages.qrDecodeFailed);
+                    toast.error(t.home.qr.messages.qrDecodeFailed);
                 }
             } finally {
                 setIsDecoding(false);
             }
         },
-        [showError, t],
+        [onScan, toast, t],
     );
 
     // ========== EFFECTS ==========
@@ -142,8 +130,7 @@ const QrScanner: React.FC<{
                             return;
                         }
                         if (result?.data) {
-                            const scanError = onScanRef.current(result.data);
-                            if (scanError) showError(scanError);
+                            onScan(result.data);
                         }
                     },
                     {
@@ -202,9 +189,7 @@ const QrScanner: React.FC<{
                 scannerRef.current = null;
             }
         };
-        // `onClose` is not listed: the effect never calls it, and the parent
-        // hands a new one down on every render, which restarted the camera.
-    }, [openType, showError, facingMode, retryCount, t.home.qr.scanner.UnableToAccessCamera]);
+    }, [openType, onClose, onScan, facingMode, retryCount, t.home.qr.scanner.UnableToAccessCamera]);
     return (
         <div className="w-full h-full flex-1 flex flex-col items-center pt-xd-8">
             {/* Scanner Frame Container */}
@@ -264,18 +249,9 @@ const QrScanner: React.FC<{
                             className="opacity-90 grayscale brightness-200"
                         />
                     </div>
-                    <p
-                        className={`text-[#FCFCFC] text-xd-11 font-normal text-center leading-xd-11 opacity-90 ${feedback ? 'invisible' : ''}`}
-                    >
+                    <p className="text-[#FCFCFC] text-xd-11 font-normal text-center leading-xd-11 opacity-90">
                         {t.home.qr.scanner.readCode}
                     </p>
-                    {/* Scan / image errors take the caption's place: anchored to
-                        its bottom edge, growing up into the camera feed. */}
-                    <InlineFeedback
-                        feedback={feedback}
-                        surface="dark"
-                        className="absolute inset-x-xd-12 bottom-0 items-end"
-                    />
                 </div>
             </div>
 

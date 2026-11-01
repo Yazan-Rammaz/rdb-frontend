@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
+import { useTranslation } from '@/context/I18nContext';
 
 interface AnimatedTaglineProps {
     words: string[];
@@ -14,6 +15,7 @@ export const AnimatedTagline: React.FC<AnimatedTaglineProps> = ({
     duration,
     className = '',
 }) => {
+    const { rtl } = useTranslation();
     const [index, setIndex] = useState(0);
     const [isStarted, setIsStarted] = useState(false);
 
@@ -66,7 +68,7 @@ export const AnimatedTagline: React.FC<AnimatedTaglineProps> = ({
     const letterVariants: Variants = {
         hidden: {
             opacity: 0,
-            x: -50,
+            x: rtl ? 50 : -50,
             scale: 0.8,
             filter: 'blur(4px)',
             transition: {
@@ -87,7 +89,7 @@ export const AnimatedTagline: React.FC<AnimatedTaglineProps> = ({
         },
         exit: {
             opacity: 0,
-            x: 50,
+            x: rtl ? -50 : 50,
             scale: 0.8,
             filter: 'blur(4px)',
             transition: {
@@ -103,11 +105,8 @@ export const AnimatedTagline: React.FC<AnimatedTaglineProps> = ({
         >
             <AnimatePresence mode="wait">
                 {isStarted && (
-                    // LTR on purpose: the tagline is always the English words, and
-                    // per-letter spans in a flex row paint backwards under dir="rtl".
                     <motion.div
                         key={index}
-                        dir="ltr"
                         variants={containerVariants}
                         initial="hidden"
                         animate="visible"

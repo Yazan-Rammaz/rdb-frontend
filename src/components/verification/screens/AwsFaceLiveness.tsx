@@ -30,12 +30,8 @@ import type { LivenessChallenge } from '@/services/kyc/kycService.interface';
 import faceDetectSvg from '@/assets/icons/verification/face-detect.svg';
 import shieldSvg from '@/assets/icons/verification/shield.svg';
 import ExitConfirmDialog from '../ExitConfirmDialog';
-import { useTranslation } from '@/context/I18nContext';
-import type { TranslationSchema } from '@/i18n';
 import FlexibleSpace from '@/scaling/FlexibleSpace';
 import { faceConfig } from '@/config/kycConfig';
-import { isOffline } from '@/lib/networkStatus';
-import { useIsOnline } from '@/hooks/useIsOnline';
 
 // ─── Progress bar based on /assets/icons/verification/face-bar.svg ───────────
 export function FaceProgressBar({ pct, tone }: { pct: number; tone: Tone }) {
@@ -79,10 +75,10 @@ export function FaceProgressBar({ pct, tone }: { pct: number; tone: Tone }) {
         </svg>
     );
 }
-const CHALLENGE_STEPS: { key: LivenessChallenge }[] = [
-    { key: 'look_straight' },
-    { key: 'turn_right' },
-    { key: 'turn_left' },
+const CHALLENGE_STEPS: { key: LivenessChallenge; label: string }[] = [
+    { key: 'look_straight', label: 'Face The Camera' },
+    { key: 'turn_right', label: 'Turn Head Right' },
+    { key: 'turn_left', label: 'Turn Head Left' },
 ];
 
 const HOLD_LOCKED_MS = faceConfig.timing.holdLockedMs;
@@ -118,33 +114,31 @@ const NET_COLOR: Record<Tone, string> = {
     red: '#EF4444',
 };
 
-type LivenessHints = TranslationSchema['faceLiveness']['hints'];
-
-function reasonToHint(reason: string, step: LivenessChallenge, h: LivenessHints): string {
+function reasonToHint(reason: string, step: LivenessChallenge): string {
     switch (reason) {
         case 'no_face_detected':
-            return h.noFace;
+            return 'Position face within mask';
         case 'eyes_closed':
-            return h.eyesClosed;
+            return 'Keep your eyes open';
         case 'sunglasses_detected':
-            return h.sunglasses;
+            return 'Please remove your sunglasses';
         case 'screen_detected':
-            return h.screenDetected;
+            return 'Use your real face — a screen or phone was detected';
         case 'too_dark':
-            return h.tooDark;
+            return 'Move to a brighter area';
         case 'too_blurry':
-            return h.tooBlurry;
+            return 'Hold steady — frame too blurry';
         case 'not_facing_camera':
-            return h.notFacingCamera;
+            return 'Face the camera straight on';
         case 'turn_more_right':
         case 'turn_more_left':
-            return h.keepGoing;
+            return 'Keep going...';
         default:
             return step === 'look_straight'
-                ? h.lookStraight
+                ? 'Please Keep Your Face Centered On The Screen And Facing Forward'
                 : step === 'turn_right'
-                  ? h.turnRight
-                  : h.turnLeft;
+                  ? 'Slowly Turn Your Head To The Right'
+                  : 'Slowly Turn Your Head To The Left';
     }
 }
 
@@ -716,9 +710,6 @@ function SparkleField({
 }
 
 export default function AwsFaceLivenessScreen() {
-    const { t } = useTranslation();
-    const isOnline = useIsOnline();
-    const hints = t.faceLiveness.hints;
     const { goTo, setLivenessResult, markCompleted } = useVerification();
     const router = useRouter();
     const {
@@ -880,7 +871,7 @@ export default function AwsFaceLivenessScreen() {
                     return;
                 }
                 setTone('red');
-                setInstruction(reasonToHint(result.reason ?? '', 'look_straight', hints));
+                setInstruction(reasonToHint(result.reason ?? '', 'look_straight'));
             } catch (err) {
                 // The liveness call itself failed (network, Worker 5xx, expired
                 // token). This used to be swallowed by a bare `catch {}` and
@@ -889,12 +880,8 @@ export default function AwsFaceLivenessScreen() {
                 console.error('[AwsFaceLiveness] final capture detectFace failed:', err);
                 if (runIdRef.current !== runId) return;
                 consecutiveErrorsRef.current += 1;
-                // Offline: keep the current instruction — the offline pill says
-                // what broke, and the raw network error is not for the user.
-                if (!isOffline()) {
-                    setTone('red');
-                    setInstruction(describeError(err, 'Face check failed — retrying...'));
-                }
+                setTone('red');
+                setInstruction(describeError(err, 'Face check failed — retrying...'));
                 await new Promise((r) =>
                     setTimeout(r, errorBackoffMs(consecutiveErrorsRef.current)),
                 );
@@ -915,7 +902,7 @@ export default function AwsFaceLivenessScreen() {
             const step = CHALLENGE_STEPS[idx];
             setCurrentChallengeIdx(idx);
             setTone('idle');
-            setInstruction(reasonToHint('', step.key, hints));
+            setInstruction(reasonToHint('', step.key));
 
             await new Promise((r) => setTimeout(r, faceConfig.timing.stepDelayMs));
             if (runIdRef.current !== runId) return;
@@ -989,7 +976,7 @@ export default function AwsFaceLivenessScreen() {
                     // right is not a failed verification; whether they are allowed
                     // to keep going is NestJS's call, made at submit time.
                     setTone('red');
-                    if (result.reason) setInstruction(reasonToHint(result.reason, step.key, hints));
+                    if (result.reason) setInstruction(reasonToHint(result.reason, step.key));
                     await new Promise((r) => setTimeout(r, faceConfig.timing.rejectionPauseMs));
                     runChallengeStep(idx, runId);
                 }
@@ -1005,10 +992,8 @@ export default function AwsFaceLivenessScreen() {
                 );
                 if (runIdRef.current !== runId) return;
                 consecutiveErrorsRef.current += 1;
-                if (!isOffline()) {
-                    setTone('red');
-                    setInstruction(describeError(err, 'Face check failed — retrying...'));
-                }
+                setTone('red');
+                setInstruction(describeError(err, 'Face check failed — retrying...'));
                 await new Promise((r) =>
                     setTimeout(r, errorBackoffMs(consecutiveErrorsRef.current)),
                 );
@@ -1090,7 +1075,7 @@ export default function AwsFaceLivenessScreen() {
             />
 
             {/* Close button */}
-            <div className="flex absolute top-xd-50 end-xd-30 justify-end mb-2">
+            <div className="flex absolute top-xd-50 right-xd-30 justify-end mb-2">
                 <button
                     onClick={() => setShowExitDialog(true)}
                     className="text-red-400 hover:text-red-600"
@@ -1110,16 +1095,16 @@ export default function AwsFaceLivenessScreen() {
 
             {/* Header */}
             <h1 className="text-xd-30 font-bold text-center text-[#1D1D1D] mb-xd-5">
-                {t.verification.title}
+                Identity Verification !
             </h1>
             <div className="flex items-center justify-center gap-2 mb-xd-11">
                 <Image
                     src={faceDetectSvg}
-                    alt=""
+                    alt="live detect ID"
                     className="object-contain w-xd-20 h-xd-20"
                 />
                 <span className="text-xd-16 font-medium text-[#1D1D1D]">
-                    {allDone ? t.verification.title : t.faceLiveness.liveDetection}
+                    {allDone ? 'Identity Verification !' : 'Live Face Detection'}
                 </span>
             </div>
 
@@ -1158,7 +1143,7 @@ export default function AwsFaceLivenessScreen() {
                 {allDone && processedFaceImage && (
                     <img
                         src={processedFaceImage}
-                        alt=""
+                        alt="captured face"
                         className="absolute inset-0 w-full h-full object-cover"
                         style={{
                             backgroundColor: '#E9EEEE',
@@ -1308,7 +1293,7 @@ export default function AwsFaceLivenessScreen() {
                         </motion.svg>
                         {phase === 'init' ? (
                             <p className="text-white/90 text-xd-12 text-center">
-                                {t.faceLiveness.preparingSession}
+                                Preparing AI session…
                             </p>
                         ) : phase === 'failed' ? (
                             <p className="text-[#FF5F61] text-xd-12 text-center leading-snug">
@@ -1316,11 +1301,8 @@ export default function AwsFaceLivenessScreen() {
                             </p>
                         ) : (
                             <p className="text-white/90 text-xd-12 text-center leading-snug">
-                                {t.faceLiveness.tapBeginPrefix}
-                                <span className="text-[#FFD700] font-semibold">
-                                    {t.faceLiveness.tapBeginWord}
-                                </span>
-                                {t.faceLiveness.tapBeginSuffix}
+                                Tap <span className="text-[#FFD700] font-semibold">Begin</span> to
+                                start the AI liveness check
                             </p>
                         )}
                     </div>
@@ -1365,7 +1347,7 @@ export default function AwsFaceLivenessScreen() {
                         onClick={startCamera}
                         className="text-xs text-[#388CFF] hover:underline"
                     >
-                        {t.common.tryAgain}
+                        Try Again
                     </button>
                 </div>
             )}
@@ -1377,24 +1359,21 @@ export default function AwsFaceLivenessScreen() {
                 <div className="flex items-center flex-col justify-center gap-2 mb-xd-12">
                     <Image
                         src={shieldSvg}
-                        alt=""
+                        alt="shield"
                         className="w-xd-15 h-xd-15 object-contain"
                     />
                     <span className="text-xd-12 text-[#388CFF]">
-                        {t.verification.privacySafe}
+                        Your Privacy Is Completely Safe
                     </span>
                 </div>
 
                 {(phase === 'ready' || phase === 'failed') && (
                     <motion.button
                         onClick={handleBegin}
-                        disabled={!isOnline}
-                        whileTap={isOnline ? { scale: 0.97 } : undefined}
-                        className="w-xd-390 h-xd-60 py-4 rounded-xd-20 border border-dashed border-[#5D5C5D]/50 text-[#1D1D1D] text-xd-16 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                        whileTap={{ scale: 0.97 }}
+                        className="w-xd-390 h-xd-60 py-4 rounded-xd-20 border border-dashed border-[#5D5C5D]/50 text-[#1D1D1D] text-xd-16 font-medium"
                     >
-                        {phase === 'failed'
-                            ? t.faceLiveness.restartButton
-                            : t.faceLiveness.beginButton}
+                        {phase === 'failed' ? 'Restart AI Face Check' : 'Begin AI Face Check'}
                     </motion.button>
                 )}
 

@@ -10,7 +10,7 @@ import type { SupportedLanguage } from '@/i18n';
 import Image from 'next/image';
 import { useTranslation } from '@/context/I18nContext';
 import ConfirmDialog from '../ui/ConfirmDialog';
-import InlineFeedback from '../ui/InlineFeedback';
+import { useToast } from '@/context/ToastContext';
 import Skeleton from 'react-loading-skeleton';
 import PhoneSvg from '@/assets/icons/profile/phone.svg';
 import settingsIcon from '@/assets/icons/profile/settings.svg';
@@ -21,7 +21,6 @@ import shareappIcon from '@/assets/icons/profile/shareapp.svg';
 import warnSvg from '@/assets/icons/profile/warn.svg';
 import infoSvg from '@/assets/icons/profile/info.svg';
 import languageIcon from '@/assets/icons/profile/language.svg';
-import kurdistanFlag from '@/assets/icons/profile/flag-kurdistan.svg';
 import loginhistoryIcon from '@/assets/icons/profile/loginhistory.svg';
 import logoutIcon from '@/assets/icons/profile/logout.svg';
 import unprotectedIcon from '@/assets/icons/profile/unprotected.svg';
@@ -36,32 +35,16 @@ import ClientNameScreen from './ClientNameScreen';
 import ClientPhoneScreen from './ClientPhoneScreen';
 import LoginHistoryScreen from './LoginHistoryScreen';
 import { QRCodeDisplay } from '../QR/send/shared/QRCodeDisplay';
-import { buildClientIdQr } from '@/lib/clientIdQr';
 
 import { KycVerificationStatus, type KycStatusResponse } from '@/core/types/auth';
-import { api, isNetworkError } from '@/api';
-import { isOffline } from '@/lib/networkStatus';
-import { useIsOnline } from '@/hooks/useIsOnline';
-import { useInlineFeedback } from '@/hooks/useInlineFeedback';
-import { useLogout } from '@/hooks/useLogout';
+import { api } from '@/api';
+
 const ProfileContent = () => {
-    const { userData, refreshUser, isLoading } = useAuth();
-    const logout = useLogout();
-    const isOnline = useIsOnline();
+    const { userData, removeAuthCookies, refreshUser, isLoading } = useAuth();
     const { account } = useStore();
-    // Photo save / remove result: shown on the photo screen while it is open,
-    // under the avatar here once the user has left it.
-    const photoFeedback = useInlineFeedback();
-    // "Name updated": shown on the client information screen the name editor returns to.
-    const nameFeedback = useInlineFeedback();
+    const { toast } = useToast();
     const router = useRouter();
-    const { t, tr, language, setLanguage } = useTranslation();
-    const languageLabel: Record<SupportedLanguage, string> = {
-        en: t.languageSelector.english,
-        ar: t.languageSelector.arabic,
-        tr: t.languageSelector.turkish,
-        ckb: t.languageSelector.kurdish,
-    };
+    const { t, language, setLanguage } = useTranslation();
     const [showLogoutDialog, setShowLogoutDialog] = useState(false);
     const [imgError, setImgError] = useState(false);
     const [kycStatus, setKycStatus] = useState<KycStatusResponse | null | undefined>(undefined);
@@ -87,29 +70,29 @@ const ProfileContent = () => {
 
     const handleLogout = async () => {
         setShowLogoutDialog(false);
-        await logout();
+        await removeAuthCookies();
+        localStorage.clear();
+        localStorage.removeItem('rdb_passcode');
+        localStorage.removeItem('rdb_passkey_locked');
+        window.location.reload();
     };
 
-    /** Resolves whether the change was stored, so the photo screen can revert its preview. */
-    const handlePhotoSave = async (dataUrl: string): Promise<boolean> => {
+    const handlePhotoSave = async (dataUrl: string) => {
         const user = userData?.user;
-        if (!user || isOffline()) return false;
+        if (!user) return;
 
         if (!dataUrl) {
-            const previousUrl = localPhotoUrl;
             setLocalPhotoUrl(undefined);
             setImgError(false);
             // Empty string clears it — undefined would be dropped from the JSON
             // and leave the existing photo in place.
             const delRes = await api.profile.update({ profilePictureURL: '' });
             if (delRes.ok) {
-                photoFeedback.success(t.profile.photo.removed);
-                return true;
+                toast.success('Photo removed successfully');
+            } else {
+                toast.error(delRes.error.message);
             }
-            // Offline failures stay silent here — the network banner says why.
-            if (!isNetworkError(delRes.error)) photoFeedback.error(delRes.error.message);
-            setLocalPhotoUrl(previousUrl);
-            return false;
+            return;
         }
 
         // Convert the cropper's dataUrl back into a File for the multipart upload.
@@ -119,8 +102,8 @@ const ProfileContent = () => {
 
         const uploadRes = await api.profile.uploadPhoto(file);
         if (!uploadRes.ok) {
-            if (!isNetworkError(uploadRes.error)) photoFeedback.error(uploadRes.error.message);
-            return false;
+            toast.error(uploadRes.error.message);
+            return;
         }
         const imageUrl = uploadRes.data.url;
 
@@ -131,14 +114,13 @@ const ProfileContent = () => {
             language: user.language,
         });
         if (!updateRes.ok) {
-            if (!isNetworkError(updateRes.error)) photoFeedback.error(updateRes.error.message);
-            return false;
+            toast.error(updateRes.error.message);
+            return;
         }
 
         setLocalPhotoUrl(imageUrl);
         setImgError(false);
-        photoFeedback.success(t.profile.photo.updated);
-        return true;
+        toast.success('Photo updated successfully');
     };
 
     if (isLoading) {
@@ -204,7 +186,6 @@ const ProfileContent = () => {
                         currentUrl={localPhotoUrl}
                         onBack={() => setShowPhotoScreen(false)}
                         onSave={handlePhotoSave}
-                        feedback={photoFeedback.feedback}
                     />
                 </div>
             )}
@@ -235,7 +216,6 @@ const ProfileContent = () => {
                                     : user
                             }
                             displayId={user.displayId ?? '-'}
-                            feedback={nameFeedback.feedback}
                         />
                     </motion.div>
                 )}
@@ -281,10 +261,7 @@ const ProfileContent = () => {
                                 setShowClientName(false);
                                 router.push('/verification');
                             }}
-                            onSaved={(name) => {
-                                setLocalFullName(name);
-                                nameFeedback.success(t.profile.clientName.updateSuccess);
-                            }}
+                            onSaved={(name) => setLocalFullName(name)}
                             fullName={
                                 localFullName ??
                                 ([user.firstName, user.lastName].filter(Boolean).join(' ') ||
@@ -315,7 +292,7 @@ const ProfileContent = () => {
 
             <div className="flex flex-col w-full h-full overflow-hidden bg-white">
                 {/* ── Profile Header ── */}
-                <div className="relative flex items-start justify-between px-xd-24 pt-xd-32 pb-xd-16">
+                <div className="flex items-start justify-between px-xd-24 pt-xd-32 pb-xd-16">
                     <div className="flex flex-col gap-xd-7 text-left">
                         <div
                             className="relative size-xd-50 cursor-pointer"
@@ -324,10 +301,7 @@ const ProfileContent = () => {
                                 setShowClientQR(true);
                             }}
                         >
-                            <QRCodeDisplay
-                                value={user.displayId ? buildClientIdQr(user.displayId) : '-'}
-                                size={50}
-                            />
+                            <QRCodeDisplay value={user.displayId ?? '-'} size={50} />
                         </div>
                         <div className="flex items-baseline gap-0">
                             {/* <span className="text-[#1D1D1D] text-xd-13 leading-none">ID</span> */}
@@ -408,22 +382,11 @@ const ProfileContent = () => {
                                     className="object-contain size-xd-13"
                                 />
                                 <span className="text-[#FCFCFC] text-xd-10 leading-none">
-                                    {t.profile.addPhoto}
+                                    Add Photo
                                 </span>
                             </div>
                         )}
                     </button>
-
-                    {/* A save that finishes after the user left the photo screen
-                        reports here, in the header's bottom padding under the
-                        avatar — out of flow, so nothing moves. */}
-                    {!showPhotoScreen && (
-                        <InlineFeedback
-                            feedback={photoFeedback.feedback}
-                            lines={1}
-                            className="absolute inset-x-xd-24 bottom-0 h-xd-16 items-center"
-                        />
-                    )}
                 </div>
 
                 <div className="h-px bg-[#d3d3d35e] mx-xd-25" />
@@ -446,13 +409,15 @@ const ProfileContent = () => {
                                                 />
                                             </div>
                                             <span className="font-medium text-[#1D1D1D] text-xd-11 leading-none">
-                                                {t.profile.clientName.unprotectedTitle}
+                                                Unprotected Account | Limited Access
                                             </span>
                                         </span>
                                         <span className="text-[#1D1D1D] pl-xd-20 font-medium text-xd-11 leading-tight truncate">
-                                            {tr('profile.clientName.weeklyVolume', {
-                                                amount: '60/15 USD',
-                                            })}
+                                            Weekly Transaction Volume{' '}
+                                            <span className="font-bold text-[#1D1D1D]">
+                                                60/15 USD
+                                            </span>{' '}
+                                            | Renew Fri 10:00
                                         </span>
                                     </div>
                                 </div>
@@ -476,11 +441,11 @@ const ProfileContent = () => {
                                                     />
                                                 </div>
                                                 <span className="font-medium text-[#1D1D1D] text-xd-11 leading-none">
-                                                    {t.profile.clientName.protectTitle}
+                                                    Protect Your Account | Full Access
                                                 </span>
                                             </div>
                                             <span className="text-[#1D1D1D] pl-xd-20 text-xd-11 leading-tight">
-                                                {t.profile.clientName.protectDesc}
+                                                Keep Your Account Secure, Ensures Safe Transactions.
                                             </span>
                                         </div>
                                     </div>
@@ -507,7 +472,7 @@ const ProfileContent = () => {
                                             className="object-contain"
                                         />
                                     </div>
-                                    {t.profile.clientName.protectButton}
+                                    Protect &amp; Verify Now
                                 </button>
                             </div>
                         </>
@@ -532,10 +497,10 @@ const ProfileContent = () => {
                             <span className="text-[#F59E0B] text-xd-18">⏳</span>
                             <div className="flex flex-col gap-xd-2">
                                 <span className="font-bold text-[#92400E] text-xd-12">
-                                    {t.profile.kycPending}
+                                    Under Review
                                 </span>
                                 <span className="text-[#888] text-xd-10">
-                                    {t.profile.kycPendingDesc}
+                                    Your verification is being reviewed
                                 </span>
                             </div>
                         </div>
@@ -547,7 +512,7 @@ const ProfileContent = () => {
                                 <span className="text-[#EF4444] text-xd-18">✕</span>
                                 <div className="flex flex-col gap-xd-2">
                                     <span className="font-bold text-[#991B1B] text-xd-12">
-                                        {t.profile.kycRejected}
+                                        Verification Rejected
                                     </span>
                                     {kycStatus?.rejectionReason && (
                                         <span className="text-[#888] text-xd-10">
@@ -561,7 +526,7 @@ const ProfileContent = () => {
                                 onClick={() => router.push('/verification')}
                                 className="text-xd-11 font-semibold text-[#EF4444]"
                             >
-                                {t.common.tryAgain}
+                                Try Again
                             </button>
                         </div>
                     )}
@@ -610,7 +575,11 @@ const ProfileContent = () => {
                                     />
                                 </div>
                                 <span className="text-[#1D1D1D] text-xd-13 font-medium">
-                                    {languageLabel[language]}
+                                    {language === 'ar'
+                                        ? t.languageSelector.arabic
+                                        : language === 'tr'
+                                          ? t.languageSelector.turkish
+                                          : t.languageSelector.english}
                                 </span>
                             </div>
                             {/* <ChevronRight className="w-xd-16 h-xd-16 text-[#C0C0C0]" /> */}
@@ -631,11 +600,11 @@ const ProfileContent = () => {
                                     className="object-contain"
                                 />
                                 <span className="text-[#1D1D1D] text-xd-13 font-medium">
-                                    {t.profile.loginHistory.title}
+                                    Login History
                                 </span>
                             </div>
                             <span className="text-[#888] text-xd-11 font-normal">
-                                {t.profile.activeSession}
+                                Active Session
                             </span>
                         </button>
 
@@ -643,10 +612,7 @@ const ProfileContent = () => {
                         <button
                             type="button"
                             onClick={() => setShowLogoutDialog(true)}
-                            // Logging out needs the server to clear the httpOnly
-                            // cookies; offline it would only reload into an error page.
-                            disabled={!isOnline}
-                            className="flex items-center justify-between h-xd-58 w-xd-406 rounded-xd-15 px-xd-12 py-xd-20 bg-[#FCFCFC] disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="flex items-center justify-between h-xd-58 w-xd-406 rounded-xd-15 px-xd-12 py-xd-20 bg-[#FCFCFC]"
                         >
                             <div className="flex items-center gap-xd-16">
                                 <Image
@@ -702,14 +668,6 @@ const ProfileContent = () => {
                                 label: t.languageSelector.turkish,
                                 native: 'Türkçe',
                             },
-                            {
-                                // flagcdn has no Kurdistan flag (no ISO 3166
-                                // code), so this one row ships its own SVG.
-                                code: 'ckb' as SupportedLanguage,
-                                flagSrc: kurdistanFlag.src,
-                                label: t.languageSelector.kurdish,
-                                native: 'کوردی',
-                            },
                         ].map((lang) => (
                             <button
                                 key={lang.code}
@@ -722,7 +680,7 @@ const ProfileContent = () => {
                             >
                                 <div className="flex items-center gap-xd-14">
                                     <img
-                                        src={lang.flagSrc ?? `https://flagcdn.com/w40/${lang.flag}.png`}
+                                        src={`https://flagcdn.com/w40/${lang.flag}.png`}
                                         alt={lang.native}
                                         className="w-xd-24 h-xd-16 object-cover rounded-sm"
                                     />

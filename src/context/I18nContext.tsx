@@ -28,7 +28,7 @@ interface I18nContextValue {
     setLanguage: (lang: SupportedLanguage) => void;
 }
 
-export const I18nContext = createContext<I18nContextValue | undefined>(undefined);
+const I18nContext = createContext<I18nContextValue | undefined>(undefined);
 
 // ─── Provider Props ───────────────────────────────────────
 
@@ -85,7 +85,7 @@ export function I18nProvider({ children, locale }: I18nProviderProps) {
 
     // Apply dir attribute on <html> element
     // Policy:
-    // - 'ar', 'ckb' -> rtl
+    // - 'ar' -> rtl
     // - 'en' -> ltr
     // - 'tr' -> ltr
     // Components should inherit this unless displaying inherently LTR data (e.g. phone numbers).

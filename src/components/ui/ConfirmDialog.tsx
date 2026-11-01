@@ -11,12 +11,10 @@ export interface ConfirmDialogProps {
     open: boolean;
     onConfirm: ((inputValue?: string) => void);
     onCancel: () => void;
-    /* Required, and deliberately so: a default here would be an English string
-       baked in outside React, where it cannot reach the translations. */
-    title: string;
-    message: string;
-    confirmLabel: string;
-    cancelLabel: string;
+    title?: string;
+    message?: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
     /** Optional input field inside the dialog */
     inputConfig?: {
         placeholder?: string;
@@ -28,10 +26,10 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
     open,
     onConfirm,
     onCancel,
-    title,
-    message,
-    confirmLabel,
-    cancelLabel,
+    title = 'Confirm',
+    message = 'Are you sure?',
+    confirmLabel = 'Confirm',
+    cancelLabel = 'Cancel',
     inputConfig,
 }) => {
     const [inputValue, setInputValue] = useState(inputConfig?.defaultValue || '');

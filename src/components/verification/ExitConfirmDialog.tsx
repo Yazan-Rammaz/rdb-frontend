@@ -2,7 +2,6 @@
 
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useTranslation } from '@/context/I18nContext';
 
 interface ExitConfirmDialogProps {
     open: boolean;
@@ -11,7 +10,6 @@ interface ExitConfirmDialogProps {
 }
 
 export default function ExitConfirmDialog({ open, onConfirm, onCancel }: ExitConfirmDialogProps) {
-    const { t } = useTranslation();
     return (
         <AnimatePresence>
             {open && (
@@ -34,23 +32,24 @@ export default function ExitConfirmDialog({ open, onConfirm, onCancel }: ExitCon
                         transition={{ duration: 0.2 }}
                     >
                         <h3 className="text-base font-semibold text-gray-900 text-center mb-2">
-                            {t.verification.exitDialog.title}
+                            Exit Verification?
                         </h3>
                         <p className="text-xs text-gray-500 text-center mb-6">
-                            {t.verification.exitDialog.message}
+                            Your progress will be lost. You can restart verification later from the
+                            limited version.
                         </p>
                         <div className="flex gap-3">
                             <button
                                 onClick={onCancel}
                                 className="flex-1 py-3 rounded-full border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
                             >
-                                {t.verification.exitDialog.stay}
+                                Stay
                             </button>
                             <button
                                 onClick={onConfirm}
                                 className="flex-1 py-3 rounded-full bg-red-500 text-sm font-medium text-white hover:bg-red-600 transition-colors"
                             >
-                                {t.verification.exitDialog.exit}
+                                Exit
                             </button>
                         </div>
                     </motion.div>

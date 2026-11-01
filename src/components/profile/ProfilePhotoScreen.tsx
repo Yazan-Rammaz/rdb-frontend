@@ -2,37 +2,27 @@
 
 import React, { useRef, useState, useEffect } from 'react';
 import Image from 'next/image';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft } from 'lucide-react';
 import defaultProfile from '@/assets/icons/profile/defaultprofile.svg';
 import galleryIcon from '@/assets/icons/profile/gallery.svg';
 import cameraIcon from '@/assets/icons/profile/camear.svg';
 import deleteIcon from '@/assets/icons/profile/delete.svg';
 import addPhotoIcon from '@/assets/icons/profile/add_photo.svg';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
-import { useTranslation } from '@/context/I18nContext';
-import { useIsOnline } from '@/hooks/useIsOnline';
-import type { Feedback } from '@/hooks/useInlineFeedback';
-import InlineFeedback from '@/components/ui/InlineFeedback';
 
 type PhotoView = 'display' | 'crop' | 'review';
 
 interface ProfilePhotoScreenProps {
     currentUrl?: string;
     onBack: () => void;
-    /** Resolves `false` when nothing was saved, so the preview goes back to what is stored. */
-    onSave: (dataUrl: string) => Promise<boolean> | void;
-    /** Result of the last save / remove, shown above the photo. */
-    feedback?: Feedback | null;
+    onSave: (dataUrl: string) => void;
 }
 
 export default function ProfilePhotoScreen({
     currentUrl,
     onBack,
     onSave,
-    feedback = null,
 }: ProfilePhotoScreenProps) {
-    const { t, rtl } = useTranslation();
-    const isOnline = useIsOnline();
     const [view, setView] = useState<PhotoView>('display');
     const [photoUrl, setPhotoUrl] = useState<string | undefined>(currentUrl);
     const [croppedDataUrl, setCroppedDataUrl] = useState<string | null>(null);
@@ -162,32 +152,17 @@ export default function ProfilePhotoScreen({
 
     // Confirm review → actually save
     const handleConfirm = () => {
-        if (!croppedDataUrl || !isOnline) return;
-        const previous = photoUrl;
+        if (!croppedDataUrl) return;
         setPhotoUrl(croppedDataUrl);
-        // A failed upload must not leave the unsaved picture on display next
-        // to the error that says it wasn't saved.
-        void Promise.resolve(onSave(croppedDataUrl)).then(
-            (ok) => {
-                if (ok === false) setPhotoUrl(previous);
-            },
-            () => setPhotoUrl(previous),
-        );
+        onSave(croppedDataUrl);
         setView('display');
         setShowOptions(false);
         setCroppedDataUrl(null);
     };
 
     const handleDelete = () => {
-        if (!isOnline) return;
-        const previous = photoUrl;
         setPhotoUrl(undefined);
-        void Promise.resolve(onSave('')).then(
-            (ok) => {
-                if (ok === false) setPhotoUrl(previous);
-            },
-            () => setPhotoUrl(previous),
-        );
+        onSave('');
         setShowOptions(false);
         setShowDeleteConfirm(false);
     };
@@ -199,20 +174,12 @@ export default function ProfilePhotoScreen({
             <div className="w-full h-full bg-black flex flex-col">
                 {/* Header */}
                 <div className="flex items-center justify-between px-xd-28 pt-xd-14 pb-xd-10">
-                    <button
-                        onClick={() => setView('display')}
-                        aria-label={t.common.accessibility.back}
-                        className="flex items-center text-white"
-                    >
-                        {rtl ? (
-                            <ChevronRight className="w-xd-22 h-xd-22" />
-                        ) : (
-                            <ChevronLeft className="w-xd-22 h-xd-22" />
-                        )}
+                    <button onClick={() => setView('display')} className="flex items-center text-white">
+                        <ChevronLeft className="w-xd-22 h-xd-22" />
                     </button>
-                    <span className="text-xd-16 font-medium text-white">{t.profile.photo.title}</span>
+                    <span className="text-xd-16 font-medium text-white">Profile Photo</span>
                     <button onClick={handleCropDone} className="text-xd-16 font-medium text-[#3066CC]">
-                        {t.common.done}
+                        Done
                     </button>
                 </div>
 
@@ -301,26 +268,12 @@ export default function ProfilePhotoScreen({
             <div className="w-full h-full bg-white flex flex-col">
                 {/* Header */}
                 <div className="flex items-center justify-center relative px-xd-28 pt-xd-14 pb-xd-10">
-                    <button
-                        onClick={() => setView('crop')}
-                        aria-label={t.common.accessibility.back}
-                        className="absolute start-xd-20 flex items-center text-[#1D1D1D]"
-                    >
-                        {rtl ? (
-                            <ChevronRight className="w-xd-22 h-xd-22" />
-                        ) : (
-                            <ChevronLeft className="w-xd-22 h-xd-22" />
-                        )}
+                    <button onClick={() => setView('crop')} className="absolute left-xd-20 flex items-center text-[#1D1D1D]">
+                        <ChevronLeft className="w-xd-22 h-xd-22" />
                     </button>
-                    <span className="text-xd-16 font-medium text-[#1D1D1D]">
-                        {t.profile.photo.title}
-                    </span>
-                    <button
-                        onClick={handleConfirm}
-                        disabled={!isOnline}
-                        className="absolute end-xd-20 text-xd-16 font-medium text-[#3066CC] disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        {t.common.save}
+                    <span className="text-xd-16 font-medium text-[#1D1D1D]">Profile Photo</span>
+                    <button onClick={handleConfirm} className="absolute right-xd-20 text-xd-16 font-medium text-[#3066CC]">
+                        Save
                     </button>
                 </div>
 
@@ -330,7 +283,7 @@ export default function ProfilePhotoScreen({
                         {croppedDataUrl && (
                             <img
                                 src={croppedDataUrl}
-                                alt=""
+                                alt="Preview"
                                 className="w-full h-full object-cover"
                             />
                         )}
@@ -348,40 +301,26 @@ export default function ProfilePhotoScreen({
                 <div className="flex items-center justify-center relative px-xd-28 pt-xd-14 border-[#f0f0f0]">
                     <button
                         onClick={onBack}
-                        aria-label={t.common.accessibility.back}
-                        className="absolute start-xd-20 flex items-center text-[#1D1D1D]"
+                        className="absolute left-xd-20 flex items-center text-[#1D1D1D]"
                     >
-                        {rtl ? (
-                            <ChevronRight className="w-xd-22 h-xd-22" />
-                        ) : (
-                            <ChevronLeft className="w-xd-22 h-xd-22" />
-                        )}
+                        <ChevronLeft className="w-xd-22 h-xd-22" />
                     </button>
-                    <span className="text-xd-16 font-medium text-[#1D1D1D]">
-                        {t.profile.photo.title}
-                    </span>
+                    <span className="text-xd-16 font-medium text-[#1D1D1D]">Profile Photo</span>
                 </div>
 
                 {/* Photo area */}
-                <div className="relative flex-1 flex flex-col items-center justify-start pt-xd-35">
-                    {/* Save / remove result, in the empty gap above the photo —
-                        out of flow, so the photo doesn't move. */}
-                    <InlineFeedback
-                        feedback={feedback}
-                        lines={1}
-                        className="absolute inset-x-xd-20 top-0 h-xd-35 items-center"
-                    />
+                <div className="flex-1 flex flex-col items-center justify-start pt-xd-35">
                     <div className="relative overflow-hidden m-2 size-xd-350 rounded-xd-20">
                         {photoUrl ? (
                             <img
                                 src={photoUrl}
-                                alt=""
+                                alt="Profile"
                                 className="w-full h-full object-cover"
                             />
                         ) : (
                             <Image
                                 src={defaultProfile}
-                                alt=""
+                                alt="Default"
                                 fill
                                 className="object-contain"
                             />
@@ -400,7 +339,7 @@ export default function ProfilePhotoScreen({
                                 className="object-contain"
                             />
                             <span className="text-[#FCFCFC] text-xd-14">
-                                {hasPhoto ? t.profile.photo.edit : t.profile.photo.add}
+                                {hasPhoto ? 'Edit Profile Photo' : 'Add Profile Photo'}
                             </span>
                         </button>
                     </div>
@@ -414,14 +353,12 @@ export default function ProfilePhotoScreen({
                             >
                                 <Image
                                     src={galleryIcon}
-                                    alt=""
+                                    alt="Choose"
                                     width={20}
                                     height={20}
                                     className="object-contain size-xd-20"
                                 />
-                                <span className="text-xd-11 text-[#1D1D1D]">
-                                    {t.profile.photo.choose}
-                                </span>
+                                <span className="text-xd-11 text-[#1D1D1D]">Choose</span>
                             </button>
                             <button
                                 onClick={() => cameraInputRef.current?.click()}
@@ -429,31 +366,26 @@ export default function ProfilePhotoScreen({
                             >
                                 <Image
                                     src={cameraIcon}
-                                    alt=""
+                                    alt="Take Photo"
                                     width={20}
                                     height={20}
                                     className="object-contain size-xd-20"
                                 />
-                                <span className="text-xd-11 text-[#1D1D1D]">
-                                    {t.profile.photo.takePhoto}
-                                </span>
+                                <span className="text-xd-11 text-[#1D1D1D]">Take Photo</span>
                             </button>
                             {hasPhoto && (
                                 <button
                                     onClick={() => setShowDeleteConfirm(true)}
-                                    disabled={!isOnline}
-                                    className="flex flex-col items-center gap-xd-6 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="flex flex-col items-center gap-xd-6"
                                 >
                                     <Image
                                         src={deleteIcon}
-                                        alt=""
+                                        alt="Remove"
                                         width={20}
                                         height={20}
                                         className="object-contain size-xd-20"
                                     />
-                                    <span className="text-xd-11 text-[#1D1D1D]">
-                                        {t.profile.photo.remove}
-                                    </span>
+                                    <span className="text-xd-11 text-[#1D1D1D]">Remove</span>
                                 </button>
                             )}
                         </div>
@@ -482,10 +414,10 @@ export default function ProfilePhotoScreen({
                 open={showDeleteConfirm}
                 onConfirm={handleDelete}
                 onCancel={() => setShowDeleteConfirm(false)}
-                title={t.profile.photo.removeTitle}
-                message={t.profile.photo.removeMessage}
-                confirmLabel={t.profile.photo.remove}
-                cancelLabel={t.common.cancel}
+                title="Remove Photo"
+                message="Are you sure you want to remove your profile photo?"
+                confirmLabel="Remove"
+                cancelLabel="Cancel"
             />
         </>
     );

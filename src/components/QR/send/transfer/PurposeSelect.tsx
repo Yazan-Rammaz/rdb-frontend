@@ -3,7 +3,6 @@
 import React, { useEffect, useRef } from 'react';
 import Select from '@/components/ui/Select';
 import { useTransferPurposes } from '@/hooks/useTransferPurposes';
-import { useIsOnline } from '@/hooks/useIsOnline';
 import { useTranslation } from '@/context/I18nContext';
 import Image from 'next/image';
 import NoteIcon from '@/assets/icons/home/transfer/note.svg';
@@ -23,7 +22,6 @@ const PurposeSelect: React.FC<PurposeSelectProps> = ({
 }) => {
     const { tr } = useTranslation();
     const { purposes, isLoading, error, retry } = useTransferPurposes();
-    const isOnline = useIsOnline();
     const noteRef = useRef<HTMLInputElement>(null);
 
 
@@ -56,8 +54,7 @@ const PurposeSelect: React.FC<PurposeSelectProps> = ({
                     <span className="text-xd-12 text-red-500">{error}</span>
                     <button
                         onClick={retry}
-                        disabled={!isOnline}
-                        className="px-xd-12 py-xd-4 rounded-full text-xd-12 font-medium bg-[#F8F8F8] text-[#1D1D1D] border border-[#E8E8E8] hover:bg-gray-100 shrink-0 disabled:text-[#C3C3C3] disabled:hover:bg-[#F8F8F8]"
+                        className="px-xd-12 py-xd-4 rounded-full text-xd-12 font-medium bg-[#F8F8F8] text-[#1D1D1D] border border-[#E8E8E8] hover:bg-gray-100 shrink-0"
                     >
                         {tr('common.retry')}
                     </button>

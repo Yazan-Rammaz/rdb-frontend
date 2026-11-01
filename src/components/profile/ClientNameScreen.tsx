@@ -1,22 +1,14 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft } from 'lucide-react';
 import Image from 'next/image';
 import verifiedBigIcon from '@/assets/icons/verification/verified-big.svg';
 import warnSvg from '@/assets/icons/profile/warn.svg';
 import infoSvg from '@/assets/icons/profile/info.svg';
-import { useTranslation } from '@/context/I18nContext';
+import { useToast } from '@/context/ToastContext';
 import { unwrapKycRequest } from '@/api/helpers/kyc';
-import { api, isNetworkError } from '@/api';
-import { useIsOnline } from '@/hooks/useIsOnline';
-import { useInlineFeedback } from '@/hooks/useInlineFeedback';
-import {
-    NAME_MAX_LENGTH,
-    type NameIssue,
-    nameIssue,
-    normalizeName,
-} from '@/lib/nameValidation';
+import { api } from '@/api';
 
 interface ClientNameScreenProps {
     onBack: () => void;
@@ -39,16 +31,7 @@ export default function ClientNameScreen({
     fullName,
     isVerified,
 }: ClientNameScreenProps) {
-    // Errors take the name card's label in place (same line, red), so nothing moves.
-    const { feedback, error: showError, clear: clearFeedback } = useInlineFeedback();
-    const { t, tr, rtl } = useTranslation();
-    const isOnline = useIsOnline();
-    const nameErrors: Record<NameIssue, string> = {
-        empty: t.auth.enterName.errors.tooShort,
-        'invalid-chars': t.auth.enterName.errors.invalidChars,
-        'too-short': t.auth.enterName.errors.tooShort,
-        'too-long': t.auth.enterName.errors.tooLong,
-    };
+    const { toast } = useToast();
     const [name, setName] = useState(fullName);
     const [saving, setSaving] = useState(false);
     const [docs, setDocs] = useState<KycDoc | null>(null);
@@ -77,20 +60,9 @@ export default function ClientNameScreen({
     ].filter(Boolean) as string[];
 
     const handleSave = async () => {
-        // Same field, same endpoint as the sign-up screen — validating only
-        // there would leave the identical hole one screen away. The user stays
-        // on the field they have to fix; an empty value used to return
-        // silently, with Save doing nothing.
-        const issue = nameIssue(name);
-        if (issue) {
-            showError(nameErrors[issue]);
-            return;
-        }
-
-        if (!isOnline) return;
-
-        const trimmed = normalizeName(name);
-        const parts = trimmed.split(' ');
+        const trimmed = name.trim();
+        if (!trimmed) return;
+        const parts = trimmed.split(/\s+/);
         const firstName = parts[0];
         const lastName = parts.length > 1 ? parts.slice(1).join(' ') : undefined;
 
@@ -100,23 +72,16 @@ export default function ClientNameScreen({
                 lastName ? { firstName, lastName } : { firstName },
             );
             if (res.ok) {
-                // The parent confirms the change on the client information
-                // screen this one returns to.
                 onSaved?.(trimmed);
-                onBack();
-            } else if (isNetworkError(res.error)) {
-                // Nothing was saved: stay on the field so the user can retry
-                // once the connection is back. The offline pill says why.
-                return;
+                toast.success('Name updated successfully');
             } else {
                 // The server's own message beats a generic string — a 429 or a
-                // validation failure now says what actually went wrong. Stay on
-                // the screen: nothing was saved, and the field is still there
-                // to fix and retry.
-                showError(res.error.message);
+                // validation failure now says what actually went wrong.
+                toast.error(res.error.message);
             }
+            onBack();
         } catch {
-            showError(t.profile.clientName.updateFailed);
+            toast.error('Failed to update name');
         } finally {
             setSaving(false);
         }
@@ -128,38 +93,18 @@ export default function ClientNameScreen({
             <div className="flex items-center justify-center relative px-xd-28 pt-xd-14 pb-xd-10 border-b border-[#f0f0f0]">
                 <button
                     onClick={onBack}
-                    aria-label={t.common.accessibility.back}
-                    className="absolute start-xd-20 flex items-center text-[#1D1D1D]"
+                    className="absolute left-xd-20 flex items-center text-[#1D1D1D]"
                 >
-                    {rtl ? (
-                        <ChevronRight className="w-xd-22 h-xd-22" />
-                    ) : (
-                        <ChevronLeft className="w-xd-22 h-xd-22" />
-                    )}
+                    <ChevronLeft className="w-xd-22 h-xd-22" />
                 </button>
-                <span className="text-xd-16 font-medium text-[#1D1D1D]">
-                    {t.profile.clientName.title}
-                </span>
+                <span className="text-xd-16 font-medium text-[#1D1D1D]">Client Name</span>
             </div>
 
             <div className="flex-1 overflow-y-auto px-xd-12 pt-xd-16 pb-xd-20 flex flex-col gap-xd-10 items-center">
                 {/* Name field */}
-                <div
-                    className={`border w-xd-406 bg-[#FFFFFF] rounded-xd-15 px-xd-12 pt-xd-7 pb-xd-8 flex items-center justify-between ${
-                        feedback?.tone === 'error' ? 'border-[#FF5F61]' : 'border-[#C3C3C3]/50'
-                    }`}
-                >
-                    <div className="flex flex-col gap-xd-6 flex-1 min-w-0">
-                        {/* The error borrows this label: same element and type, one
-                            line, so the card keeps its height. */}
-                        <span
-                            aria-live="polite"
-                            className={`text-xd-12 leading-none truncate ${
-                                feedback?.tone === 'error' ? 'text-[#FF5F61]' : 'text-[#8D8D8D]'
-                            }`}
-                        >
-                            {feedback?.tone === 'error' ? feedback.text : t.profile.clientName.label}
-                        </span>
+                <div className="border border-[#C3C3C3]/50 w-xd-406 bg-[#FFFFFF] rounded-xd-15 px-xd-12 pt-xd-7 pb-xd-8 flex items-center justify-between">
+                    <div className="flex flex-col gap-xd-6 flex-1">
+                        <span className="text-xd-12 text-[#8D8D8D] leading-none">Client Name</span>
                         {isVerified ? (
                             <span className="text-xd-14 text-[#1D1D1D] font-medium leading-none py-xd-4">
                                 {fullName}
@@ -168,13 +113,7 @@ export default function ClientNameScreen({
                             <input
                                 type="text"
                                 value={name}
-                                onChange={(e) => {
-                                    setName(e.target.value);
-                                    clearFeedback();
-                                }}
-                                dir="auto"
-                                autoComplete="name"
-                                maxLength={NAME_MAX_LENGTH}
+                                onChange={(e) => setName(e.target.value)}
                                 className="text-xd-14 text-[#1D1D1D] font-medium leading-none bg-transparent outline-none w-full"
                             />
                         )}
@@ -194,10 +133,10 @@ export default function ClientNameScreen({
                         </div>
                         <div className="flex flex-col gap-xd-4">
                             <span className="font-bold text-xd-12 text-[#8D8D8D] leading-tight">
-                                {t.profile.clientName.cannotChangeTitle}
+                                Client Name Cannot Be Changed
                             </span>
                             <span className="text-xd-11 text-[#8D8D8D] leading-tight">
-                                {t.profile.clientName.cannotChangeDesc}
+                                Because It Is Linked To The Documents You Submitted
                             </span>
                         </div>
                     </div>
@@ -208,10 +147,12 @@ export default function ClientNameScreen({
                         </div>
                         <div className="flex flex-col gap-xd-4">
                             <span className="font-medium text-xd-11 text-[#8D8D8D] leading-tight">
-                                {t.profile.clientName.mustMatchTitle}
+                                The Name Must Match The Personal Identification
                             </span>
                             <span className="text-xd-11 text-[#8D8D8D] leading-tight">
-                                {t.profile.clientName.mustMatchDesc}
+                                To Guarantee Ownership Of The Funds In The Account. Also, When
+                                Receiving Any Money From The Centers, It Will Not Be Released Except
+                                Upon Presentation Of A Matching Official Document.
                             </span>
                         </div>
                     </div>
@@ -234,13 +175,13 @@ export default function ClientNameScreen({
                                             />
                                         </div>
                                         <span className="font-medium text-[#1D1D1D] text-xd-11 leading-none">
-                                            {t.profile.clientName.unprotectedTitle}
+                                            Unprotected Account | Limited Access
                                         </span>
                                     </span>
-                                    <span className="text-[#1D1D1D] ps-xd-20 font-medium text-xd-11 leading-tight truncate">
-                                        {tr('profile.clientName.weeklyVolume', {
-                                            amount: '60/15 USD',
-                                        })}
+                                    <span className="text-[#1D1D1D] pl-xd-20 font-medium text-xd-11 leading-tight truncate">
+                                        Weekly Transaction Volume{' '}
+                                        <span className="font-bold text-[#1D1D1D]">60/15 USD</span>{' '}
+                                        | Renew Fri 10:00
                                     </span>
                                 </div>
                             </div>
@@ -264,11 +205,11 @@ export default function ClientNameScreen({
                                                 />
                                             </div>
                                             <span className="font-medium text-[#1D1D1D] text-xd-11 leading-none">
-                                                {t.profile.clientName.protectTitle}
+                                                Protect Your Account | Full Access
                                             </span>
                                         </div>
-                                        <span className="text-[#1D1D1D] ps-xd-20 text-xd-11 leading-tight">
-                                            {t.profile.clientName.protectDesc}
+                                        <span className="text-[#1D1D1D] pl-xd-20 text-xd-11 leading-tight">
+                                            Keep Your Account Secure, Ensures Safe Transactions.
                                         </span>
                                     </div>
                                 </div>
@@ -290,7 +231,7 @@ export default function ClientNameScreen({
                                         className="object-contain"
                                     />
                                 </div>
-                                {t.profile.clientName.protectButton}
+                                Protect &amp; Verify Now
                             </button>
                         </div>
                     </>
@@ -300,17 +241,15 @@ export default function ClientNameScreen({
                 {isVerified && docImages.length > 0 && (
                     <div className="w-xd-406 flex flex-col gap-xd-10">
                         <span className="text-xd-13 font-medium text-[#1D1D1D]">
-                            {t.profile.clientName.uploadedDocuments}
+                            Client Uploaded Documents
                         </span>
-                        <span className="text-xd-12 text-[#8D8D8D]">
-                            {t.profile.clientName.yourFiles}
-                        </span>
+                        <span className="text-xd-12 text-[#8D8D8D]">Your Files</span>
                         <div className="flex gap-xd-8 flex-wrap">
                             {docImages.map((url, i) => (
                                 <img
                                     key={i}
                                     src={url}
-                                    alt={tr('profile.clientName.documentAlt', { number: i + 1 })}
+                                    alt={`Document ${i + 1}`}
                                     className="h-xd-80 w-xd-120 object-cover rounded-xd-10 border border-[#E5E5E5]"
                                 />
                             ))}
@@ -323,16 +262,16 @@ export default function ClientNameScreen({
             <div className="px-xd-12 pb-xd-24 flex items-center justify-center">
                 {isVerified ? (
                     <button type="button" className="text-xd-13 text-[#3066CC]">
-                        {t.profile.clientName.needHelp}
+                        Need Help About My Name
                     </button>
                 ) : (
                     <button
                         type="button"
                         onClick={handleSave}
-                        disabled={saving || !isOnline}
+                        disabled={saving}
                         className="w-xd-406 h-xd-44 rounded-xd-15 bg-[#3066CC] text-white font-medium text-xd-13 disabled:opacity-50"
                     >
-                        {saving ? t.common.saving : t.common.save}
+                        {saving ? 'Saving...' : 'Save'}
                     </button>
                 )}
             </div>

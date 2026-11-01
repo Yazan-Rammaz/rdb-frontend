@@ -3,13 +3,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import { useStore } from '@/context/StoreContext';
+import { useToast } from '@/context/ToastContext';
 import { useTranslation } from '@/context/I18nContext';
 import { usePaymentRequestAPI } from '@/hooks/usePaymentRequestAPI';
-import { usePaymentRequestStatus } from '@/hooks/usePaymentRequestStatus';
-import { useIsOnline, useOnReconnect } from '@/hooks/useIsOnline';
-import { useInlineFeedback } from '@/hooks/useInlineFeedback';
-import InlineFeedback from '@/components/ui/InlineFeedback';
-import { reportUserError } from '@/lib/observe';
 import { buildPaymentRequestQr } from '@/lib/paymentRequestQr';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import Input from '@/components/ui/Input';
@@ -28,8 +24,6 @@ import CopySvg from '@/assets/icons/home/qr/copy.svg';
 import DownloadSvg from '@/assets/icons/home/qr/download.svg';
 import ShareSvg from '@/assets/icons/home/qr/share.svg';
 import CancelSvg from '@/assets/icons/home/qr/cancel.svg';
-import DoneIcon from '@/assets/icons/home/transfer/done.svg';
-import { PaymentReceived } from '../../receive/PaymentReceived';
 import type { ParsedQR } from '../types';
 import type {
     MerchantPaymentLookup,
@@ -67,11 +61,8 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
     onBack,
 }) => {
     const { activeAssetSymbol, balances, account, refreshTransactions } = useStore();
+    const { toast } = useToast();
     const { t } = useTranslation();
-    // Requester: copy / download / share / cancel results, above the action bar.
-    // Payer: the inline-cancel confirmation, above the Send bar. Errors that
-    // belong to the request itself use the red boxes (fetchError, sendError).
-    const { feedback, success: showSuccess, error: showError } = useInlineFeedback();
 
     // Determine mode
     const isRequesterMode = !!directRequestCode;
@@ -88,6 +79,8 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
     apiRef.current = api;
     const onMerchantRef = useRef(onMerchant);
     onMerchantRef.current = onMerchant;
+    const toastRef = useRef(toast);
+    toastRef.current = toast;
     const onBackRef = useRef(onBack);
     onBackRef.current = onBack;
 
@@ -110,51 +103,22 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
     // Payer mode inline cancel
     const [showCancelInput, setShowCancelInput] = useState(false);
     const [cancelReason, setCancelReason] = useState('');
-    const isOnline = useIsOnline();
-    // A lookup that failed for lack of connection, to re-run on reconnect.
-    const lookupPendingRef = useRef(false);
-    // One key per fulfilment attempt: kept across a dropped connection so the
-    // retry is deduplicated by the backend, cleared once the server has answered.
-    const idempotencyKeyRef = useRef<string | null>(null);
-
-    // Requester: flip the screen as soon as the payer pays (or the server ends
-    // the request). Watched only while it is ACTIVE and not expired locally.
-    const { settled, refresh } = usePaymentRequestStatus(
-        isRequesterMode && data?.status === 'ACTIVE' && !isExpired && requestId
-            ? { id: requestId, requestCode: data.requestCode }
-            : null,
-    );
-    useEffect(() => {
-        if (!settled) return;
-        setData((prev) =>
-            prev
-                ? {
-                      ...prev,
-                      status: settled.status,
-                      amount: settled.amount ?? prev.amount,
-                      assetSymbol: settled.assetSymbol ?? prev.assetSymbol,
-                  }
-                : prev,
-        );
-    }, [settled]);
 
     const senderBalance = activeAssetSymbol ? balances[activeAssetSymbol] : undefined;
     const senderAccountNumber = senderBalance?.accountNumber || account?.number || '';
 
-    // Tint the bottom sheet in requester mode: green once paid (paid wins over
-    // a local expiry), red when cancelled or expired.
+    // Change bottom sheet bg for cancelled/expired in requester mode
     useEffect(() => {
         if (!isRequesterMode || !data) return;
-        const isPaid = data.status === 'FULFILLED';
         const isCancelledOrExpired =
             data.status === 'CANCELLED' || data.status === 'EXPIRED' || isExpired;
-        if (!isPaid && !isCancelledOrExpired) return;
+        if (!isCancelledOrExpired) return;
 
         const bottomSheet = document.getElementById('bottom-sheet');
         if (!bottomSheet) return;
 
         const previousBg = bottomSheet.style.backgroundColor;
-        bottomSheet.style.backgroundColor = isPaid ? '#F4FFFA' : '#FFF5F5';
+        bottomSheet.style.backgroundColor = '#FFF5F5';
 
         return () => {
             bottomSheet.style.backgroundColor = previousBg;
@@ -174,7 +138,6 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
                 code = scannedRequestCode;
             } else {
                 setFetchError('Invalid payment request data');
-                reportUserError('Invalid payment request data');
                 setLoading(false);
                 return;
             }
@@ -182,15 +145,8 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
             const result = await apiRef.current.lookupPaymentRequest(code);
 
             if ('error' in result) {
-                // No connection: stay on the loading state and look it up again
-                // once the app is back online — the offline pill explains the wait.
-                if (result.network) {
-                    lookupPendingRef.current = true;
-                    return;
-                }
-                // The hook shows nothing: this screen is the only report.
                 setFetchError(result.error);
-                reportUserError(result.error);
+                toastRef.current.error(result.error);
                 setLoading(false);
                 return;
             }
@@ -226,7 +182,7 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
             setLoading(false);
         } catch {
             setFetchError('Failed to load payment request');
-            reportUserError('Failed to load payment request');
+            toastRef.current.error('Failed to load payment request');
             setLoading(false);
         }
     }, [scannedRequestCode, requesterAccount, directRequestCode, qrAccount]);
@@ -235,19 +191,7 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
         void fetchData();
     }, [fetchData]);
 
-    useOnReconnect(() => {
-        if (!lookupPendingRef.current) return;
-        lookupPendingRef.current = false;
-        void fetchData();
-    });
-
     const handleExpired = useCallback(async () => {
-        // Requester: the server decides — the request may have been paid just now.
-        if (isRequesterMode) {
-            const result = await refresh();
-            if (result?.status !== 'FULFILLED') setIsExpired(true);
-            return;
-        }
         try {
             let code: string | null = null;
             if (directRequestCode) {
@@ -265,10 +209,10 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
             // still mark expired locally if API fails
         }
         setIsExpired(true);
-    }, [isRequesterMode, refresh, directRequestCode, scannedRequestCode, requesterAccount]);
+    }, [directRequestCode, scannedRequestCode, requesterAccount]);
 
     const handleSend = async () => {
-        if (!data || !requestId || isSending || !isOnline) return;
+        if (!data || !requestId || isSending) return;
 
         if (!data.isPermanent) {
             const expiryTime = new Date(data.expiresAt).getTime();
@@ -281,24 +225,17 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
         setIsSending(true);
         setSendError(null);
 
-        idempotencyKeyRef.current ??= `fulfill-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+        const idempotencyKey = `fulfill-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
 
         const result = await apiRef.current.fulfillPaymentRequest({
             id: requestId,
             accountNumber: senderAccountNumber,
-            idempotencyKey: idempotencyKeyRef.current,
+            idempotencyKey,
         });
-
-        if ('error' in result && result.network) {
-            // Outcome unknown — keep the key so the retry cannot pay twice.
-            setIsSending(false);
-            return;
-        }
-        idempotencyKeyRef.current = null;
 
         if ('error' in result) {
             setSendError(result.error);
-            reportUserError(result.error);
+            toastRef.current.error(result.error);
             setIsSending(false);
             return;
         }
@@ -335,15 +272,14 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
         });
 
         if ('error' in result) {
-            if (!result.network) showError(result.error);
+            toastRef.current.error(result.error);
             setIsCancelling(false);
             return;
         }
 
-        // No success line: the screen turns into the Cancelled state (badge,
-        // dimmed QR), which is the confirmation.
         setData((prev) => (prev ? { ...prev, status: 'CANCELLED' } : prev));
         setIsCancelling(false);
+        toastRef.current.success('Payment request cancelled');
         refreshTransactions();
     };
 
@@ -352,17 +288,13 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
         if (!requestId || isCancelling || !cancelReason.trim()) return;
 
         setIsCancelling(true);
-        setSendError(null);
         const result = await apiRef.current.cancelPaymentRequest({
             id: requestId,
             reason: cancelReason.trim(),
         });
 
         if ('error' in result) {
-            if (!result.network) {
-                setSendError(result.error);
-                reportUserError(result.error);
-            }
+            toastRef.current.error(result.error);
             setIsCancelling(false);
             return;
         }
@@ -371,8 +303,7 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
         setShowCancelInput(false);
         setCancelReason('');
         setIsCancelling(false);
-        // Payer mode has no Cancelled badge, so this line is the only confirmation.
-        showSuccess(t.transfer.deposit.requestCancelled);
+        toastRef.current.success('Payment request cancelled');
         refreshTransactions();
     };
 
@@ -406,29 +337,29 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
         if (!qrValue) return;
         try {
             await navigator.clipboard.writeText(qrValue);
-            showSuccess(t.home.qr.messages.qrCopied);
+            toastRef.current.success(t.home.qr.messages.qrCopied);
         } catch {
-            showError(t.home.qr.messages.qrCopyFailed);
+            toastRef.current.error(t.home.qr.messages.qrDownloadFailed);
         }
     };
 
     const handleDownload = async () => {
         const canvas = await captureCanvas();
         if (!canvas) {
-            showError(t.home.qr.messages.qrDownloadFailed);
+            toastRef.current.error(t.home.qr.messages.qrDownloadFailed);
             return;
         }
         const link = document.createElement('a');
         link.download = `payment-request-${data?.requestCode || requestId}.png`;
         link.href = canvas.toDataURL('image/png');
         link.click();
-        showSuccess(t.home.qr.messages.qrDownloadSuccess);
+        toastRef.current.success(t.home.qr.messages.qrDownloadSuccess);
     };
 
     const handleShareQR = async () => {
         const canvas = await captureCanvas();
         if (!canvas) {
-            showError(t.home.qr.messages.qrDownloadFailed);
+            toastRef.current.error(t.home.qr.messages.qrDownloadFailed);
             return;
         }
         const result = await shareQRImage(
@@ -437,9 +368,9 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
             `Amount: ${data?.amount} ${data?.assetSymbol}`,
         );
         if (result === 'shared') {
-            showSuccess(t.home.qr.messages.qrShareSuccess);
+            toastRef.current.success(t.home.qr.messages.qrShareSuccess);
         } else if (result === 'copied') {
-            showSuccess(t.home.qr.messages.qrCopied);
+            toastRef.current.success(t.home.qr.messages.qrCopied);
         }
     };
 
@@ -467,18 +398,17 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
         return (
             <div className="w-full h-full flex items-center justify-center">
                 <div className="flex flex-col items-center gap-3 px-6 text-center">
-                    <p aria-live="polite" className="text-[13px] text-[#FF5F61]">
-                        {fetchError || t.home.qr.loadRequestFailed}
+                    <p className="text-[13px] text-[#FF4D4D]">
+                        {fetchError || 'Failed to load request'}
                     </p>
                     <button
                         onClick={() => void fetchData()}
-                        disabled={!isOnline}
-                        className="text-[13px] text-[#388CFF] font-medium underline disabled:text-[#C3C3C3]"
+                        className="text-[13px] text-[#388CFF] font-medium underline"
                     >
-                        {t.common.retry}
+                        Retry
                     </button>
                     <button onClick={onBack} className="text-[13px] text-[#8D8D8D] mt-1">
-                        {t.common.accessibility.goBack}
+                        Go back
                     </button>
                 </div>
             </div>
@@ -490,10 +420,31 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
         return <SuccessReceipt data={receiptData} onClose={onDone} />;
     }
 
-    // --- Requester mode view (ACTIVE / FULFILLED / CANCELLED / EXPIRED) ---
+    // --- Requester FULFILLED view (receipt) ---
+    if (isRequesterMode && data.status === 'FULFILLED') {
+        const fulfilledReceipt: ReceiptData = {
+            referenceCode: data.requestCode || requestId,
+            createdAt: data.createdAt || new Date().toISOString(),
+            status: 'COMPLETED',
+            senderAccountNumber: '',
+            senderMaskedName: '',
+            recipientAccountNumber: data.requesterAccountNumber,
+            recipientMaskedName: data.requesterAccountName,
+            amount: String(data.amount),
+            currency: data.assetSymbol,
+            purposeLabel: data.purpose?.name || '',
+            inputMethod: 'MANUAL',
+        };
+        return (
+            <div className="w-full h-full flex items-center justify-center overflow-y-auto">
+                <div className="max-w-xd-370 mx-xd-30 h-full"></div>
+            </div>
+        );
+    }
+
+    // --- Requester mode view (ACTIVE / CANCELLED / EXPIRED) ---
     if (isRequesterMode) {
         const isActive = data.status === 'ACTIVE' && !isExpired;
-        const isPaid = data.status === 'FULFILLED';
 
         return (
             <div className="flex flex-col items-center w-full h-full relative overflow-hidden">
@@ -511,32 +462,19 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
                             />
                         </div>
 
-                        {/* QR Code — faded when cancelled/expired, replaced once paid */}
+                        {/* QR Code — faded when cancelled/expired */}
                         <div className="w-62.5 mt-3 shrink-0 h-62.5 flex flex-col items-center justify-center gap-2">
-                            {isPaid ? (
-                                <PaymentReceived
+                            <div ref={captureRef} className={isRequesterDead ? 'opacity-10' : ''}>
+                                <CustomQRCode
+                                    errorCorrectionLevel="L"
+                                    value={qrValue || ''}
                                     size={224}
-                                    amount={data.amount}
-                                    currency={data.assetSymbol}
                                 />
-                            ) : (
-                                <div
-                                    ref={captureRef}
-                                    className={isRequesterDead ? 'opacity-10' : ''}
-                                >
-                                    <CustomQRCode
-                                        errorCorrectionLevel="L"
-                                        value={qrValue || ''}
-                                        size={224}
-                                    />
-                                </div>
-                            )}
+                            </div>
                             <p className="text-4 font-light text-text text-center pt-1">
-                                {isPaid
-                                    ? t.home.qr.paid
-                                    : isRequesterDead
-                                      ? 'Expired Code ( Time Expired )'
-                                      : data.requesterAccountNumber}
+                                {isRequesterDead
+                                    ? 'Expired Code ( Time Expired )'
+                                    : data.requesterAccountNumber}
                             </p>
                         </div>
                     </div>
@@ -620,7 +558,7 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
                                     hideRequired
                                     reviewMode
                                     disabled
-                                    label={t.common.note}
+                                    label="Note"
                                     value={data.note}
                                     className="text-[11px]!"
                                     containerClassName="bg-transparent "
@@ -630,17 +568,7 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
                         {/* Valid Until */}
 
                         <div className="flex gap-2 w-full px-2">
-                            {isPaid ? (
-                                <Input
-                                    hideRequired
-                                    reviewMode
-                                    disabled
-                                    label={t.transfer.receipt.status}
-                                    value={t.home.qr.paid}
-                                    className="text-[11px]!"
-                                    containerClassName="bg-transparent w-1/2"
-                                />
-                            ) : data.isPermanent ? (
+                            {data.isPermanent ? (
                                 <Input
                                     hideRequired
                                     reviewMode
@@ -673,27 +601,9 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
                     </div>
                 </div>
 
-                {/* Paid: nothing left to share or cancel */}
-                {isPaid && (
-                    <div className="absolute bottom-0 left-0 right-0 flex items-center justify-center px-6 py-4">
-                        <ActionButton
-                            icon={DoneIcon}
-                            label={t.common.done}
-                            onClick={onDone}
-                            bounceOnClick
-                        />
-                    </div>
-                )}
-
                 {/* Bottom action bar — only when ACTIVE */}
                 {isActive && (
                     <div className="absolute bottom-0 left-0 right-0 bg-background border-0 border-[#F2F2F2]">
-                        {/* The row's empty py-4 top padding: out of flow, nothing moves. */}
-                        <InlineFeedback
-                            feedback={feedback}
-                            lines={1}
-                            className="absolute inset-x-0 top-0 h-xd-16 items-center px-6"
-                        />
                         <div className="flex items-center justify-center gap-13 px-6 py-4">
                             <ActionButton
                                 icon={CopySvg}
@@ -714,7 +624,6 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
                                 icon={CancelSvg}
                                 label={t.home.qr.cancel}
                                 onClick={() => setShowCancelDialog(true)}
-                                disabled={!isOnline || isCancelling}
                             />
                         </div>
                     </div>
@@ -726,13 +635,11 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
                     onCancel={() => setShowCancelDialog(false)}
                     onConfirm={(reason) => void handleCancelConfirm(reason)}
                     title={t.home.qr.cancel}
-                    message={t.home.qr.cancelConfirm}
+                    message="Are you sure you want to cancel this payment request?"
                     confirmLabel={t.common.cancel}
-                    cancelLabel={t.common.keep}
+                    cancelLabel="Keep"
                     inputConfig={{
-                        placeholder: t.home.qr.cancelReasonPlaceholder,
-                        // Sent to cancelPaymentRequest as the reason field — a
-                        // payload sentinel, not copy. Stays untranslated.
+                        placeholder: 'Reason for cancellation',
                         defaultValue: 'no reason',
                     }}
                 />
@@ -802,25 +709,18 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
                             />
                         )}
 
-                        {data.note && <DetailRow bg="#F7F7F7" label={t.common.note} value={data.note} />}
+                        {data.note && <DetailRow bg="#F7F7F7" label="Note" value={data.note} />}
 
-                        {/* Padded to line up with the filled rows above, which
-                            carry their inline padding inside the pill. */}
                         {!data.isPermanent && data.expiresAt && (
-                            <div className="px-xd-15">
-                                <CountdownTimer
-                                    expiryTimestamp={data.expiresAt}
-                                    onExpired={handleExpired}
-                                />
-                            </div>
+                            <CountdownTimer
+                                expiryTimestamp={data.expiresAt}
+                                onExpired={handleExpired}
+                            />
                         )}
 
                         {sendError && (
-                            <div
-                                aria-live="polite"
-                                className="bg-[#FFF0F0] border border-[#FF5F61]/20 rounded-lg p-3 mt-2"
-                            >
-                                <p className="text-[12px] text-[#FF5F61]">{sendError}</p>
+                            <div className="bg-[#FFF0F0] border border-[#FF4D4D]/20 rounded-lg p-3 mt-2">
+                                <p className="text-[12px] text-[#FF4D4D]">{sendError}</p>
                             </div>
                         )}
 
@@ -830,7 +730,7 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
                                     type="text"
                                     value={cancelReason}
                                     onChange={(e) => setCancelReason(e.target.value)}
-                                    placeholder={t.home.qr.cancelReasonPlaceholder}
+                                    placeholder="Reason for cancellation"
                                     className="w-full text-[13px] text-[#1D1D1D] bg-transparent border-b border-[#E0E0E0] focus:border-[#388CFF] focus:outline-0 pb-1 transition-colors"
                                 />
                                 <div className="flex gap-2">
@@ -839,9 +739,7 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
                                         disabled={!cancelReason.trim() || isCancelling}
                                         className="flex-1 py-2 rounded-lg bg-[#FF4D4D]/10 text-[#FF4D4D] text-[12px] font-medium disabled:opacity-50"
                                     >
-                                        {isCancelling
-                                            ? t.home.qr.cancelling
-                                            : t.home.qr.confirmCancel}
+                                        {isCancelling ? 'Cancelling…' : 'Confirm Cancel'}
                                     </button>
                                     <button
                                         onClick={() => {
@@ -850,7 +748,7 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
                                         }}
                                         className="flex-1 py-2 rounded-lg bg-[#F5F5F5] text-[#8D8D8D] text-[12px] font-medium"
                                     >
-                                        {t.common.keep}
+                                        Keep
                                     </button>
                                 </div>
                             </div>
@@ -862,17 +760,11 @@ const PaymentRequestReview: React.FC<PaymentRequestReviewProps> = ({
 
                 {/* Action buttons */}
                 <div className="absolute bottom-0 w-full bg-white">
-                    {/* SendButton's empty py-6 top padding: out of flow, nothing moves. */}
-                    <InlineFeedback
-                        feedback={feedback}
-                        lines={1}
-                        className="absolute inset-x-0 top-0 h-6 items-center px-4"
-                    />
                     <div className="flex flex-col gap-2 px-4">
                         <SendButton
                             isExpired={isExpired || data.status === 'EXPIRED'}
                             isSending={isSending}
-                            isDisabled={!canSend || !isOnline}
+                            isDisabled={!canSend}
                             onSend={() => void handleSend()}
                         />
                     </div>
