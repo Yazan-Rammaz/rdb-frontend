@@ -7,6 +7,7 @@ import { useTranslation } from '@/context/I18nContext';
 import type { ReceiptData } from './receipt-types';
 import TrydosSvg from '@/assets/icons/trydos.svg';
 import SuccessSvg from '@/assets/icons/home/transfer/success.svg';
+import { getReceiptTone, RECEIPT_TONES } from './receiptStatus';
 
 interface DownloadViewProps {
     show: boolean;
@@ -61,6 +62,9 @@ const DownloadView = forwardRef<HTMLDivElement, DownloadViewProps>(
             t.transfer.receipt.statusValue[
                 data.status.toLowerCase() as keyof typeof t.transfer.receipt.statusValue
             ] || data.status;
+        const tone = getReceiptTone(data.status);
+        const { accent } = RECEIPT_TONES[tone];
+        const receiptT = t.transfer.receipt;
 
         const cardWidth = Math.min(screenWidth, 430);
         return (
@@ -151,30 +155,55 @@ const DownloadView = forwardRef<HTMLDivElement, DownloadViewProps>(
                         }}
                     >
                         <Row
-                            label={t.transfer.receipt.amountSent}
+                            label={
+                                data.direction === 'IN'
+                                    ? receiptT.amountReceived
+                                    : receiptT.amountSent
+                            }
                             value={`${data.amount} ${data.currency}`}
                             bold
                         />
                         <Row label={t.transfer.receipt.reference} value={data.referenceCode} />
                         <Row label={t.transfer.receipt.dateTime} value={dateTime} />
-                        <Row label={t.transfer.receipt.type} value={t.transfer.receipt.typeValue} />
-                        <Row label={t.transfer.receipt.purpose} value={data.purposeLabel} />
+                        <Row
+                            label={receiptT.type}
+                            value={data.typeLabel ?? receiptT.typeValue}
+                        />
+                        <Row label={receiptT.purpose} value={data.purposeLabel || '—'} />
                         <Row
                             label={t.transfer.receipt.status}
                             value={displayStatus}
                             icon={
-                                <img
-                                    src={SuccessSvg.src}
-                                    alt="success"
-                                    style={{
-                                        width: '16px',
-                                        height: '16px',
-                                        marginLeft: '8px',
-                                        display: 'inline-block',
-                                    }}
-                                />
+                                tone === 'success' ? (
+                                    <img
+                                        src={SuccessSvg.src}
+                                        alt="success"
+                                        style={{
+                                            width: '16px',
+                                            height: '16px',
+                                            marginLeft: '8px',
+                                            display: 'inline-block',
+                                        }}
+                                    />
+                                ) : (
+                                    // A plain CSS dot: html2canvas renders it
+                                    // reliably, inline SVG less so.
+                                    <span
+                                        style={{
+                                            width: '10px',
+                                            height: '10px',
+                                            marginLeft: '8px',
+                                            borderRadius: '50%',
+                                            backgroundColor: accent,
+                                            display: 'inline-block',
+                                        }}
+                                    />
+                                )
                             }
                         />
+                        {data.extraRows?.map((row) => (
+                            <Row key={row.label} label={row.label} value={row.value} />
+                        ))}
                     </div>
                 </div>
 

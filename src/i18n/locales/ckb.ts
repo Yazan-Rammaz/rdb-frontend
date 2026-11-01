@@ -322,6 +322,13 @@ const ckb: TranslationSchema = {
             recipientAccountNumber: 'ژمارەی هەژماری وەرگر',
             recipientAccountName: 'ناوی تەواوی وەرگر',
             amountSent: 'بڕی نێردراو',
+            amountReceived: 'بڕی وەرگیراو',
+            headline: {
+                received: 'پارەکە بە سەرکەوتوویی وەرگیرا',
+                pending: 'مامەڵەکە چاوەڕوانکراوە',
+                expired: 'ماوەی مامەڵەکە بەسەرچوو',
+                failed: 'مامەڵەکە سەرکەوتوو نەبوو',
+            },
             reference: 'سەرچاوە',
             dateTime: 'بەروار و کات',
             type: 'جۆر',
@@ -344,6 +351,7 @@ const ckb: TranslationSchema = {
                 completed: 'سەرکەوتوو',
                 pending: 'چاوەڕوانکراو',
                 failed: 'سەرکەوتوو نەبوو',
+                expired: 'بەسەرچووە',
             },
         },
         receiveMoneyInfo:
@@ -367,6 +375,7 @@ const ckb: TranslationSchema = {
             success: 'سەرکەوتوو',
             pending: 'چاوەڕوانکراو',
             failed: 'سەرکەوتوو نەبوو',
+            expired: 'بەسەرچووە',
         },
         transactions: {
             transferSend: 'گواستنەوە | ناردن',
