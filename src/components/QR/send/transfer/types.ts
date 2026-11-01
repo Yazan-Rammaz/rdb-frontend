@@ -4,6 +4,20 @@ import type {
     VerifyTransferResponse,
 } from '@/core/types/transfer';
 
+/** How the sender identifies the recipient. Drives the tabs above the field. */
+export type RecipientInputMode = 'account' | 'phone';
+
+/**
+ * Details collected for a phone number that has no account yet. They exist so
+ * the money can be released against a matching official document.
+ */
+export interface UnregisteredRecipient {
+    fullName: string;
+    idNumber: string;
+}
+
+export const emptyUnregisteredRecipient: UnregisteredRecipient = { fullName: '', idNumber: '' };
+
 export interface TransferFormState {
     recipientAccountNumber: string;
     recipientDetails: RecipientAccountDetails | null;
@@ -20,7 +34,10 @@ export interface TransferFormState {
     accountError: string | null;
     amountError: string | null;
     currencyWarning: string | null;
-    recipientInputMode: 'account' | 'phone';
+    recipientInputMode: RecipientInputMode;
+    /** Phone lookup answered "no account on this number". */
+    recipientNotFound: boolean;
+    unregisteredRecipient: UnregisteredRecipient;
     accountConfirmed: boolean;
     editingAfterConfirm: boolean;
     inputMethod: 'MANUAL' | 'QR';
@@ -43,6 +60,8 @@ export const initialFormState: TransferFormState = {
     amountError: null,
     currencyWarning: null,
     recipientInputMode: 'account',
+    recipientNotFound: false,
+    unregisteredRecipient: emptyUnregisteredRecipient,
     accountConfirmed: false,
     editingAfterConfirm: false,
     inputMethod: 'MANUAL',

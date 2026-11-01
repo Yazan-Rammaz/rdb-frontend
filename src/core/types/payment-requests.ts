@@ -84,8 +84,17 @@ export interface MerchantPaymentLookup {
     feeAmount: string;
     assetType: string;
     assetSymbol: string;
-    /** Pre-localized by the merchant; pick by current language, fall back to en. */
-    description?: { en?: string; ar?: string };
+    /**
+     * The order in words — "Trydos order SA52845R2LBYCC0D". The one line on the
+     * pay screen that tells a customer this is *their* basket, so it is worth
+     * reading carefully.
+     *
+     * Two shapes arrive: a plain string, and a `{ en, ar }` pair a merchant
+     * pre-localized. Read it through `merchantDescription()` — indexing a
+     * string by language yields `undefined` silently, which is exactly how this
+     * line went missing from the screen once already.
+     */
+    description?: string | { en?: string; ar?: string };
     expiresAt: string;
 }
 

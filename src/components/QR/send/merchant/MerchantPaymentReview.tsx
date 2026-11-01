@@ -3,14 +3,26 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useTranslation } from '@/context/I18nContext';
+import { contentLanguage } from '@/i18n';
 import { useStore } from '@/context/StoreContext';
-import { useToast } from '@/context/ToastContext';
 import { usePaymentRequestAPI } from '@/hooks/usePaymentRequestAPI';
-import { isMerchantPayable } from '@/api/helpers/paymentRequests';
-import Input from '@/components/ui/Input';
+import { useIsOnline, useOnReconnect } from '@/hooks/useIsOnline';
+import { reportUserError } from '@/lib/observe';
+import { isMerchantPayable, merchantDescription } from '@/api/helpers/paymentRequests';
+import { formatMoneyString } from '../../shared/formatMoneyString';
+import { formatDateTime } from '../../shared/formatDateTime';
+import DetailRow from '../../shared/DetailRow';
+import { ActionButton } from '../../shared/ActionButton';
+import SenderCard from '../transfer/SenderCard';
 import CountdownTimer from '../payment-request/CountdownTimer';
 import SendButton from '../payment-request/SendButton';
-import LogoIcon from '@/assets/icons/home/qr/title.svg';
+import { QRCodeDisplay } from '../shared/QRCodeDisplay';
+import TitleIcon from '@/assets/icons/home/qr/sendT.svg';
+import OrderIcon from '@/assets/icons/home/orderinvoice.svg';
+import TransferDoneIcon from '@/assets/icons/home/transfer/transferdone.svg';
+import SuccessIcon from '@/assets/icons/home/transfer/success.svg';
+import DoneIcon from '@/assets/icons/home/transfer/done.svg';
+import TrydosIcon from '@/assets/icons/trydos.svg';
 import type { MerchantPaymentLookup, MerchantPayResponse } from '@/core/types';
 
 interface MerchantPaymentReviewProps {
@@ -31,6 +43,11 @@ interface MerchantPaymentReviewProps {
  * with a receipt rather than a request, and shows a shop and an order number
  * where the other shows a person. Sharing one component would mean two payment
  * paths interleaved behind `kind` checks in every branch.
+ *
+ * It does borrow that screen's furniture wholesale — the same title block,
+ * SenderCard, DetailRow list and SendButton — because to the customer this is
+ * the same act as any other payment, and a shop scan that landed somewhere
+ * visually unrelated read as a different app.
  */
 const MerchantPaymentReview: React.FC<MerchantPaymentReviewProps> = ({
     code,
@@ -39,20 +56,19 @@ const MerchantPaymentReview: React.FC<MerchantPaymentReviewProps> = ({
     onBack,
 }) => {
     const { t, language } = useTranslation();
-    const { toast } = useToast();
     const { refreshTransactions } = useStore();
     const api = usePaymentRequestAPI();
 
     const apiRef = useRef(api);
     apiRef.current = api;
-    const toastRef = useRef(toast);
-    toastRef.current = toast;
 
     const [order, setOrder] = useState<MerchantPaymentLookup | null>(prefetched ?? null);
     const [loading, setLoading] = useState(!prefetched);
     const [fetchError, setFetchError] = useState<string | null>(null);
     const [isExpired, setIsExpired] = useState(false);
     const [isPaying, setIsPaying] = useState(false);
+    /** A refused payment, shown in the red box under the order until the next attempt. */
+    const [payError, setPayError] = useState<string | null>(null);
     const [receipt, setReceipt] = useState<MerchantPayResponse | null>(null);
 
     /**
@@ -66,6 +82,9 @@ const MerchantPaymentReview: React.FC<MerchantPaymentReviewProps> = ({
     );
 
     const cancelledRef = useRef(false);
+    const isOnline = useIsOnline();
+    // A lookup that failed for lack of connection, to re-run on reconnect.
+    const lookupPendingRef = useRef(false);
 
     const fetchOrder = useCallback(async () => {
         if (!code) return;
@@ -78,7 +97,15 @@ const MerchantPaymentReview: React.FC<MerchantPaymentReviewProps> = ({
         if (cancelledRef.current) return;
 
         if ('error' in result) {
+            // No connection: stay on the loading state and look it up again
+            // once the app is back online — the offline pill explains the wait.
+            if (result.network) {
+                lookupPendingRef.current = true;
+                return;
+            }
+            // The hook shows nothing: this screen is the only report.
             setFetchError(result.error);
+            reportUserError(result.error);
             setLoading(false);
             return;
         }
@@ -89,6 +116,7 @@ const MerchantPaymentReview: React.FC<MerchantPaymentReviewProps> = ({
         // endpoint, so refuse rather than guess.
         if (result.kind !== 'MERCHANT') {
             setFetchError(t.home.qr.messages.invalidQrCode);
+            reportUserError(t.home.qr.messages.invalidQrCode);
             setLoading(false);
             return;
         }
@@ -105,9 +133,33 @@ const MerchantPaymentReview: React.FC<MerchantPaymentReviewProps> = ({
         };
     }, [code, prefetched, fetchOrder]);
 
+    useOnReconnect(() => {
+        if (!lookupPendingRef.current) return;
+        lookupPendingRef.current = false;
+        void fetchOrder();
+    });
+
+    /**
+     * The receipt tints the sheet green, the same way a completed transfer
+     * does. Restored on unmount so the sheet is not left green for whatever
+     * opens in it next.
+     */
+    useEffect(() => {
+        if (!receipt) return;
+        const bottomSheet = document.getElementById('bottom-sheet');
+        if (!bottomSheet) return;
+
+        const previousBg = bottomSheet.style.backgroundColor;
+        bottomSheet.style.backgroundColor = '#F4FFFA';
+        return () => {
+            bottomSheet.style.backgroundColor = previousBg;
+        };
+    }, [receipt]);
+
     const handlePay = useCallback(async () => {
-        if (!order || isPaying) return;
+        if (!order || isPaying || !isOnline) return;
         setIsPaying(true);
+        setPayError(null);
 
         const result = await apiRef.current.payMerchantPayment({
             id: order.id,
@@ -115,20 +167,32 @@ const MerchantPaymentReview: React.FC<MerchantPaymentReviewProps> = ({
         });
 
         setIsPaying(false);
-        if ('error' in result) return; // the hook has already toasted
+        // A network failure is silent (the offline pill says it) and keeps the
+        // key for the retry. A server refusal is shown here — the hook shows
+        // nothing — and stays until the next tap on Pay.
+        if ('error' in result) {
+            if (!result.network) {
+                setPayError(result.error);
+                reportUserError(result.error);
+            }
+            return;
+        }
 
         setReceipt(result);
         // The payment shows up in the ledger — pull it in now so going back to
         // the transactions list does not show a stale one.
         void refreshTransactions?.();
-    }, [order, isPaying, refreshTransactions]);
+    }, [order, isPaying, isOnline, refreshTransactions]);
 
     // ─── States before the order can be shown ────────────────────────────────
 
     if (loading) {
         return (
-            <div className="flex flex-col items-center justify-center w-full h-full">
-                <p className="text-4 font-light text-text">{t.common.loading}</p>
+            <div className="w-full h-full flex items-center justify-center">
+                <div className="flex flex-col items-center gap-3">
+                    <div className="w-8 h-8 border-2 border-[#388CFF] border-t-transparent rounded-full animate-spin" />
+                    <p className="text-[13px] text-[#8D8D8D]">{t.merchantPayment.loading}</p>
+                </div>
             </div>
         );
     }
@@ -140,7 +204,7 @@ const MerchantPaymentReview: React.FC<MerchantPaymentReviewProps> = ({
         return (
             <div className="w-full h-full flex items-center justify-center">
                 <div className="flex flex-col items-center gap-3 px-6 text-center">
-                    <p className="text-[13px] text-[#FF4D4D]">
+                    <p aria-live="polite" className="text-[13px] text-[#FF5F61]">
                         {fetchError || t.home.qr.messages.invalidQrCode}
                     </p>
                     {/* Retry only helps when there is a code to re-fetch; a
@@ -148,7 +212,8 @@ const MerchantPaymentReview: React.FC<MerchantPaymentReviewProps> = ({
                     {code && (
                         <button
                             onClick={() => void fetchOrder()}
-                            className="text-[13px] text-[#388CFF] font-medium underline cursor-pointer"
+                            disabled={!isOnline}
+                            className="text-[13px] text-[#388CFF] font-medium underline cursor-pointer disabled:cursor-default disabled:text-[#C3C3C3]"
                         >
                             {t.common.retry}
                         </button>
@@ -164,75 +229,140 @@ const MerchantPaymentReview: React.FC<MerchantPaymentReviewProps> = ({
         );
     }
 
+    const description = merchantDescription(order, contentLanguage(language));
+
     // ─── Paid ────────────────────────────────────────────────────────────────
 
     if (receipt) {
         return (
-            <div className="flex flex-col items-center w-full h-full overflow-y-auto pt-2 pb-6">
-                <div className="relative w-25 h-7 shrink-0">
-                    <Image src={LogoIcon} alt="" fill className="object-contain" />
-                </div>
+            <div className="flex flex-col relative bg-[#F4FFFA] h-full w-full">
+                {/* Content scrolls; the action bar below keeps its own space. */}
+                <div className="flex-1 min-h-0 w-full overflow-y-auto flex flex-col items-center">
+                    <div className="mt-xd-16 mb-xd-12">
+                        <Image src={TransferDoneIcon} alt="" className="size-xd-40" />
+                    </div>
 
-                <div className="flex flex-col items-center gap-1 mt-6">
-                    <p className="text-[22px] font-semibold text-text">
-                        {receipt.amount} {receipt.assetSymbol}
+                    <h2 className="text-xd-13 text-[#1D1D1D] font-medium text-center mb-xd-16 uppercase">
+                        {t.merchantPayment.paidSuccess}
+                    </h2>
+
+                    <div className="mb-xd-8">
+                        <QRCodeDisplay value={receipt.receiptNumber} bg="#F4FFFA" size={120} />
+                    </div>
+
+                    <p className="text-xd-13 text-[#1D1D1D] font-medium mb-xd-24">
+                        {receipt.receiptNumber}
                     </p>
-                    <p className="text-4 font-light text-text">{receipt.merchantName}</p>
+
+                    <div className="w-xd-370 max-w-full space-y-xd-16">
+                        <DetailRow
+                            label={t.merchantPayment.merchant}
+                            value={receipt.merchantName}
+                            icon={
+                                <Image
+                                    src={OrderIcon}
+                                    alt=""
+                                    width={14}
+                                    height={14}
+                                    className="size-xd-14 object-contain"
+                                />
+                            }
+                        />
+
+                        {description && (
+                            <DetailRow label={t.merchantPayment.orderDetails} value={description} />
+                        )}
+
+                        <div className="grid grid-cols-2 gap-y-xd-16 gap-x-xd-48">
+                            <DetailRow
+                                label={t.merchantPayment.amountToPay}
+                                value={`${formatMoneyString(receipt.amount)} ${receipt.assetSymbol}`}
+                                bold
+                            />
+                            <DetailRow
+                                label={t.merchantPayment.receiptNumber}
+                                value={receipt.receiptNumber}
+                            />
+                            <DetailRow
+                                label={t.merchantPayment.paidAt}
+                                value={formatDateTime(receipt.paidAt, language)}
+                            />
+                            <div>
+                                <p className="text-xd-11 text-[#8D8D8D] font-medium">
+                                    {t.merchantPayment.status}
+                                </p>
+                                <div className="flex items-center gap-xd-4">
+                                    <span className="text-xd-13 text-[#1D1D1D] mt-xd-5 font-medium">
+                                        {
+                                            statusLabel(
+                                                receipt.status,
+                                                t.merchantPayment.statusValue,
+                                            ).label
+                                        }
+                                    </span>
+                                    <Image
+                                        src={SuccessIcon}
+                                        alt=""
+                                        width={16}
+                                        height={16}
+                                        className="size-xd-16"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <OrderReference
+                            label={t.merchantPayment.orderRef}
+                            value={receipt.orderRef}
+                        />
+                    </div>
+
+                    <div className="mt-xd-24 mb-xd-16">
+                        <Image
+                            alt="trydos"
+                            width={80}
+                            height={25}
+                            src={TrydosIcon}
+                            className="w-xd-80 h-xd-25"
+                        />
+                    </div>
                 </div>
 
-                <div className="px-xd-25 w-full mt-6 space-y-0">
-                    <Input
-                        containerClassName="bg-transparent w-full"
-                        hideRequired
-                        reviewMode
-                        disabled
-                        readOnly
-                        label={t.merchantPayment.orderRef}
-                        value={receipt.orderRef}
+                {/* Action buttons — in the layout flow, so they never cover the content */}
+                <div className="relative shrink-0 flex bg-[#F4FFFA] max-w-xd-370 mx-auto items-center justify-around w-full pt-xd-16 pb-xd-16 border-t border-gray-100">
+                    <ActionButton
+                        icon={DoneIcon}
+                        label={t.common.done}
+                        onClick={onDone}
+                        bounceOnClick
                     />
-                    <Input
-                        containerClassName="bg-transparent w-full"
-                        hideRequired
-                        reviewMode
-                        disabled
-                        readOnly
-                        label={t.merchantPayment.receiptNumber}
-                        value={receipt.receiptNumber}
-                    />
-                    <Input
-                        containerClassName="bg-transparent w-full"
-                        hideRequired
-                        reviewMode
-                        disabled
-                        readOnly
-                        label={t.merchantPayment.paidAt}
-                        value={formatPaidAt(receipt.paidAt, language)}
-                    />
-                </div>
-
-                <div className="flex flex-col items-center gap-3 w-full px-xd-25 mt-8">
                     {/*
                       The shop's own "thank you" page. Opened in a new tab and
                       severed with noopener: it is a third-party URL handed to us
                       in an API response, and it must not get a handle on the
-                      banking tab it was launched from.
+                      banking tab it was launched from. An anchor rather than an
+                      ActionButton for exactly that reason — `rel` is what does
+                      the severing.
                     */}
                     {receipt.successUrl && (
                         <a
                             href={receipt.successUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="w-full max-w-[320px] py-3.5 rounded-xl bg-[#388CFF]/10 text-[#388CFF] text-[14px] font-semibold text-center"
+                            className="flex cursor-pointer flex-col items-center gap-xd-5 transition-opacity hover:opacity-70 active:opacity-50"
                         >
-                            {t.merchantPayment.backToStore}
+                            <Image
+                                width={20}
+                                height={20}
+                                src={OrderIcon}
+                                alt=""
+                                className="size-xd-20 object-contain"
+                            />
+                            <span className="text-xd-11 leading-xd-16 font-normal text-[#1D1D1D]">
+                                {t.merchantPayment.backToStore}
+                            </span>
                         </a>
                     )}
-                    <button
-                        onClick={onDone}
-                        className="w-full max-w-[320px] py-3.5 rounded-xl text-[14px] font-semibold text-text cursor-pointer"
-                    >
-                        {t.common.done}
-                    </button>
                 </div>
             </div>
         );
@@ -241,83 +371,182 @@ const MerchantPaymentReview: React.FC<MerchantPaymentReviewProps> = ({
     // ─── Ready to pay ────────────────────────────────────────────────────────
 
     const payable = isMerchantPayable(order) && !isExpired;
-    const description = order.description?.[language === 'ar' ? 'ar' : 'en'] ?? order.description?.en;
     const hasFee = !!order.feeAmount && Number(order.feeAmount) > 0;
+    const status = statusLabel(
+        isExpired ? 'EXPIRED' : order.status,
+        t.merchantPayment.statusValue,
+    );
 
     return (
-        <div className="flex flex-col items-center w-full h-full overflow-y-auto pt-2">
-            <div className="relative w-25 h-7 shrink-0">
-                <Image src={LogoIcon} alt="" fill className="object-contain" />
-            </div>
+        <div className="w-full h-full overflow-y-auto relative flex flex-col">
+            <div className="w-full relative flex flex-col flex-1">
+                {/* Header */}
+                <div className="flex flex-col items-center mb-4 pt-2">
+                    <div className="mb-3">
+                        <Image src={TitleIcon} alt="" width={40} height={40} />
+                    </div>
+                    <h2 className="text-[13px] font-medium tracking-widest text-[#1D1D1D] uppercase">
+                        {t.merchantPayment.title}
+                    </h2>
+                </div>
 
-            {/* The shop and what it is charging for — the two things worth
-                checking before paying, so they lead. */}
-            <div className="flex flex-col items-center gap-1 mt-5 px-xd-25 text-center">
-                <p className="text-4 font-light text-text">{order.merchantName}</p>
-                <p className="text-[26px] font-semibold text-text">
-                    {order.amount} {order.assetSymbol}
+                <SenderCard selectedAssetSymbol={order.assetSymbol} />
+
+                {/* Pay To divider */}
+                <p className="text-[13px] text-[#1D1D1D] font-medium text-center mt-4 mb-2">
+                    {t.merchantPayment.payTo}
                 </p>
-                {hasFee && (
-                    <p className="text-[12px] font-light text-[#888888]">
-                        {t.merchantPayment.feeLabel}: {order.feeAmount} {order.assetSymbol}
-                    </p>
-                )}
-                {description && (
-                    <p className="text-[13px] font-light text-[#666666] mt-1">{description}</p>
-                )}
-            </div>
 
-            <div className="px-xd-25 w-full mt-5 space-y-0">
-                <Input
-                    containerClassName="bg-transparent w-full"
-                    hideRequired
-                    reviewMode
-                    disabled
-                    readOnly
-                    label={t.merchantPayment.orderRef}
-                    value={order.orderRef}
-                />
-            </div>
+                {/* The order in the customer's terms — who is charging, for what,
+                    and how much. The ids that identify it to the two backends sit
+                    underneath, where they belong. */}
+                <div className="flex items-center justify-center w-full">
+                    <div className="overflow-auto pb-40 w-xd-370 space-y-1">
+                        <DetailRow
+                            bg="#F7F7F7"
+                            label={t.merchantPayment.merchant}
+                            value={order.merchantName}
+                            icon={
+                                <Image
+                                    src={OrderIcon}
+                                    alt=""
+                                    width={14}
+                                    height={14}
+                                    className="object-contain"
+                                />
+                            }
+                        />
 
-            {order.expiresAt && !isExpired && (
-                <div className="w-full px-xd-25 mt-2">
-                    <CountdownTimer
-                        expiryTimestamp={order.expiresAt}
-                        onExpired={() => setIsExpired(true)}
+                        {description && (
+                            <DetailRow
+                                bg="#F7F7F7"
+                                label={t.merchantPayment.orderDetails}
+                                value={description}
+                            />
+                        )}
+
+                        <DetailRow
+                            bg="#F7F7F7"
+                            label={t.merchantPayment.amountToPay}
+                            value={`${formatMoneyString(order.amount)} ${order.assetSymbol}`}
+                            bold
+                        />
+
+                        {hasFee && (
+                            <DetailRow
+                                bg="#F7F7F7"
+                                label={t.merchantPayment.feeLabel}
+                                value={`${formatMoneyString(order.feeAmount)} ${order.assetSymbol}`}
+                            />
+                        )}
+
+                        <DetailRow
+                            bg="#F7F7F7"
+                            label={t.merchantPayment.status}
+                            value={status.label}
+                            valueColor={status.color}
+                        />
+
+                        <OrderReference
+                            bg="#F7F7F7"
+                            label={t.merchantPayment.orderRef}
+                            value={order.orderRef}
+                        />
+
+                        {/* Padded to match the filled rows above — it carries no
+                            pill of its own, so without this its "Valid Until"
+                            hangs 15px left of every other label. */}
+                        {order.expiresAt && !isExpired && (
+                            <div className="px-xd-15">
+                                <CountdownTimer
+                                    expiryTimestamp={order.expiresAt}
+                                    onExpired={() => setIsExpired(true)}
+                                />
+                            </div>
+                        )}
+
+                        {(!payable || payError) && (
+                            <div
+                                aria-live="polite"
+                                className="bg-[#FFF0F0] border border-[#FF5F61]/20 rounded-lg p-3 mt-2"
+                            >
+                                <p className="text-[12px] text-[#FF5F61]">
+                                    {!payable
+                                        ? isExpired || order.status === 'EXPIRED'
+                                            ? t.merchantPayment.expired
+                                            : t.merchantPayment.notPayable
+                                        : payError}
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                <div className="flex-1" />
+
+                <div className="absolute bottom-0 w-full bg-background">
+                    <SendButton
+                        isExpired={isExpired || order.status === 'EXPIRED'}
+                        isSending={isPaying}
+                        isDisabled={!payable || !isOnline}
+                        onSend={() => void handlePay()}
+                        label={t.merchantPayment.payButton}
+                        sendingLabel={t.merchantPayment.payingButton}
                     />
                 </div>
-            )}
-
-            {!payable && (
-                <p className="text-[13px] font-medium text-[#FF4D4D] mt-4 px-xd-25 text-center">
-                    {isExpired || order.status === 'EXPIRED'
-                        ? t.merchantPayment.expired
-                        : t.merchantPayment.notPayable}
-                </p>
-            )}
-
-            <div className="mt-auto w-full">
-                <SendButton
-                    isExpired={!payable}
-                    isSending={isPaying}
-                    isDisabled={!payable}
-                    onSend={handlePay}
-                />
             </div>
         </div>
     );
 };
 
-function formatPaidAt(iso: string, language: string): string {
-    const date = new Date(iso);
-    if (Number.isNaN(date.getTime())) return iso;
-    return date.toLocaleString(language === 'ar' ? 'ar' : 'en-GB', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-    });
+/**
+ * The shop's order reference.
+ *
+ * Its own row rather than a DetailRow because of what shops actually send: a
+ * readable order number from some, a 36-character UUID from others. At
+ * DetailRow's size a UUID wraps over two lines and reads as the loudest thing
+ * on a payment screen, which is backwards — it is the one field the customer
+ * never needs to check. Shown small and complete: quiet, still quotable to
+ * support, and never truncated.
+ */
+function OrderReference({ label, value, bg }: { label: string; value: string; bg?: string }) {
+    if (!value) return null;
+    return (
+        // Padding tracks DetailRow's: filled pill gets inline padding, bare row
+        // stays flush, so the two line up wherever they sit together.
+        <div
+            className={`rounded-xd-15 py-xd-8 ${bg ? 'px-xd-15' : ''}`}
+            style={{ backgroundColor: bg || 'transparent' }}
+        >
+            <p className="text-xd-11 text-[#8D8D8D]">{label}</p>
+            <p className="text-xd-11 text-[#8D8D8D] mt-xd-4 break-all">{value}</p>
+        </div>
+    );
+}
+
+/** Backend status → what it is called on screen, and the colour that says it. */
+function statusLabel(
+    status: string | undefined,
+    values: { pending: string; paid: string; expired: string; cancelled: string },
+): { label: string; color: string } {
+    switch (status?.toUpperCase()) {
+        case 'PENDING':
+            return { label: values.pending, color: '#F59E0B' };
+        case 'PAID':
+        case 'COMPLETED':
+        case 'SUCCEEDED':
+            return { label: values.paid, color: '#22C55E' };
+        case 'EXPIRED':
+            return { label: values.expired, color: '#FF4D4D' };
+        case 'CANCELLED':
+        case 'CANCELED':
+            return { label: values.cancelled, color: '#FF4D4D' };
+        // An unrecognised status is shown as sent rather than swallowed — a
+        // customer seeing a word the app does not know is better than a
+        // payment screen that quietly omits the state it is in.
+        default:
+            return { label: status || '', color: '#1D1D1D' };
+    }
 }
 
 export default MerchantPaymentReview;

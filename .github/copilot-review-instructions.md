@@ -14,7 +14,7 @@
 - Client components must **never** import server actions directly — they receive them via the `actions` prop through `useActions()` hook or context.
 
 ### Library Boundary Violations
-- Internal contexts (`AuthContext`, `ScannerContext`, `StoreContext`, `ToastContext`, `LayoutContext`, `PasskeyContext`, `RDBContext`) must **not** be exported from `src/rdb/index.ts` unless explicitly required by consumers.
+- Internal contexts (`AuthContext`, `ScannerContext`, `StoreContext`, `LayoutContext`, `PasskeyContext`, `RDBContext`) must **not** be exported from `src/rdb/index.ts` unless explicitly required by consumers.
 - `package.json` exports (`./server`, `./core`, `./styles`) must match the intended public API. Flag any new export that exposes internals.
 - Peer dependencies (`react`, `react-dom`, `next`) must stay **external** in `tsup.config.ts`. Flag if someone bundles them.
 
@@ -65,7 +65,7 @@
 - Locale format is `country-language` (e.g., `sy-en`, `lb-ar`). Language is extracted from the part after the dash.
 
 ### Error Handling
-- API calls should have proper error handling with user-facing feedback (Toast context). Flag silent `catch` blocks that swallow errors without notifying the user.
+- API calls should have proper error handling with user-facing feedback shown inline in the screen (`useInlineFeedback` + `<InlineFeedback>`, or an existing error slot) — there are no toasts; never add a message that shifts the layout. Flag silent `catch` blocks that swallow errors without notifying the user.
 - Flag empty `catch (error) { }` blocks — at minimum they should log to console.
 - Async functions in event handlers must be wrapped in try/catch.
 

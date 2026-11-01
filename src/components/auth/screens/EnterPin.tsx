@@ -6,10 +6,23 @@ import Image from 'next/image';
 import OtpInputs from '@/components/ui/OtpInputs';
 import { useTranslation } from '@/context/I18nContext';
 import { FlexibleSpace } from '@/scaling';
+import InlineFeedback from '@/components/ui/InlineFeedback';
+import type { Feedback } from '@/hooks/useInlineFeedback';
 import simSvg from '@/assets/icons/auth/sim.svg';
 import shieldSvg from '@/assets/icons/auth/shield.svg';
 import InfoSvg from '@/assets/icons/auth/info.svg';
 import closeSvg from '@/assets/icons/auth/close.svg';
+import { toE164 } from '@/lib/phoneValidation';
+
+/**
+ * Seconds from a successful send until "resend" unlocks. The backend returns no
+ * expiry, so the countdown is measured from the moment the send succeeded. It
+ * is UX only — the server decides whether a code is still valid.
+ */
+export const OTP_TIMER_SECONDS = 120;
+
+const secondsUntil = (deadline: number) =>
+    Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
 
 interface EnterPinScreenProps {
     onSubmit: (pin: string) => void;
@@ -28,8 +41,14 @@ interface EnterPinScreenProps {
     // Override props for non-phone OTP flows (e.g. IP verification)
     overrideTitle?: string;
     overrideSubtitle?: string;
-    timerSeconds?: number; // default 120; pass 600 for 10-min IP OTP
-    onResend?: () => void; // custom resend handler; hides phone-resend logic when provided
+    /** When "resend" unlocks (epoch ms). Owned by the page so a reload resumes it. */
+    expiresAt: number;
+    /** A resend succeeded: the new deadline. */
+    onExpiresAtChange: (expiresAt: number) => void;
+    /** Offline: the code stays typed but cannot be submitted or resent. */
+    disabled?: boolean;
+    /** A result line (code sent, wrong code…) — shown under the boxes, over "code expired". */
+    feedback?: Feedback | null;
 }
 
 export default function EnterPin({
@@ -48,22 +67,37 @@ export default function EnterPin({
     isValidPin = '',
     overrideTitle,
     overrideSubtitle,
-    timerSeconds = 120,
-    onResend,
+    expiresAt,
+    onExpiresAtChange,
+    disabled = false,
+    feedback = null,
 }: EnterPinScreenProps) {
     const { t } = useTranslation();
-    const [timeLeft, setTimeLeft] = useState(timerSeconds);
-    const [canResend, setCanResend] = useState(false);
+    const [timeLeft, setTimeLeft] = useState(() => secondsUntil(expiresAt));
 
+    // Read from the clock on every tick, never decremented: a reload, a
+    // background tab or a locked phone cannot make the countdown fall behind.
+    // 500 ms so timer jitter never skips a second; same-second ticks don't render.
     useEffect(() => {
-        if (timeLeft <= 0) {
-            setCanResend(true);
-            return;
-        }
-        if (loading === 'resend-pin') return;
-        const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
-        return () => clearTimeout(timer);
-    }, [timeLeft, loading]);
+        const tick = () => {
+            const left = secondsUntil(expiresAt);
+            setTimeLeft(left);
+            return left;
+        };
+        if (tick() === 0) return;
+        const interval = setInterval(() => {
+            if (tick() === 0) clearInterval(interval);
+        }, 500);
+        // A hidden tab's timers are throttled: catch up the moment it shows.
+        const onVisible = () => {
+            if (!document.hidden) tick();
+        };
+        document.addEventListener('visibilitychange', onVisible);
+        return () => {
+            clearInterval(interval);
+            document.removeEventListener('visibilitychange', onVisible);
+        };
+    }, [expiresAt]);
 
     const formatTime = (seconds: number) => {
         const mins = Math.floor(seconds / 60);
@@ -77,35 +111,32 @@ export default function EnterPin({
     };
 
     const handleResend = async () => {
-        if (onResend) {
-            onResend();
-            setTimeLeft(timerSeconds);
-            setCanResend(false);
-            setPin('');
-            return;
-        }
+        if (disabled) return;
+        // Without a valid number this would be a request for `+undefined`.
+        const phoneNumber = toE164(phone ?? '');
+        if (!phoneNumber) return;
         setLoading?.('resend-pin');
         const res = await api.auth.resendOtp({
-            phoneNumber: `+${phone}`,
+            phoneNumber,
             channel: method === 'whatsapp' ? 'whatsapp' : 'sms',
         });
         setLoading?.('');
         if (!res.ok) return;
         if (res.data.sessionInfo) {
-            setTimeLeft(timerSeconds);
-            setCanResend(false);
+            // Only a confirmed send restarts the countdown.
+            onExpiresAtChange(Date.now() + OTP_TIMER_SECONDS * 1000);
             setPin('');
             setSessionInfo?.(res.data.sessionInfo);
         }
     };
 
-    const isExpired = canResend && !loading;
+    const isExpired = timeLeft <= 0 && !loading;
     const methodLabel = method === 'whatsapp' ? t.auth.enterPin.whatsapp : t.auth.enterPin.sms;
 
     return (
         <div className="w-full h-full flex flex-col bg-white">
             {/* Close button */}
-            <div className="flex absolute justify-end right-xd-30 top-xd-30">
+            <div className="flex absolute justify-end end-xd-30 top-xd-30">
                 {onClose && (
                     <button
                         onClick={onClose}
@@ -162,7 +193,11 @@ export default function EnterPin({
                             )}
                             <div className="flex items-center pt-xd-8 gap-xd-5">
                                 {!overrideTitle && (
-                                    <span className="text-trim-descend text-xd-12 font-normal text-[#1D1D1D]">
+                                    // LTR, or RTL copy pushes the `+` to the far end.
+                                    <span
+                                        dir="ltr"
+                                        className="text-trim-descend text-xd-12 font-normal text-[#1D1D1D]"
+                                    >
                                         +{phone}
                                     </span>
                                 )}
@@ -195,7 +230,8 @@ export default function EnterPin({
                                 <div className="flex items-center pt-xd-8 gap-xd-5">
                                     <button
                                         onClick={handleResend}
-                                        className="text-trim-descend text-xd-13 text-[#388CFF] underline"
+                                        disabled={disabled}
+                                        className="text-trim-descend text-xd-13 text-[#388CFF] underline disabled:opacity-50"
                                     >
                                         {t.auth.enterPin.resendCode}
                                     </button>
@@ -254,15 +290,24 @@ export default function EnterPin({
                         value={pin}
                         onChange={setPin}
                         onComplete={handlePinComplete}
-                        disabled={loading === 'verify-pin' || isValidPin === 'valid' || isExpired}
+                        disabled={
+                            disabled || loading === 'verify-pin' || isValidPin === 'valid' || isExpired
+                        }
                         isValidPin={isValidPin}
                         isExpired={isExpired}
                     />
-                    {isExpired && (
-                        <p className="text-xd-11 pt-1 font-medium text-[#1D1D1D]">
-                            {t.auth.enterPin.codeExpired}
-                        </p>
-                    )}
+                    {/* One slot under the boxes: a feedback line wins over "code
+                        expired" while it is up. Only the grow spacer is below it,
+                        so nothing on screen moves. It sits well above the custom
+                        keypad, which rises from the bottom edge on touch devices. */}
+                    <div className="w-full flex flex-col items-center pt-1 px-xd-20">
+                        {isExpired && !feedback && (
+                            <p className="text-xd-11 font-medium text-[#1D1D1D]">
+                                {t.auth.enterPin.codeExpired}
+                            </p>
+                        )}
+                        <InlineFeedback feedback={feedback} className="w-full" />
+                    </div>
                     <FlexibleSpace grow />
                 </div>
             </div>

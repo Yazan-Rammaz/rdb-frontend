@@ -1,4 +1,6 @@
 import React from 'react';
+import Image from 'next/image';
+import SuccessIcon from '@/assets/icons/home/transfer/success.svg';
 import Input from '@/components/ui/Input';
 import { useTranslation } from '@/context/I18nContext';
 import { NoteField } from './NoteField';
@@ -14,6 +16,8 @@ interface ReadOnlyFieldsProps {
     expiresAt?: string | null;
     isPermanent?: boolean;
     onExpired?: () => void;
+    /** Paid: the countdown means nothing any more — show the outcome instead. */
+    paid?: boolean;
 }
 
 export function ReadOnlyFields({
@@ -24,6 +28,7 @@ export function ReadOnlyFields({
     expiresAt,
     isPermanent,
     onExpired,
+    paid = false,
 }: ReadOnlyFieldsProps) {
     const { t } = useTranslation();
     const purposeLabel = getPurposeLabel(formData.purpose, purposes);
@@ -79,7 +84,19 @@ export function ReadOnlyFields({
 
             {formData.note && <NoteField value={formData.note} disabled />}
 
-            {!isPermanent && expiresAt ? (
+            {paid ? (
+                <div className="px-xd-12 flex flex-col gap-xd-6">
+                    <p className="text-xd-11 text-[#8D8D8D] font-medium">
+                        {t.transfer.receipt.status}
+                    </p>
+                    <div className="h-xd-30 px-xd-12 shadow-[0_0_0_0.5px_#D3D3D3] rounded-xd-12 flex items-center gap-xd-4">
+                        <span className="text-xd-11 text-[#1D1D1D] font-medium">
+                            {t.home.qr.paid}
+                        </span>
+                        <Image src={SuccessIcon} alt="" className="size-xd-14" />
+                    </div>
+                </div>
+            ) : !isPermanent && expiresAt ? (
                 <div className="px-xd-12 flex flex-col gap-xd-6">
                     <p className="text-xd-11 text-[#8D8D8D] font-medium">{t.home.qr.validUntil}</p>
                     <div className="h-xd-30 px-xd-12 shadow-[0_0_0_0.5px_#D3D3D3] rounded-xd-12 flex items-center">

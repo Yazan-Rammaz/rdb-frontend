@@ -6,9 +6,9 @@ import { LayoutProvider } from '@/context/LayoutContext';
 import { generateThemeVariables } from '@/lib/theme';
 import { StoreProvider } from '@/context/StoreContext';
 import { I18nProvider } from '@/context/I18nContext';
-import { ToastProvider } from '@/context/ToastContext';
 import { ScannerProvider } from '@/context/ScannerContext';
-import ToastContainer from '@/components/ui/Toast/ToastContainer';
+import NetworkBanner from '@/components/layout/NetworkBanner';
+import ImageRecovery from '@/components/layout/ImageRecovery';
 import React from 'react';
 import { PasskeyProvider } from '@/context/PasskeyContext';
 import { Quicksand } from 'next/font/google';
@@ -75,10 +75,9 @@ export default function RootLayout({
                                     <RDBLayout>
                                         {/* 4. Feature-specific State Management */}
                                         <LayoutProvider>
-                                            <ToastProvider>
-                                                {children}
-                                                <ToastContainer />
-                                            </ToastProvider>
+                                            {children}
+                                            <NetworkBanner />
+                                            <ImageRecovery />
                                         </LayoutProvider>
                                     </RDBLayout>
                                 </ScannerProvider>

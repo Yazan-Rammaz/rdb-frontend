@@ -59,3 +59,23 @@ export function isMerchantPayable(merchant: MerchantPaymentLookup): boolean {
     if (merchant.expiresAt && Date.parse(merchant.expiresAt) <= Date.now()) return false;
     return true;
 }
+
+/**
+ * The merchant's own description of the order, in the reader's language.
+ *
+ * Exists because `description` is sent two ways — `"Trydos order SA52…"` and
+ * `{ en: "…", ar: "…" }` — and a call site that picks one shape drops the
+ * other on the floor without erroring. The plain string is the common case.
+ */
+export function merchantDescription(
+    merchant: MerchantPaymentLookup,
+    language: string,
+): string | undefined {
+    const description = merchant.description;
+    if (!description) return undefined;
+
+    if (typeof description === 'string') return description.trim() || undefined;
+
+    const preferred = language === 'ar' ? description.ar : description.en;
+    return (preferred ?? description.en ?? description.ar)?.trim() || undefined;
+}

@@ -1,7 +1,7 @@
 'use client';
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { User, UserData } from '@/core/types/auth';
-import { clearAuthFlowState } from '@/lib/authFlowCookie';
+import { clearAuthFlowState } from '@/lib/authFlowState';
 import { refreshAccessToken } from '@/core/utils';
 import { api } from '@/api';
 import { useRouter } from 'next/navigation';
@@ -205,6 +205,13 @@ export function AuthProvider({
                     if (outcome === 'ok') return;
                     if (outcome === 'unauthenticated') {
                         setUserDataState(null);
+                        // rdb_sid is minted only with a full session, never
+                        // mid-login: if it is here, a dead session left cookies
+                        // (rdb_st, rdb_sid, an orphan rdb_at) to sweep. No
+                        // session-expired event — a login in progress stays.
+                        if (/(?:^|;\s*)rdb_sid=/.test(document.cookie)) {
+                            void api.session.logout();
+                        }
                         return;
                     }
                     // transient → wait for connectivity, then retry. Don't wipe the session.

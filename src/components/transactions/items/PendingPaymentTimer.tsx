@@ -5,6 +5,7 @@ import { resolvePaymentRequestLookup } from '@/api/helpers/paymentRequests';
 import React, { useEffect, useRef, useState } from 'react';
 import CountdownTimer from '@/components/QR/send/payment-request/CountdownTimer';
 import { useStore } from '@/context/StoreContext';
+import { useTranslation } from '@/context/I18nContext';
 import type { FinancialLedgerItem } from '@/core/types';
 
 interface PendingPaymentTimerProps {
@@ -19,6 +20,7 @@ interface PendingPaymentTimerProps {
  * - On expiry, calls lookup again to update the transaction status in the store
  */
 const PendingPaymentTimer: React.FC<PendingPaymentTimerProps> = ({ requestCode, ledgerId }) => {
+    const { t } = useTranslation();
     const { setTransactions } = useStore();
     const [expiresAt, setExpiresAt] = useState<string | null>(null);
     const [isPermanent, setIsPermanent] = useState(false);
@@ -68,11 +70,13 @@ const PendingPaymentTimer: React.FC<PendingPaymentTimerProps> = ({ requestCode, 
     };
 
     if (isPermanent) {
-        return <span className="font-normal text-[#A0A0A0] text-xd-11">Always valid</span>;
+        return (
+            <span className="font-normal text-[#A0A0A0] text-xd-11">{t.common.alwaysValid}</span>
+        );
     }
 
     if (!expiresAt) {
-        return <span className="font-normal text-[#A0A0A0] text-xd-11">Waiting…</span>;
+        return <span className="font-normal text-[#A0A0A0] text-xd-11">{t.common.waiting}</span>;
     }
 
     return (

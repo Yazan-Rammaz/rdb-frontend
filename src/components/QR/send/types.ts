@@ -38,16 +38,17 @@ export interface AccountData {
     initials: string;
 }
 
+/** Why a scanned QR was rejected */
+export type QRValidationError =
+    | 'invalid_format'
+    | 'client_id_qr'
+    | 'missing_account_info'
+    | 'missing_account_number'
+    | 'missing_account_name'
+    | 'missing_currency'
+    | 'missing_both';
+
 /** Validation result for a scanned QR */
 export type QRValidationResult =
     | { valid: true; data: ParsedQR }
-    | {
-          valid: false;
-          error:
-              | 'invalid_format'
-              | 'missing_account_info'
-              | 'missing_account_number'
-              | 'missing_account_name'
-              | 'missing_currency'
-              | 'missing_both';
-      };
+    | { valid: false; error: QRValidationError };

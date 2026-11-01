@@ -1,0 +1,189 @@
+/**
+ * KYC transport — the seam rdb kept at `@/api`, rebuilt for this project.
+ *
+ * `HttpKycService` is the domain layer; this is the layer under it that
+ * actually moves bytes. It exists as its own file so that pointing this feature
+ * at the real backend is a change to ONE module, not to fifteen call sites.
+ *
+ * ── Why these calls are same-origin ─────────────────────────────────────────
+ * Every caller is a Client Component driving a camera, and this project's rule
+ * is that the browser never talks to a backend directly and never holds a
+ * token. So the browser calls OUR origin at `/api/kyc/*`, and a route handler
+ * (`app/api/kyc/[...path]/route.ts`) attaches the auth cookie server-side and
+ * forwards to the KYC service. That also keeps `connect-src 'self'` intact.
+ *
+ * Server Actions are deliberately NOT used here: the capture screens post
+ * camera frames many times per second, which is not what the RSC action
+ * protocol is for.
+ *
+ * ── Contract note ───────────────────────────────────────────────────────────
+ * These functions NEVER throw. They return `ApiResult`, which is the shape
+ * `HttpKycService.unwrap()` and every `if (!res.ok)` branch is written against.
+ * A thrown error would bypass that error handling entirely.
+ *
+ * ── Paths ───────────────────────────────────────────────────────────────────
+ * Taken from the existing ramaaz-kyc Worker, which mounts `app.route('/api/kyc',
+ * kycRoutes)`. If the agreed backend differs, PATHS below is the only thing that
+ * changes — see SCENARIOS.md §"What I need from you".
+ */
+
+import type { KycRequest } from './kycService.interface';
+import { request as rdbRequest } from '@/api/client';
+
+export type ApiResult<T> =
+    | { ok: true; data: T }
+    | { ok: false; error: { message: string; status?: number; body?: unknown } };
+
+/** Every endpoint this feature uses, in one table. */
+export const PATHS = {
+    analyzeId: '/api/kyc/analyze-id',
+    compareFace: '/api/kyc/compare-face',
+    session: '/api/kyc/session',
+    status: '/api/kyc/status',
+    current: '/api/kyc/current',
+    submit: '/api/kyc/submit',
+    webhookNestjs: '/api/kyc/webhook-nestjs',
+    reverifyStart: '/api/kyc/reverify/start',
+    reverifyVerify: '/api/kyc/reverify/verify',
+    /**
+     * Temporary AWS credentials for the Face Liveness component, gated on the
+     * challenge. They are short-lived and permit exactly one action —
+     * `rekognition:StartFaceLivenessSession` — because the browser has to sign
+     * its own video stream to AWS and there is no server-side path for that.
+     *
+     * A GET with the challenge in the query string, not a POST: it reads state
+     * rather than changing any, and that is how the Worker exposes it.
+     */
+    reverifyCredentials: '/api/kyc/reverify/credentials',
+    /**
+     * Document enrolment. NOT `submit` above — that is RDB's route, and it
+     * needs a KYC session, a media-upload endpoint and a countries table, none
+     * of which exist on root (all three answer 404). `enroll` sends the images
+     * inline in one call the Worker signs. See backend docs/to-backend/2026-09-22-kyc-submit-request.md.
+     */
+    enroll: '/api/kyc/enroll',
+    /**
+     * rdb ENROLMENT liveness — the same AWS Face Liveness check as the
+     * re-verify, on the Worker routes that need no challenge:
+     *
+     *   POST livenessSession      → { sessionId, region }   opens the AWS session
+     *   POST livenessCredentials  { kycSessionId } → STS creds, gated on the
+     *                             enrolment session rdb's backend issued
+     *   GET  livenessResult?sessionId → { status, confidence, livenessImageData }
+     *
+     * All three already exist on the Worker and answer for the `rdb` tenant;
+     * nothing on rdb's backend changes.
+     */
+    livenessSession: '/api/kyc/liveness-aws',
+    livenessResult: '/api/kyc/liveness-aws',
+    livenessCredentials: '/api/kyc/liveness-credentials',
+} as const;
+
+/**
+ * rdb: every call goes through rdb's own client (`@/api/client`), not a raw
+ * fetch. That client is what refreshes an access token that expired mid-flow
+ * (rdb_at lives ~15 min, and an ID scan plus a liveness check can outlast it);
+ * a raw fetch failed the step outright instead. Same-origin either way — the
+ * `[...path]` proxy forwards `/api/kyc/*` to the Worker with the cookie.
+ *
+ * PATHS keep their `/api` prefix so they read like the URLs they are; the
+ * client adds its own, so it is stripped here.
+ */
+async function request<T>(
+    path: string,
+    init: { method?: 'GET' | 'POST'; body?: unknown } = {},
+): Promise<ApiResult<T>> {
+    const { method = 'POST', body } = init;
+    const [bare, qs] = path.replace(/^\/api/, '').split('?');
+    const query = qs ? Object.fromEntries(new URLSearchParams(qs)) : undefined;
+    const res = await rdbRequest<T>({ path: bare, method, body, query });
+    if (res.ok) return { ok: true, data: res.data };
+    // `body` is load-bearing: submitReverify reads a structured 'failed'
+    // verdict out of a non-2xx response rather than treating it as a
+    // transport error. rdb reports a network failure as status 0; the screens
+    // read "no status" as "never reached a server", so 0 maps to undefined.
+    return {
+        ok: false,
+        error: {
+            message: res.error.message,
+            status: res.error.status || undefined,
+            body: res.error.body,
+        },
+    };
+}
+
+const post = <T>(path: string, body?: unknown) => request<T>(path, { method: 'POST', body });
+const get = <T>(path: string) => request<T>(path, { method: 'GET' });
+
+/**
+ * Response shapes, as the callers actually consume them.
+ *
+ * These are the contract this feature needs the backend to satisfy — they are
+ * the single most useful thing to check the real API against, because a
+ * mismatch here is what "backend drift" looks like.
+ */
+export type FaceMatchResponse = {
+    isMatch: boolean;
+    confidence?: number;
+    similarity?: number;
+    verdict?: 'pass' | 'review' | 'fail';
+    errorMessage: string | null;
+};
+
+/** What FaceMatchScreen reads straight off the wire. */
+export type CompareFaceResponse = {
+    status: 'success' | 'error';
+    matchScore?: number;
+    message?: string;
+};
+
+export type SessionResponse = { sessionId: string; expiresAt: string };
+export type LivenessSessionResponse = { sessionId: string; region: string };
+/**
+ * The Worker's read of a finished AWS session. `livenessImageData` is the
+ * reference image AWS selected — the face it actually judged — as a data URL.
+ */
+export type LivenessResultResponse = {
+    status: 'CREATED' | 'IN_PROGRESS' | 'SUCCEEDED' | 'FAILED' | 'EXPIRED' | string;
+    confidence: number;
+    livenessImageData: string | null;
+};
+export type StatusResponse = { status?: string };
+export type SubmitResponse = { success: boolean; kycRequest?: KycRequest };
+
+export const api = {
+    kyc: {
+        analyzeId: <T>(body: unknown) => post<T>(PATHS.analyzeId, body),
+        /** Used by httpKycService.matchFaceToID. */
+        faceMatch: (body: unknown) => post<FaceMatchResponse>(PATHS.compareFace, body),
+        /** Used by FaceMatchScreen directly — same endpoint, caller's own body keys. */
+        compareFace: (body: unknown) => post<CompareFaceResponse>(PATHS.compareFace, body),
+        startSession: () => post<SessionResponse>(PATHS.session),
+        status: () => get<StatusResponse>(PATHS.status),
+        current: <T>() => get<T>(PATHS.current),
+        submit: (body: unknown) => post<SubmitResponse>(PATHS.submit, body),
+        webhookNestjs: <T>(body: unknown) => post<T>(PATHS.webhookNestjs, body),
+        reverifyStart: <T>(body: unknown) => post<T>(PATHS.reverifyStart, body),
+        reverifyVerify: <T>(body: unknown) => post<T>(PATHS.reverifyVerify, body),
+        reverifyCredentials: <T>(challengeId: string) =>
+            get<T>(`${PATHS.reverifyCredentials}?challengeId=${encodeURIComponent(challengeId)}`),
+        enroll: <T>(body: unknown) => post<T>(PATHS.enroll, body),
+        /** rdb enrolment liveness — see PATHS.livenessSession. */
+        livenessSession: () => post<LivenessSessionResponse>(PATHS.livenessSession),
+        livenessCredentials: <T>(kycSessionId: string) =>
+            post<T>(PATHS.livenessCredentials, { kycSessionId }),
+        livenessResult: (sessionId: string) =>
+            get<LivenessResultResponse>(
+                `${PATHS.livenessResult}?sessionId=${encodeURIComponent(sessionId)}`,
+            ),
+    },
+
+    /**
+     * rdb writes the name read off the ID onto the signed-in profile when the
+     * account has none yet (SuccessScreen) — the person verifying IS the
+     * signed-in user here, unlike root's pre-provisioned admins.
+     */
+    profile: {
+        update: <T>(body: unknown) => post<T>('/api/profile', body),
+    },
+};

@@ -1,4 +1,5 @@
 import path from 'path';
+import { networkInterfaces } from 'os';
 import type { NextConfig } from 'next';
 
 // Dev-only network fix: on networks where the TCP connect to Cloudflare takes
@@ -16,6 +17,28 @@ if (process.env.NODE_ENV !== 'production') {
         .catch(() => {});
 }
 
+function rank(ip: string): number {
+    if (ip.startsWith('192.168.')) return 0;
+    if (/^172.(1[6-9]|2d|3[01])./.test(ip)) return 1;
+    return 2;
+}
+
+/**
+ * This machine's LAN IPv4s, dev only. Link-local 169.254.* is unroutable.
+ * Override the one the QR uses with DEV_LAN_HOST (PowerShell:
+ * `$env:DEV_LAN_HOST='192.168.1.5'; npm run dev:mobile`).
+ */
+const LAN_ADDRESSES: string[] =
+    process.env.NODE_ENV === 'production'
+        ? []
+        : Object.values(networkInterfaces())
+              .flat()
+              .filter((a) => a && a.family === 'IPv4' && !a.internal && !a.address.startsWith('169.254.'))
+              .map((a) => a!.address)
+              // Wi-Fi first: 192.168.* is what a phone on the same network sees;
+              // 10.* is as often a VPN adapter, which the phone cannot reach.
+              .sort((x, y) => rank(x) - rank(y));
+
 const nextConfig: NextConfig = {
     // Required by OpenNext (Cloudflare Workers deploy): the Worker bundle is
     // built from .next/standalone. OpenNext normally injects this itself, but
@@ -31,7 +54,20 @@ const nextConfig: NextConfig = {
     // is front-facing, low-resolution and fixed-focus, so the document scanner
     // struggles to find a clean card quad. Add your machine's current IPv4 here
     // if it changes — DHCP will reassign it.
-    allowedDevOrigins: ['192.168.1.100', '192.168.1.101', '172.20.10.2'],
+    // The machine's CURRENT addresses are added at start-up: a hardcoded list
+    // goes stale the moment DHCP moves the machine (it is on 192.168.43.* now),
+    // and Next then blocks /_next assets for the phone — the page loads as
+    // dead HTML and the KYC QR hand-off never starts.
+    allowedDevOrigins: ['192.168.1.100', '192.168.1.101', '172.20.10.2', ...LAN_ADDRESSES],
+    env: {
+        // Where the phone reaches this dev server. The camera hand-off QR uses
+        // it when the desktop itself is on localhost — a phone cannot open
+        // "localhost". Empty in production, where the page origin is public.
+        NEXT_PUBLIC_DEV_LAN_ORIGIN:
+            process.env.NODE_ENV !== 'production' && (process.env.DEV_LAN_HOST || LAN_ADDRESSES[0])
+                ? `https://${process.env.DEV_LAN_HOST || LAN_ADDRESSES[0]}:${process.env.PORT ?? '3000'}`
+                : '',
+    },
     images: {
         unoptimized: true,
         remotePatterns: [

@@ -3,11 +3,15 @@
 import { useEffect, useRef } from 'react';
 import { useTranslation } from '@/context/I18nContext';
 import { FlexibleSpace } from '@/scaling';
+import InlineFeedback from '@/components/ui/InlineFeedback';
+import type { Feedback } from '@/hooks/useInlineFeedback';
 
 interface AuthSuccessScreenProps {
     variant: 'login' | 'signup';
     onDone?: () => void;
     delayMs?: number;
+    /** Why the screen is stuck (the cookie save failed) — under the centred text. */
+    feedback?: Feedback | null;
 }
 
 const variantStyles = {
@@ -19,6 +23,7 @@ export default function AuthSuccessScreen({
     variant,
     onDone,
     delayMs = 1500,
+    feedback = null,
 }: AuthSuccessScreenProps) {
     const { t } = useTranslation();
     const { bg, cls } = variantStyles[variant];
@@ -41,9 +46,14 @@ export default function AuthSuccessScreen({
             <FlexibleSpace size={366} share={0.5} />
 
             {/* Centered content */}
-            <div className="flex flex-col items-center text-center px-xd-30">
+            <div className="relative flex flex-col items-center text-center px-xd-30">
                 <h2 className="text-xd-30 font-bold text-[#1D1D1D]">{copy.title}</h2>
                 <p className="text-xd-16 mt-xd-5 text-[#1D1D1D] font-medium">{copy.subtitle}</p>
+                {/* Hangs into the bottom spacer — out of flow, nothing moves. */}
+                <InlineFeedback
+                    feedback={feedback}
+                    className="absolute inset-x-xd-30 top-full pt-xd-20"
+                />
             </div>
 
             {/* Bottom space — absorbs 50% of vertical change */}

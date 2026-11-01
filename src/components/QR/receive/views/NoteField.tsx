@@ -21,12 +21,12 @@ export function NoteField({ value, onChange, disabled }: NoteFieldProps) {
                 value={value}
                 onChange={onChange ? (e) => onChange(e.target.value) : undefined}
                 disabled={disabled}
-                className="text-xd-13! ml-5 leading-xd-16! font-light!! ps-xd-6! placeholder:text-[#D3D3D3]! text-[#1D1D1D]!"
+                className="text-xd-13! ms-5 leading-xd-16! font-light!! ps-xd-6! placeholder:text-[#D3D3D3]! text-[#1D1D1D]!"
             />
             <div
                 className={`absolute inset-s-0 top-1/2 -translate-y-1/2 ${value ? 'opacity-100' : 'opacity-40'}`}
             >
-                <Image src={PinIcon} alt="note" width={16} height={16} className="size-xd-16" />
+                <Image src={PinIcon} alt="" width={16} height={16} className="size-xd-16" />
             </div>
         </div>
     );

@@ -5,21 +5,30 @@ import { RdbIcon } from '@/components/icons';
 import { useTranslation } from '@/context/I18nContext';
 import termsSvg from '@/assets/icons/auth/terms.svg';
 import { FlexibleSpace } from '@/scaling';
+import InlineFeedback from '@/components/ui/InlineFeedback';
+import type { Feedback } from '@/hooks/useInlineFeedback';
 
 interface TermsScreenProps {
     onAgree?: () => void;
     onLater?: () => void;
+    /** A notice from the page that sent the user here (a resumed step). */
+    feedback?: Feedback | null;
 }
 // all items hieght 662
 
-export default function TermsScreen({ onAgree, onLater }: TermsScreenProps) {
+export default function TermsScreen({ onAgree, onLater, feedback = null }: TermsScreenProps) {
     const { t } = useTranslation();
     return (
         <div className="w-full bg-white flex flex-col">
             <FlexibleSpace size={280} share={0.42} />
             {/* Section 1 — Logo (flex-1 so extra space goes here only) */}
-            <div className="flex flex-col items-center justify-center">
+            <div className="relative flex flex-col items-center justify-center">
                 <RdbIcon className="w-xd-144 h-xd-104" />
+                {/* In the empty logo↔text gap — out of flow, nothing moves. */}
+                <InlineFeedback
+                    feedback={feedback}
+                    className="absolute inset-x-xd-30 top-full pt-xd-40"
+                />
             </div>
             <FlexibleSpace size={196} share={0.29} />
             {/* Section 2 — fixed layout, no flex-1, spacings preserved as-designed */}

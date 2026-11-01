@@ -1,10 +1,10 @@
 'use client';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import EnterPhoneScreen from '@/components/auth/screens/EnterPhone';
 import GetStartedScreen from '@/components/auth/screens/GetStarted';
 import SelectMethod from '@/components/auth/screens/SelectMethod';
-import EnterPin from '@/components/auth/screens/EnterPin';
+import EnterPin, { OTP_TIMER_SECONDS } from '@/components/auth/screens/EnterPin';
 import TermsScreen from '@/components/auth/screens/Terms';
 import AuthSuccessScreen from '@/components/auth/screens/AuthSuccess';
 import PasscodeScreen from '@/components/auth/screens/PasscodeScreen';
@@ -12,18 +12,16 @@ import RegistrationStatusScreen from '@/components/auth/screens/RegistrationStat
 import EnterNameScreen from '@/components/auth/screens/EnterNameScreen';
 import QrLoginScreen from '@/components/auth/screens/QrLogin';
 import ApprovalWaitingScreen from '@/components/auth/screens/ApprovalWaiting';
-import {
-    saveAuthFlowState,
-    loadAuthFlowState,
-    clearAuthFlowState,
-    getCachedAuthFlowState,
-} from '@/lib/authFlowCookie';
+import { saveAuthFlowState, loadAuthFlowState, clearAuthFlowState } from '@/lib/authFlowState';
 import { useRouter } from 'next/navigation';
 import { extractMerchantCode, stashMerchantCode } from '@/lib/merchantPayment';
 import { useAuth, type LoginApiResponse } from '@/context/AuthContext';
 import { usePasskey } from '@/context/PasskeyContext';
-import { api } from '@/api';
-import { useToast } from '@/context/ToastContext';
+import { api, isNetworkError } from '@/api';
+import { useInlineFeedback } from '@/hooks/useInlineFeedback';
+import { takeAuthNotice } from '@/lib/authNotice';
+import { useIsOnline } from '@/hooks/useIsOnline';
+import { isOffline } from '@/lib/networkStatus';
 import { useTranslation } from '@/context/I18nContext';
 import { useStore } from '@/context/StoreContext';
 import { setupPin, unlockWithPin, getDeviceId } from '@/services/passkeyApi';
@@ -31,6 +29,7 @@ import { ResetPasscodeProvider, useResetPasscode } from '@/context/ResetPasscode
 import ResetPasscodeOverlay from '@/components/resetPasscode/ResetPasscodeOverlay';
 import { Page } from '@/scaling';
 import { passcodeEnabled } from '@/api/helpers/session';
+import { normalizePhoneDigits, toE164 } from '@/lib/phoneValidation';
 
 type AuthStep =
     | 'get-started'
@@ -60,6 +59,7 @@ const RESUMABLE_STEPS: readonly AuthStep[] = [
     'enter-name',
     'set-passcode',
     'enter-passcode',
+    'qr-login',
 ];
 const POST_AUTH_STEPS: readonly AuthStep[] = [
     'enter-name',
@@ -69,6 +69,22 @@ const POST_AUTH_STEPS: readonly AuthStep[] = [
     'signup-success',
     'already-registered',
 ];
+
+/**
+ * The OTP countdown's deadline from a restored record. Trusted only inside the
+ * window a real send produces; anything else (tampered, NaN) counts as expired
+ * so the screen offers "resend" rather than a countdown that never ends. A
+ * record from before deadlines were kept starts a fresh countdown, as it used to.
+ */
+function restoredOtpDeadline(saved: unknown): number {
+    const now = Date.now();
+    if (saved === undefined) return now + OTP_TIMER_SECONDS * 1000;
+    const plausible =
+        typeof saved === 'number' &&
+        Number.isFinite(saved) &&
+        saved <= now + OTP_TIMER_SECONDS * 1000;
+    return plausible ? saved : now;
+}
 
 const transition = { duration: 0.35, ease: [0.4, 0, 0.2, 1] as [number, number, number, number] };
 
@@ -101,25 +117,40 @@ function AuthPageInner() {
         setPartialUserPhone,
     } = useAuth();
     const { unlockWithPin: stepUnlockWithPin, confirmSetup, confirmUnlock } = usePasskey();
-    const { start: startPasscodeReset } = useResetPasscode();
-    const { toast } = useToast();
+    const {
+        start: startPasscodeReset,
+        notice: resetNotice,
+        clearNotice: clearResetNotice,
+    } = useResetPasscode();
     const { t, tr } = useTranslation();
+    // One result line for the whole page. Steps are keyed children of
+    // AnimatePresence, so the state lives here and the current step renders it.
+    // `goTo` clears it; anything meant for the next step is set after the goTo.
+    const {
+        feedback,
+        success: showSuccess,
+        error: showError,
+        clear: clearFeedback,
+    } = useInlineFeedback();
     const { preloadData } = useStore();
-    // Read cached auth-flow state synchronously so the first render already
-    // shows the correct step (cache is populated during the splash window by
-    // ClientProviders).
-    const cached = getCachedAuthFlowState();
-    const initial = cached && RESUMABLE_STEPS.includes(cached.step as AuthStep) ? cached : null;
+    const isOnline = useIsOnline();
+    // Where this tab was in the flow before a reload. Read once, synchronously:
+    // the page only mounts after the client splash, so the first render can
+    // already show the right step.
+    const [initial] = useState(() => {
+        const saved = loadAuthFlowState();
+        return saved && RESUMABLE_STEPS.includes(saved.step as AuthStep) ? saved : null;
+    });
     const [authType, setAuthType] = useState<'signIn' | 'signUp'>(initial?.authType ?? 'signUp');
     const [isValidPin, setIsValidPin] = useState<'notvalid' | 'valid' | ''>('');
     const [step, setStep] = useState<AuthStep>((initial?.step as AuthStep) ?? 'get-started');
-    // Cache is `undefined` only if preload hasn't finished yet. Treat that as
-    // "needs async hydration"; otherwise we already have the correct state.
-    const [hydrated, setHydrated] = useState(cached !== undefined);
     const [direction, setDirection] = useState(1);
-    const [phone, setPhone] = useState(initial?.phone ?? '');
+    const [phone, setPhone] = useState(normalizePhoneDigits(initial?.phone ?? ''));
     const [sessionInfo, setSessionInfo] = useState(initial?.sessionInfo ?? '');
     const [method, setMethod] = useState<'sms' | 'whatsapp' | ''>(initial?.method ?? '');
+    const [otpExpiresAt, setOtpExpiresAt] = useState(() =>
+        restoredOtpDeadline(initial?.otpExpiresAt),
+    );
     const [pin, setPin] = useState('');
     const [loading, setLoading] = useState<
         'send-phone' | 'send-pin' | 'resend-pin' | 'verify-pin' | ''
@@ -134,6 +165,51 @@ function AuthPageInner() {
     // post-refresh redirect already uses.
     const [navigateHome, setNavigateHome] = useState(false);
     const navigatedHomeRef = useRef(false);
+
+    /**
+     * A notice left by the screen that sent the user here (the lock screen's
+     * "session expired", the reset flow's "login expired" before its reload).
+     * Taken once, shown on whichever step this page lands on, and kept until
+     * the user's first tap or key: it is the only explanation for the bounce.
+     */
+    const authNoticeTakenRef = useRef(false);
+    const authNoticeTextRef = useRef<string | null>(null);
+    useEffect(() => {
+        if (authNoticeTakenRef.current) return;
+        authNoticeTakenRef.current = true;
+        const notice = takeAuthNotice();
+        if (!notice) return;
+        const text =
+            notice === 'loginExpired'
+                ? t.resetPasscode.toasts.loginExpired
+                : t.common.sessionExpired;
+        authNoticeTextRef.current = text;
+        showError(text, { sticky: true });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    useEffect(() => {
+        const noticeText = authNoticeTextRef.current;
+        if (!noticeText || feedback?.text !== noticeText) return;
+        const dismiss = () => {
+            authNoticeTextRef.current = null;
+            clearFeedback();
+        };
+        window.addEventListener('pointerdown', dismiss, { capture: true, once: true });
+        window.addEventListener('keydown', dismiss, { capture: true, once: true });
+        return () => {
+            window.removeEventListener('pointerdown', dismiss, { capture: true });
+            window.removeEventListener('keydown', dismiss, { capture: true });
+        };
+    }, [feedback, clearFeedback]);
+
+    // "Passcode updated" from the reset overlay, which has unmounted by now:
+    // shown on the passcode screen it uncovers.
+    useEffect(() => {
+        if (!resetNotice) return;
+        showSuccess(resetNotice);
+        clearResetNotice();
+    }, [resetNotice, showSuccess, clearResetNotice]);
 
     /**
      * Rescue a merchant payment link that got bounced here.
@@ -173,14 +249,28 @@ function AuthPageInner() {
      */
     const postOtpPendingRef = useRef(false);
 
+    /**
+     * Set once the flow is over (the user is on the way to /home). Every
+     * completion path drops loginStep afterwards, which re-runs the save effect
+     * further down; without this it would write the finished flow straight back.
+     */
+    const flowFinishedRef = useRef(false);
+    const finishFlow = () => {
+        flowFinishedRef.current = true;
+        clearAuthFlowState();
+    };
+
     // If authenticated and not in a post-auth step, redirect to /home.
     useEffect(() => {
-        if (!hydrated) return;
         if (postOtpPendingRef.current) return;
         if (!isAuthLoading && userData && !POST_AUTH_STEPS.includes(step)) {
+            // Nothing left to do here: drop the flow so the middleware stops
+            // letting this signed-in user back onto /auth.
+            finishFlow();
             router.replace('/home');
         }
-    }, [hydrated, isAuthLoading, userData, router, step]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isAuthLoading, userData, router, step]);
 
     // Passcode-success navigation (see navigateHome declaration above). Runs from a
     // committed effect so the soft navigation isn't dropped by the edge build; the
@@ -197,7 +287,7 @@ function AuthPageInner() {
     // this user (e.g. after a refresh between save and redirect), switch to
     // enter-passcode. Response envelope is { message, data: { enabled } }.
     useEffect(() => {
-        if (!hydrated || step !== 'set-passcode') return;
+        if (step !== 'set-passcode') return;
         let cancelled = false;
         (async () => {
             try {
@@ -214,7 +304,7 @@ function AuthPageInner() {
             cancelled = true;
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [hydrated, step]);
+    }, [step]);
 
     // Store verified user data for passcode step
     const verifiedUserRef = useRef<any>(null);
@@ -223,35 +313,15 @@ function AuthPageInner() {
     // awaits this before navigating so /home always has userData (cookies) ready.
     const pendingSessionCompleteRef = useRef<Promise<void> | null>(null);
 
-    // Restore auth flow state from encrypted cookie on mount (handles page refresh).
-    // We must hydrate before the first render of the AnimatePresence — otherwise the
-    // GetStarted screen flashes and AnimatePresence animates to the saved step.
-    useEffect(() => {
-        let cancelled = false;
-        loadAuthFlowState()
-            .then((saved) => {
-                if (cancelled) return;
-                if (saved && RESUMABLE_STEPS.includes(saved.step as AuthStep)) {
-                    if (saved.phone) setPhone(saved.phone);
-                    if (saved.authType) setAuthType(saved.authType);
-                    if (saved.method) setMethod(saved.method);
-                    if (saved.sessionInfo) setSessionInfo(saved.sessionInfo);
-                    setStep(saved.step as AuthStep);
-                }
-            })
-            .finally(() => {
-                if (!cancelled) setHydrated(true);
-            });
-        return () => {
-            cancelled = true;
-        };
-    }, []);
+    // A login waiting for approval from the phone app, as primitives so the
+    // save effect does not re-run on every new loginStep object.
+    const approvalId = loginStep?.status === 'requires_approval' ? loginStep.requestId : undefined;
+    const approvalExpiresAt =
+        loginStep?.status === 'requires_approval' ? loginStep.expiresAt : undefined;
 
-    // Persist step to encrypted cookie whenever it changes to a resumable step.
-    // Skip until hydrated so the initial 'get-started' default doesn't overwrite
-    // the saved cookie before we've had a chance to read it.
+    // Record where this tab is, so a reload resumes here.
     useEffect(() => {
-        if (!hydrated) return;
+        if (flowFinishedRef.current) return;
         if (RESUMABLE_STEPS.includes(step)) {
             saveAuthFlowState({
                 step,
@@ -259,11 +329,34 @@ function AuthPageInner() {
                 authType,
                 method: method || undefined,
                 sessionInfo: sessionInfo || undefined,
+                otpExpiresAt,
+                approval:
+                    approvalId && approvalExpiresAt
+                        ? { requestId: approvalId, expiresAt: approvalExpiresAt }
+                        : undefined,
             });
         } else {
             clearAuthFlowState();
         }
-    }, [hydrated, step, phone, authType, method, sessionInfo]);
+    }, [step, phone, authType, method, sessionInfo, otpExpiresAt, approvalId, approvalExpiresAt]);
+
+    // Back to the approval-waiting screen after a reload. The step token is not
+    // in the record: polling falls back to the httpOnly rdb_step cookie. Layout
+    // effect, so the OTP screen underneath never paints. An approval that has
+    // expired meanwhile is not restored — the OTP screen stays, as when one
+    // expires while watched.
+    useLayoutEffect(() => {
+        const approval = initial?.approval;
+        if (!approval) return;
+        if (new Date(approval.expiresAt).getTime() <= Date.now()) return;
+        setLoginStep({
+            status: 'requires_approval',
+            requestId: approval.requestId,
+            expiresAt: approval.expiresAt,
+            stepToken: '',
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // Lock body scroll: prevents iOS Safari from scrolling the document when
     // the software keyboard opens. position:fixed on <body> is the only
@@ -303,7 +396,17 @@ function AuthPageInner() {
             const res = await api.session.stepApproval(requestId, {
                 headers: loginStep.stepToken ? { 'X-Step-Token': loginStep.stepToken } : {},
             });
-            if (!res.ok) return;
+            if (!res.ok) {
+                // The step token behind this request is gone (its cookie
+                // expired across a reload): the request can never resolve.
+                if (res.error.status === 401) {
+                    clearInterval(interval);
+                    setLoginStep(null);
+                    goTo('get-started', -1);
+                    showError(t.common.sessionExpired, { sticky: true });
+                }
+                return;
+            }
             const data = res.data;
             if (data.status === 'approved' || (data.sessionToken && data.status === 'active')) {
                 clearInterval(interval);
@@ -315,11 +418,13 @@ function AuthPageInner() {
                 // Narrowed by the status check above: an approved/active poll
                 // result carries the full login payload.
                 await handleLoginResponse(data as unknown as LoginApiResponse);
+                finishFlow();
                 goHome();
             } else if (data.status === 'rejected' || data.status === 'expired') {
                 clearInterval(interval);
                 setLoginStep(null);
-                toast.error(t.auth.otp.verificationFailed);
+                // Back on the OTP screen (step is still 'enter-pin').
+                showError(t.auth.otp.verificationFailed);
             }
         }, 2000);
         return () => clearInterval(interval);
@@ -327,6 +432,11 @@ function AuthPageInner() {
     }, [loginStep]);
 
     const goTo = (nextStep: AuthStep, dir = 1) => {
+        // The /auth notice survives step changes the page makes on its own
+        // (hydration); the user's first tap dismisses it.
+        if (!authNoticeTextRef.current || feedback?.text !== authNoticeTextRef.current) {
+            clearFeedback();
+        }
         setDirection(dir);
         setStep(nextStep);
     };
@@ -369,36 +479,40 @@ function AuthPageInner() {
                     preloadHomeData();
                     goTo('enter-name');
                 } else {
-                    toast.error(t.auth.otp.saveAuthFailed);
+                    // Sticky: the success screen has nothing else to explain a dead end.
+                    showError(t.auth.otp.saveAuthFailed, { sticky: true });
                 }
             }
             return;
         }
 
-        // signIn with requires_passcode: session/complete not yet done — ask for passcode
-        if (loginStep?.status === 'requires_passcode') {
+        const data = verifiedUserRef.current || userData;
+
+        // signIn with requires_passcode: session/complete not yet done — ask for
+        // passcode. With no loginStep and no user (reloaded on this screen),
+        // the passcode step is the only path that gets here without a session;
+        // enter-passcode verifies through the rdb_step cookie.
+        if (loginStep?.status === 'requires_passcode' || !data) {
             goTo('enter-passcode');
             return;
         }
 
         // Normal signIn: cookies already set via verifyOtp response
-        const data = verifiedUserRef.current || userData;
-        if (data) {
-            const success = await saveAuthCookies(data);
-            if (success) {
-                await saveSessionTokenIfPresent(data);
-                refreshUser().catch(() => {});
-                clearAuthFlowState();
-                goHome();
-            } else {
-                toast.error(t.auth.otp.saveAuthFailed);
-            }
+        const success = await saveAuthCookies(data);
+        if (success) {
+            await saveSessionTokenIfPresent(data);
+            refreshUser().catch(() => {});
+            finishFlow();
+            goHome();
+        } else {
+            showError(t.auth.otp.saveAuthFailed, { sticky: true });
         }
     };
 
     const [enterNameLoading, setEnterNameLoading] = useState(false);
 
     const handleEnterName = async (name: string) => {
+        if (isOffline()) return;
         setEnterNameLoading(true);
         try {
             const parts = name.trim().split(/\s+/);
@@ -437,37 +551,46 @@ function AuthPageInner() {
     };
 
     const handleSelectMethod = async (selectedMethod: 'sms' | 'whatsapp') => {
+        // Unreachable through the UI — this screen is only arrived at with a
+        // valid number. Guarded so a future caller cannot quietly ask the
+        // backend for an OTP on an empty string.
+        if (!toE164(phone) || isOffline()) return;
         setMethod(selectedMethod);
         setLoading('send-pin');
         // `type` is dropped: the old action accepted it but never put it in the
         // request body, so it never reached the backend.
         const sendOtpRes = await api.auth.sendOtp({
-            phoneNumber: `+${phone}`,
+            phoneNumber: toE164(phone),
             channel: selectedMethod,
         });
         setLoading('');
         if (!sendOtpRes.ok) {
-            toast.error(tr('auth.otp.sendError', { error: sendOtpRes.error.message }));
+            // The connection dropped mid-request: the offline pill says so.
+            if (isNetworkError(sendOtpRes.error)) return;
+            showError(tr('auth.otp.sendError', { error: sendOtpRes.error.message }));
             return;
         }
         if (sendOtpRes.data.sessionInfo) {
             setSessionInfo(sendOtpRes.data.sessionInfo);
+            setOtpExpiresAt(Date.now() + OTP_TIMER_SECONDS * 1000);
             setPin('');
             goTo('enter-pin');
-            toast.success(
+            // After goTo (which clears): the line belongs to the OTP screen.
+            showSuccess(
                 tr('auth.otp.sentSuccess', {
                     method: selectedMethod === 'sms' ? 'SMS' : 'WhatsApp',
                 }),
             );
         } else {
-            toast.warn(t.auth.otp.unexpectedError);
+            showError(t.auth.otp.unexpectedError);
         }
     };
 
     const handleVerifyPin = async (pinValue: string) => {
+        if (isOffline()) return;
         setLoading('verify-pin');
         const verifyOtpRes = await api.auth.verifyOtp({
-            phoneNumber: `+${phone}`,
+            phoneNumber: toE164(phone),
             otpCode: pinValue,
             sessionInfo,
             type: authType,
@@ -481,10 +604,12 @@ function AuthPageInner() {
 
         if (!verifyOtpRes.ok) {
             setLoading('');
+            // Keep the typed code; the user resubmits once the pill turns green.
+            if (isNetworkError(verifyOtpRes.error)) return;
             const message = verifyOtpRes.error.message;
             if (message.includes('Invalid') || message.includes('expired')) {
                 setIsValidPin('notvalid');
-                toast.error(t.auth.otp.invalidExpired);
+                showError(t.auth.otp.invalidExpired);
                 setTimeout(() => {
                     setIsValidPin('');
                     setPin('');
@@ -498,7 +623,7 @@ function AuthPageInner() {
             ) {
                 goTo('not-registered');
             } else {
-                toast.error(message || t.auth.otp.verificationFailed);
+                showError(message || t.auth.otp.verificationFailed);
             }
             return;
         }
@@ -571,7 +696,7 @@ function AuthPageInner() {
         } else {
             setLoading('');
             setIsValidPin('notvalid');
-            toast.error(t.auth.otp.verificationFailed);
+            showError(t.auth.otp.verificationFailed);
             setTimeout(() => {
                 setIsValidPin('');
                 setPin('');
@@ -590,7 +715,7 @@ function AuthPageInner() {
             await saveSessionTokenIfPresent(verifiedUserRef.current);
         }
         refreshUser().catch(() => {});
-        clearAuthFlowState();
+        finishFlow();
         goHome();
     };
 
@@ -628,11 +753,11 @@ function AuthPageInner() {
             confirmUnlock();
             await handleLoginResponse({ status: 'active', sessionToken });
             refreshUser().catch(() => {});
-            clearAuthFlowState();
+            finishFlow();
             goHome();
         } catch {
-            toast.error(t.auth.otp.saveAuthFailed);
             goTo('get-started', -1);
+            showError(t.auth.otp.saveAuthFailed);
         }
     };
 
@@ -655,7 +780,11 @@ function AuthPageInner() {
     };
 
     const handleSavePasscodeFailed = () => {
-        toast.error('Failed to save passcode. Please try again.');
+        // setupPin reports a dropped connection as a plain failure; the store
+        // already knows it is offline by the time we get here.
+        if (isOffline()) return;
+        // Shown in the set-passcode PIN label, which the screen is back on.
+        showError(t.auth.setPasscode.saveFailed);
     };
 
     // After set-passcode completes → save auth and go home
@@ -664,7 +793,7 @@ function AuthPageInner() {
         // so userData + cookies are already set. Just navigate home.
         if (!loginStep && userData) {
             refreshUser().catch(() => {});
-            clearAuthFlowState();
+            finishFlow();
             goHome();
             return;
         }
@@ -674,10 +803,11 @@ function AuthPageInner() {
             if (loginSuccess) {
                 await saveSessionTokenIfPresent(data);
                 refreshUser().catch(() => {});
-                clearAuthFlowState();
+                finishFlow();
                 goHome();
             } else {
-                toast.error(t.auth.otp.saveAuthFailed);
+                // Sticky: the done view has nothing else to explain a dead end.
+                showError(t.auth.otp.saveAuthFailed, { sticky: true });
             }
         }
     };
@@ -708,7 +838,11 @@ function AuthPageInner() {
             // 401 = step token missing/expired (not a wrong passcode) → restart login.
             if (!res.ok && res.error.status === 401) {
                 setLoginStep(null);
-                toast.error('Session expired. Please log in again.');
+                // The login has to start over, and the passcode screen may be
+                // the intercept that unmounts with the step: say it on the
+                // start screen, which is where the user now has to go.
+                goTo('get-started', -1);
+                showError(t.common.sessionExpired, { sticky: true });
                 return false;
             }
 
@@ -749,7 +883,16 @@ function AuthPageInner() {
             const noStepToken =
                 stepRes.error.code === 'STEP_TOKEN_MISSING' ||
                 stepRes.error.code === 'NO_SESSION';
-            if (!noStepToken) {
+
+            // No session either (reloaded mid-login): the signed-in unlock below
+            // can only fail, so a missing or expired step token means the login
+            // has to start over — not a passcode screen that is always "wrong".
+            if (!userData && (noStepToken || stepRes.error.status === 401)) {
+                goTo('get-started', -1);
+                showError(t.common.sessionExpired, { sticky: true });
+                return false;
+            }
+            if (!noStepToken || !userData) {
                 // Token existed but passcode was wrong (or expired step)
                 return false;
             }
@@ -775,7 +918,7 @@ function AuthPageInner() {
         // transition below and can starve it indefinitely (the request for /home
         // never gets issued at all — see PreloadStore in the protected layout,
         // which runs refreshUser() once we've actually landed on a protected route).
-        clearAuthFlowState();
+        finishFlow();
         // Defer the actual navigation to the committed effect above — see the
         // navigateHome comment for why an inline router.push is dropped in prod.
         setNavigateHome(true);
@@ -806,6 +949,8 @@ function AuthPageInner() {
                         onVerifyPasscode={handleVerifyPasscode}
                         onSuccess={handlePasscodeSuccess}
                         onForgotPasscode={() => startPasscodeReset('step')}
+                        disabled={!isOnline}
+                        feedback={feedback}
                     />
                 </main>
             </Page>
@@ -841,138 +986,150 @@ function AuthPageInner() {
         >
             <main className="xd-fit-screen fixed inset-0 overflow-hidden">
                 <AnimatePresence mode="wait" initial={false}>
-                    {hydrated && (
-                        <motion.div
-                            key={step}
-                            variants={currentVariants}
-                            initial="enter"
-                            animate="center"
-                            exit="exit"
-                            transition={transition}
-                            className="inset-0 w-full h-full"
-                        >
-                            {step === 'get-started' && (
-                                <GetStartedScreen
-                                    onNewCustomer={() => {
-                                        setAuthType('signUp');
-                                        goTo('terms');
-                                    }}
-                                    onExistingAccount={() => {
-                                        setAuthType('signIn');
-                                        goTo('enter-phone');
-                                    }}
-                                    onScanQr={() => goTo('qr-login')}
-                                    onLater={() => router.push('/home')}
-                                />
-                            )}
+                    <motion.div
+                        key={step}
+                        variants={currentVariants}
+                        initial="enter"
+                        animate="center"
+                        exit="exit"
+                        transition={transition}
+                        className="inset-0 w-full h-full"
+                    >
+                        {step === 'get-started' && (
+                            <GetStartedScreen
+                                onNewCustomer={() => {
+                                    setAuthType('signUp');
+                                    goTo('terms');
+                                }}
+                                onExistingAccount={() => {
+                                    setAuthType('signIn');
+                                    goTo('enter-phone');
+                                }}
+                                onScanQr={() => goTo('qr-login')}
+                                onLater={() => router.push('/home')}
+                                feedback={feedback}
+                            />
+                        )}
 
-                            {step === 'terms' && (
-                                <TermsScreen
-                                    onAgree={() => goTo('enter-phone')}
-                                    onLater={() => router.push('/home')}
-                                />
-                            )}
+                        {step === 'terms' && (
+                            <TermsScreen
+                                onAgree={() => goTo('enter-phone')}
+                                onLater={() => router.push('/home')}
+                                feedback={feedback}
+                            />
+                        )}
 
-                            {step === 'enter-phone' && (
-                                <EnterPhoneScreen
-                                    authType={authType}
-                                    onSubmit={handleSendPhone}
-                                    phone={phone}
-                                    setPhone={setPhone}
-                                    loading={loading === 'send-phone'}
-                                    onClose={handleClose}
-                                />
-                            )}
+                        {step === 'enter-phone' && (
+                            <EnterPhoneScreen
+                                authType={authType}
+                                onSubmit={handleSendPhone}
+                                phone={phone}
+                                setPhone={setPhone}
+                                loading={loading === 'send-phone'}
+                                onClose={handleClose}
+                                feedback={feedback}
+                            />
+                        )}
 
-                            {step === 'select-method' && (
-                                <SelectMethod
-                                    changeNumber={changeNumber}
-                                    setMethod={handleSelectMethod}
-                                    method={method}
-                                    phone={phone}
-                                    authType={authType}
-                                    loading={loading === 'send-pin'}
-                                    onClose={handleClose}
-                                />
-                            )}
+                        {step === 'select-method' && (
+                            <SelectMethod
+                                changeNumber={changeNumber}
+                                setMethod={handleSelectMethod}
+                                method={method}
+                                phone={phone}
+                                authType={authType}
+                                loading={loading === 'send-pin'}
+                                disabled={!isOnline}
+                                onClose={handleClose}
+                                feedback={feedback}
+                            />
+                        )}
 
-                            {step === 'enter-pin' && (
-                                <EnterPin
-                                    changeMethod={changeMethod}
-                                    changeNumber={changeNumber}
-                                    onClose={handleClose}
-                                    onSubmit={handleVerifyPin}
-                                    phone={phone}
-                                    method={method}
-                                    isValidPin={isValidPin}
-                                    pin={pin}
-                                    authType={authType}
-                                    setPin={setPin}
-                                    setSessionInfo={setSessionInfo}
-                                    loading={loading}
-                                    setLoading={setLoading}
-                                />
-                            )}
+                        {step === 'enter-pin' && (
+                            <EnterPin
+                                changeMethod={changeMethod}
+                                changeNumber={changeNumber}
+                                onClose={handleClose}
+                                onSubmit={handleVerifyPin}
+                                phone={phone}
+                                method={method}
+                                isValidPin={isValidPin}
+                                pin={pin}
+                                authType={authType}
+                                setPin={setPin}
+                                setSessionInfo={setSessionInfo}
+                                expiresAt={otpExpiresAt}
+                                onExpiresAtChange={setOtpExpiresAt}
+                                loading={loading}
+                                setLoading={setLoading}
+                                disabled={!isOnline}
+                                feedback={feedback}
+                            />
+                        )}
 
-                            {step === 'already-registered' && (
-                                <RegistrationStatusScreen
-                                    variant="already-registered"
-                                    phone={phone}
-                                    onLoginAndContinue={handleAlreadyRegisteredContinue}
-                                    onCancel={handleAlreadyRegisteredCancel}
-                                />
-                            )}
+                        {step === 'already-registered' && (
+                            <RegistrationStatusScreen
+                                variant="already-registered"
+                                phone={phone}
+                                onLoginAndContinue={handleAlreadyRegisteredContinue}
+                                onCancel={handleAlreadyRegisteredCancel}
+                            />
+                        )}
 
-                            {step === 'not-registered' && (
-                                <RegistrationStatusScreen
-                                    variant="not-registered"
-                                    phone={phone}
-                                    onCreateAccount={handleNotRegisteredCreate}
-                                    onCancel={() => router.push('/home')}
-                                />
-                            )}
+                        {step === 'not-registered' && (
+                            <RegistrationStatusScreen
+                                variant="not-registered"
+                                phone={phone}
+                                onCreateAccount={handleNotRegisteredCreate}
+                                onCancel={() => router.push('/home')}
+                            />
+                        )}
 
-                            {(step === 'login-success' || step === 'signup-success') && (
-                                <AuthSuccessScreen
-                                    variant={step === 'login-success' ? 'login' : 'signup'}
-                                    onDone={handleAfterSuccess}
-                                    delayMs={1500}
-                                />
-                            )}
+                        {(step === 'login-success' || step === 'signup-success') && (
+                            <AuthSuccessScreen
+                                variant={step === 'login-success' ? 'login' : 'signup'}
+                                onDone={handleAfterSuccess}
+                                delayMs={1500}
+                                feedback={feedback}
+                            />
+                        )}
 
-                            {step === 'qr-login' && (
-                                <QrLoginScreen
-                                    onApproved={handleQrApproved}
-                                    onCancel={() => goTo('get-started', -1)}
-                                />
-                            )}
+                        {step === 'qr-login' && (
+                            <QrLoginScreen
+                                onApproved={handleQrApproved}
+                                onCancel={() => goTo('get-started', -1)}
+                            />
+                        )}
 
-                            {step === 'enter-name' && (
-                                <EnterNameScreen
-                                    onSubmit={handleEnterName}
-                                    loading={enterNameLoading}
-                                />
-                            )}
+                        {step === 'enter-name' && (
+                            <EnterNameScreen
+                                onSubmit={handleEnterName}
+                                loading={enterNameLoading || !isOnline}
+                            />
+                        )}
 
-                            {step === 'set-passcode' && (
-                                <PasscodeScreen
-                                    mode="set"
-                                    onSavePasscode={handleSavePasscode}
-                                    onDone={handlePasscodeDone}
-                                    onSaveFailed={handleSavePasscodeFailed}
-                                />
-                            )}
+                        {step === 'set-passcode' && (
+                            <PasscodeScreen
+                                mode="set"
+                                onSavePasscode={handleSavePasscode}
+                                onDone={handlePasscodeDone}
+                                onSaveFailed={handleSavePasscodeFailed}
+                                disabled={!isOnline}
+                                feedback={feedback}
+                            />
+                        )}
 
-                            {step === 'enter-passcode' && (
-                                <PasscodeScreen
-                                    mode="enter"
-                                    onVerifyPasscode={handleVerifyPasscode}
-                                    onSuccess={handlePasscodeSuccess}
-                                    onForgotPasscode={() => startPasscodeReset('step')}
-                                />
-                            )}
-                        </motion.div>
-                    )}
+                        {step === 'enter-passcode' && (
+                            <PasscodeScreen
+                                mode="enter"
+                                onVerifyPasscode={handleVerifyPasscode}
+                                onSuccess={handlePasscodeSuccess}
+                                onForgotPasscode={() => startPasscodeReset('step')}
+                                disabled={!isOnline}
+                                feedback={feedback}
+                            />
+                        )}
+                    </motion.div>
                 </AnimatePresence>
             </main>
         </Page>
