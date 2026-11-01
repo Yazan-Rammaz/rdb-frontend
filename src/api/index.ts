@@ -2,6 +2,7 @@ import { auth } from './endpoints/auth';
 import { banking } from './endpoints/banking';
 import { kyc } from './endpoints/kyc';
 import { loginHistory } from './endpoints/loginHistory';
+import { merchant } from './endpoints/merchant';
 import { paymentRequests } from './endpoints/paymentRequests';
 import { profile } from './endpoints/profile';
 import { resetPasscode } from './endpoints/resetPasscode';
@@ -15,7 +16,7 @@ import { transfers } from './endpoints/transfers';
  *   import { api } from '@/api';
  *
  *   const res = await api.transactions.walletBalance({ currencySymbol: 'USD' });
- *   if (!res.ok) return toast(res.error.message);
+ *   if (!res.ok) return feedback.error(res.error.message);
  *   setBalances(res.data);
  *
  * Calls never throw and never return a bare `any`. `ApiResult` is a
@@ -27,6 +28,7 @@ export const api = {
     banking,
     kyc,
     loginHistory,
+    merchant,
     paymentRequests,
     profile,
     resetPasscode,
@@ -35,7 +37,15 @@ export const api = {
     transfers,
 };
 
-export type { ApiError, ApiResult, Paginated, PageParams, RequestOptions } from './types/common';
+export { isNetworkError } from './client';
+export type {
+    ApiError,
+    ApiResult,
+    NetworkErrorCode,
+    Paginated,
+    PageParams,
+    RequestOptions,
+} from './types/common';
 
 export type * from './types/auth';
 export type * from './types/banking';

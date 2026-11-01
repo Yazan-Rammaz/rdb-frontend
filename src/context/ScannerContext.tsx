@@ -8,9 +8,19 @@ interface ScannerNav {
     toPaymentRequest?: () => void;
 }
 
+type ScannerSheet = 'scan' | 'receive' | 'send' | 'merchantPay' | null;
+
 interface ScannerContextType {
-    open: 'scan' | 'receive' | 'send' | null;
-    setOpen: (open: 'scan' | 'receive' | 'send' | null) => void;
+    open: ScannerSheet;
+    setOpen: (open: ScannerSheet) => void;
+    /** Merchant order to show when `open === 'merchantPay'`. */
+    merchantCode: string | null;
+    /**
+     * Opens the merchant order sheet straight from a code, no camera involved.
+     * Used by the `/home?mrcpay=…` deep link, where the customer was sent in
+     * from the shop's site rather than scanning.
+     */
+    openMerchantPayment: (code: string) => void;
     // Cleanup: clear callback if scanner is closed without scanning
     setOnQrScanned: (callback: ((value: string) => void) | null) => void;
     // Register page navigation fns from the active QrScanner
@@ -26,8 +36,21 @@ interface ScannerContextType {
 const ScannerContext = createContext<ScannerContextType | undefined>(undefined);
 
 export const ScannerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [open, setOpen] = useState<'scan' | 'receive' | 'send' | null>(null);
+    const [open, setOpenState] = useState<ScannerSheet>(null);
+    const [merchantCode, setMerchantCode] = useState<string | null>(null);
     const [isTransferScan, setIsTransferScan] = useState(false);
+
+    // Closing any sheet drops the pending merchant order with it — otherwise
+    // opening the scanner later would reopen the order the user just dismissed.
+    const setOpen = useCallback((next: ScannerSheet) => {
+        setOpenState(next);
+        if (next !== 'merchantPay') setMerchantCode(null);
+    }, []);
+
+    const openMerchantPayment = useCallback((code: string) => {
+        setMerchantCode(code);
+        setOpenState('merchantPay');
+    }, []);
     const onQrScannedRef = useRef<((value: string) => void) | null>(null);
     const scannerNavRef = useRef<ScannerNav>({});
 
@@ -63,6 +86,8 @@ export const ScannerProvider: React.FC<{ children: React.ReactNode }> = ({ child
             value={{
                 open,
                 setOpen,
+                merchantCode,
+                openMerchantPayment,
                 setOnQrScanned,
                 setScannerNav,
                 openScannerWithCallback,

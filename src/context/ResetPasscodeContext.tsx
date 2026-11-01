@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useCallback, useContext, useState } from 'react';
+import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
 
 /**
  * Where the user entered the reset flow from (RESET_PASSCODE_WEB_INTEGRATION.md §0.1):
@@ -24,8 +24,14 @@ interface ResetPasscodeContextValue {
     entry: ResetPasscodeEntry;
     /** Open the reset-passcode flow for the given entry point. */
     start: (entry?: ResetPasscodeEntry) => void;
-    /** Close the reset-passcode flow. */
-    close: () => void;
+    /**
+     * Close the reset-passcode flow. `notice` is a line for the screen the
+     * overlay uncovers (the /auth passcode step) — the flow itself unmounts.
+     */
+    close: (notice?: string) => void;
+    /** The line left by the last `close(notice)`; cleared by `start()` and `clearNotice()`. */
+    notice: string | null;
+    clearNotice: () => void;
 }
 
 const ResetPasscodeContext = createContext<ResetPasscodeContextValue | null>(null);
@@ -33,15 +39,27 @@ const ResetPasscodeContext = createContext<ResetPasscodeContextValue | null>(nul
 export function ResetPasscodeProvider({ children }: { children: React.ReactNode }) {
     const [active, setActive] = useState(false);
     const [entry, setEntry] = useState<ResetPasscodeEntry>('idle');
+    const [notice, setNotice] = useState<string | null>(null);
 
     const start = useCallback((e: ResetPasscodeEntry = 'idle') => {
         setEntry(e);
+        setNotice(null);
         setActive(true);
     }, []);
-    const close = useCallback(() => setActive(false), []);
+    const close = useCallback((n?: string) => {
+        // Screens pass `close` straight to onClick, so `n` can be a click event.
+        setNotice(typeof n === 'string' ? n : null);
+        setActive(false);
+    }, []);
+    const clearNotice = useCallback(() => setNotice(null), []);
+
+    const value = useMemo(
+        () => ({ active, entry, start, close, notice, clearNotice }),
+        [active, entry, start, close, notice, clearNotice],
+    );
 
     return (
-        <ResetPasscodeContext.Provider value={{ active, entry, start, close }}>
+        <ResetPasscodeContext.Provider value={value}>
             {children}
         </ResetPasscodeContext.Provider>
     );

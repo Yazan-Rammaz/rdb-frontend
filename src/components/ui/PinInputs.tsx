@@ -14,8 +14,11 @@ interface PinInputsProps {
     disabled: boolean;
     isValidPin?: 'valid' | 'notvalid' | 'reenter' | '';
     label?: string;
-    /** Colour of the label under the inputs. 'error' renders it red. */
-    labelTone?: 'default' | 'error';
+    /**
+     * Colour of the label under the inputs. 'error' renders it red, 'success'
+     * blue — for a feedback line shown in the label's place.
+     */
+    labelTone?: 'default' | 'error' | 'success';
     autoFocus?: boolean;
 }
 
@@ -171,8 +174,14 @@ const PinInputs: React.FC<PinInputsProps> = ({
                     }
                 }}
             >
+                {/* A passcode is digits, and digits are read left-to-right even
+                    inside RTL copy. Without this the row inherits dir=rtl from
+                    <html> and box 0 paints on the right, so the user reads their
+                    passcode reversed. The attribute stays on the row so the
+                    label below keeps the document direction. */}
                 <div
                     key={shakeNonce}
+                    dir="ltr"
                     className={`flex items-center justify-center gap-xd-5 w-full ${shake ? 'animate-shake-horizontal' : ''}`}
                 >
                     {pin.map((digit, i) => (
@@ -217,9 +226,16 @@ const PinInputs: React.FC<PinInputsProps> = ({
                     ))}
                 </div>
                 {label && (
+                    // `polite`: the label doubles as the error / feedback line,
+                    // so a swapped-in message is announced.
                     <p
+                        aria-live="polite"
                         className={`text-xd-11 mt-xd-8 ${
-                            labelTone === 'error' ? 'text-[#FF5F61] font-medium' : 'text-[#1D1D1D]'
+                            labelTone === 'error'
+                                ? 'text-[#FF5F61] font-medium'
+                                : labelTone === 'success'
+                                  ? 'text-[#388CFF] font-medium'
+                                  : 'text-[#1D1D1D]'
                         }`}
                     >
                         {label}
@@ -243,6 +259,7 @@ const PinInputs: React.FC<PinInputsProps> = ({
                 <input
                     ref={hiddenInputRef}
                     type="text"
+                    dir="ltr"
                     inputMode="numeric"
                     autoComplete="off"
                     className="sr-only"

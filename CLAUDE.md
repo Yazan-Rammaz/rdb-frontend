@@ -74,12 +74,22 @@ npm run lint        # lint
 
 ## Payment Request QR Format (payment-request-scan-pay)
 
-- Request mode QR: `PAYREQ:{base64(iv+encryptedRequestCode)}|{requesterAccountNumber}`
+- Request mode QR: `PAYREQ:{requestCode}|{requesterAccountNumber}`
 - Address mode QR: `ana={name}&anu={number}&cu={currency}` (unchanged)
-- Scanner detects PAYREQ: prefix → decrypts with account number → calls lookup API
-- AES-GCM key = requester account number padded to 32 bytes
+- Scanner detects PAYREQ: prefix → splits on the last `|` → calls lookup API
+- Format lives in `src/lib/paymentRequestQr.ts`; parsing in `QR/send/utils.ts`
 - `paymentRequests` namespace added to `core`, `server.ts`, and `client-actions.ts`
-- `ParsedQR.requestMoneyId` renamed to `encryptedRequestCode`; `requesterAccount` field added
+- `ParsedQR` carries `requestCode` + `requesterAccount`
+
+### No client-side encryption (changed)
+
+The code was AES-GCM encrypted with the requester's account number as the key.
+That bought nothing — the key was printed after the `|` in the same QR, since
+that is how the payer's app rebuilt it. Removed along with
+`usePaymentRequestEncryption`. NestJS was never involved either way: it is
+handed the plain `requestCode` in the lookup path, as it always was. What
+protects a request is server-side and unchanged — `lookup` needs auth,
+`fulfill` is step-up gated.
 
 
 <!-- MANUAL ADDITIONS START -->

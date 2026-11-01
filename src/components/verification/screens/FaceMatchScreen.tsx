@@ -4,7 +4,10 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useVerification } from '@/context/VerificationContext';
-import { api } from '@/api';
+import { useTranslation } from '@/context/I18nContext';
+import { api, isNetworkError } from '@/api';
+import { isOffline } from '@/lib/networkStatus';
+import { useIsOnline } from '@/hooks/useIsOnline';
 import { useRouter } from 'next/navigation';
 import { createKycService } from '@/services/kyc';
 import ExitConfirmDialog from '../ExitConfirmDialog';
@@ -21,6 +24,8 @@ const FRAME_FLASHES_PER_CYCLE = 3; // flashes 3 times during each ID-visible cyc
 const FRAME_FLASH_MS = 300; // each flash lasts 300 ms
 
 export default function FaceMatchScreen() {
+    const { t } = useTranslation();
+    const isOnline = useIsOnline();
     const {
         goTo,
         livenessResult,
@@ -150,17 +155,20 @@ export default function FaceMatchScreen() {
                     // with the backend's own reason — never an optimistic "verified".
                     if (status === 'rejected') {
                         handleFailure(
-                            res.kycRequest?.rejectionReason || 'Verification was not approved.',
+                            res.kycRequest?.rejectionReason ||
+                                t.verification.faceMatch.notApproved,
                         );
                     } else {
                         goTo('success', 1);
                     }
                 } catch (err) {
                     console.error('[FaceMatch] KYC submit failed:', err);
+                    // The kyc service drops the status, so offline is read from
+                    // the network store rather than the error.
                     handleFailure(
-                        err instanceof Error && err.message
+                        err instanceof Error && err.message && !isOffline()
                             ? err.message
-                            : 'We could not submit your verification. Please try again.',
+                            : t.verification.faceMatch.submitFailed,
                     );
                 }
             } else {
@@ -169,7 +177,7 @@ export default function FaceMatchScreen() {
                     hasIdDocument: !!idDocument,
                     hasFace: !!livenessResult?.faceImageData,
                 });
-                handleFailure('Missing verification data — please start again.');
+                handleFailure(t.verification.faceMatch.missingData);
             }
         } else {
             setMatchResult({
@@ -177,7 +185,7 @@ export default function FaceMatchScreen() {
                 confidence: 0,
                 similarity: 0,
                 verdict: 'fail',
-                errorMessage: data.message ?? 'Face did not match',
+                errorMessage: data.message ?? t.verification.faceMatch.noMatch,
             });
             handleFailure(data.message);
         }
@@ -208,8 +216,14 @@ export default function FaceMatchScreen() {
         });
         apiResultRef.current = res.ok
             ? res.data
-            : { status: 'error', message: res.error.message };
-    }, [livenessResult, idDocument, handleFailure]);
+            : {
+                  status: 'error',
+                  // Never show the raw status-0 text; the offline pill explains it.
+                  message: isNetworkError(res.error)
+                      ? t.verification.faceMatch.submitFailed
+                      : res.error.message,
+              };
+    }, [livenessResult, idDocument, handleFailure, t]);
 
     useEffect(() => {
         runMatch();
@@ -284,7 +298,7 @@ export default function FaceMatchScreen() {
                 onConfirm={() => router.push('/home')}
             />
 
-            <div className="flex absolute top-xd-50 right-xd-30 justify-end mb-2">
+            <div className="flex absolute top-xd-50 end-xd-30 justify-end mb-2">
                 <button
                     onClick={() => setShowExitDialog(true)}
                     className="text-red-400 hover:text-red-600"
@@ -303,10 +317,10 @@ export default function FaceMatchScreen() {
             <FlexibleSpace size={100} share={0.3} />
 
             <h1 className="text-xd-30 font-bold text-center text-[#1D1D1D] mb-xd-5">
-                Identity Verification !
+                {t.verification.title}
             </h1>
             <div className="flex items-center justify-center gap-2 mb-xd-11">
-                <Image src={faceDetectSvg} alt="face" className="object-contain w-xd-20 h-xd-20" />
+                <Image src={faceDetectSvg} alt="" className="object-contain w-xd-20 h-xd-20" />
                 <Image src={liveDetectIdSvg} alt="id" className="object-contain w-xd-20 h-xd-20" />
                 <span className="text-xd-16 font-medium text-[#1D1D1D] whitespace-nowrap">
                     {subtitle}
@@ -322,13 +336,15 @@ export default function FaceMatchScreen() {
                 {liveFace ? (
                     <img
                         src={liveFace}
-                        alt="Face"
+                        alt=""
                         className="absolute inset-0 w-full h-full object-cover"
                         style={{ backgroundColor: '#E9EEEE' }}
                     />
                 ) : (
                     <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-gray-400 text-xs">Face Photo</span>
+                        <span className="text-gray-400 text-xs">
+                            {t.verification.faceMatch.facePhoto}
+                        </span>
                     </div>
                 )}
 
@@ -443,15 +459,13 @@ export default function FaceMatchScreen() {
             {matchState === 'review' && (
                 <div className="mt-5 mx-auto max-w-75 rounded-xl border border-[#F59E0B]/40 bg-[#F59E0B]/10 px-4 py-3 text-center">
                     <p className="text-xs text-center font-medium text-[#92400E]">
-                        Match accepted with low confidence — your verification will be reviewed by
-                        our team. Continuing to the next step…
+                        {t.verification.faceMatch.lowConfidence}
                     </p>
                 </div>
             )}
             {matchState === 'failed' && (
                 <p className="text-xd-14 text-center text-[#1D1D1D] mt-xd-12 mb-5">
-                    We noticed a discrepancy in the image and there is an issue with your
-                    verification.
+                    {t.verification.faceMatch.discrepancy}
                 </p>
             )}
 
@@ -467,13 +481,14 @@ export default function FaceMatchScreen() {
                         }}
                         className="w-xd-390 h-xd-60 py-4 rounded-xd-20 border border-dashed border-[#5D5C5D]/50 text-[#1D1D1D] text-xd-16 font-medium"
                     >
-                        Try Again With The Correction
+                        {t.verification.faceMatch.retryWithCorrection}
                     </button>
                     <button
                         onClick={() => runMatch()}
-                        className="text-xd-14 mt-xd-30 text-[#4D84FF] hover:underline"
+                        disabled={!isOnline}
+                        className="text-xd-14 mt-xd-30 text-[#4D84FF] hover:underline disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline"
                     >
-                        Rematch
+                        {t.verification.faceMatch.rematch}
                     </button>
                 </div>
             )}

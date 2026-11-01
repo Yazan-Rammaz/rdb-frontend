@@ -382,12 +382,11 @@ export const faceConfig = {
     },
 
     // ── Attempt limits ────────────────────────────────────────────────────────
-    attempts: {
-        /** Maximum failures per challenge before redirecting to contact-support. */
-        maxPerChallenge: 3,
-        /** How many times the final-capture loop retries before giving up. */
-        finalCaptureRetries: 3,
-    },
+    // Deliberately absent. Liveness retries are unbounded on the client; the
+    // NestJS backend is the only place that decides how many attempts a person
+    // gets, because it is the only place that sees every submit. A client-side
+    // cap could only ever disagree with it — and did, cutting users off before
+    // the backend considered them finished.
 
     // ── Selfie crop padding (server-side Sharp) ───────────────────────────────
     cropping: {

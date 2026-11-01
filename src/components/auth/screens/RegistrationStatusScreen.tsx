@@ -62,7 +62,7 @@ export default function RegistrationStatusScreen(props: RegistrationStatusScreen
                         {copy.description}
                     </p>
                     <div className="flex items-center gap-xd-2 mt-xd-6">
-                        <p className={`text-xd-12 ${cfg.phoneFontWeight} text-[#1D1D1D]`}>
+                        <p dir="ltr" className={`text-xd-12 ${cfg.phoneFontWeight} text-[#1D1D1D]`}>
                             +{phone}
                         </p>
                         <div className="w-xd-15 h-xd-15 ml-2 shrink-0">

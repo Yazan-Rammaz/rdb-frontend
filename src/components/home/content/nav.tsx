@@ -28,11 +28,15 @@ const NavHome = ({ activeAssetSymbol }: { activeAssetSymbol?: string }) => {
                 <button
                     onClick={() => setBalanceHidden(!balanceHidden)}
                     className="relative cursor-pointer size-xd-14"
-                    aria-label={balanceHidden ? 'Show balance' : 'Hide balance'}
+                    aria-label={
+                        balanceHidden
+                            ? t.common.accessibility.showBalance
+                            : t.common.accessibility.hideBalance
+                    }
                 >
                     <Image
                         src={balanceHidden ? EyeHiddenIcon : EyeOpenIcon}
-                        alt={balanceHidden ? 'Balance hidden' : 'Balance visible'}
+                        alt=""
                         fill
                         className="object-contain"
                     />

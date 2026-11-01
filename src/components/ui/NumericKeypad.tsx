@@ -92,6 +92,10 @@ export function NumericKeypad({
             {open && (
                 <motion.div
                     ref={keypadRef as unknown as React.Ref<HTMLDivElement>}
+                    // The pad portals into <body>, so it inherits dir=rtl from
+                    // <html> whatever screen opened it: rows would read 3 2 1
+                    // and the leading spacer would push backspace to the left.
+                    dir="ltr"
                     className="fixed bg-[#1C1C1E] bottom-0 left-0 z-999999 right-0 select-none"
                     style={{ zIndex: 99999999 }}
                     initial={{ y: '100%' }}

@@ -18,9 +18,11 @@ export interface ParsedQR {
     validity?: string;
     /** Note from the receiver */
     note?: string;
-    /** AES-GCM encrypted requestCode (base64 blob: iv[12]+ciphertext) — present on PAYREQ: QR */
-    encryptedRequestCode?: string;
-    /** Requester account number embedded in PAYREQ: QR payload — used as AES-GCM decryption key */
+    /** Payment-request code, carried in the clear — present on PAYREQ: QR */
+    requestCode?: string;
+    /** Merchant order code — present when the QR is a shop's, paid via /merchant/payments */
+    merchantCode?: string;
+    /** Requester account number embedded in the PAYREQ: payload */
     requesterAccount?: string;
     /** Request type e.g. "Payement Request" */
     type?: string;
@@ -36,16 +38,17 @@ export interface AccountData {
     initials: string;
 }
 
+/** Why a scanned QR was rejected */
+export type QRValidationError =
+    | 'invalid_format'
+    | 'client_id_qr'
+    | 'missing_account_info'
+    | 'missing_account_number'
+    | 'missing_account_name'
+    | 'missing_currency'
+    | 'missing_both';
+
 /** Validation result for a scanned QR */
 export type QRValidationResult =
     | { valid: true; data: ParsedQR }
-    | {
-          valid: false;
-          error:
-              | 'invalid_format'
-              | 'missing_account_info'
-              | 'missing_account_number'
-              | 'missing_account_name'
-              | 'missing_currency'
-              | 'missing_both';
-      };
+    | { valid: false; error: QRValidationError };

@@ -166,8 +166,8 @@ export function WSProvider({ children, authCookieName }: WSProviderProps) {
 
         return () => {
             cancelled = true;
-            // window.removeEventListener('offline', handleOffline);
-            // window.removeEventListener('online', handleOnline);
+            window.removeEventListener('offline', handleOffline);
+            window.removeEventListener('online', handleOnline);
             console.log(`${LOG} WSProvider unmounting — disconnecting socket`);
             socketRef.current?.disconnect();
             socketRef.current = null;

@@ -5,7 +5,7 @@ import type {
     CreatePaymentRequestInput,
     FulfillPaymentRequestInput,
     PaymentRequest,
-    PaymentRequestLookup,
+    PaymentRequestLookupResponse,
 } from '../types/paymentRequests';
 
 /** Request-money: create a code, look it up, pay it, or cancel it. */
@@ -21,8 +21,14 @@ export const paymentRequests = {
      *
      * The code goes in the path, so it is encoded here — a caller passing one
      * containing a slash must not be able to reach a different route.
+     *
+     * Answers two different things: a person-to-person request (`kind: 'USER'`)
+     * or a merchant order (`kind: 'MERCHANT'`), which are paid through
+     * different endpoints. Do not read this result directly — pass it through
+     * `resolvePaymentRequestLookup` in `api/helpers/paymentRequests.ts`, which
+     * settles the shape and the missing-kind case in one place.
      */
-    lookup: (code: string, o?: RequestOptions): Promise<ApiResult<PaymentRequestLookup>> =>
+    lookup: (code: string, o?: RequestOptions): Promise<ApiResult<PaymentRequestLookupResponse>> =>
         request({ path: `/payment-requests/lookup/${encodeURIComponent(code)}`, options: o }),
 
     /**

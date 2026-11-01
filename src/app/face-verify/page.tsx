@@ -5,6 +5,7 @@ import {useSearchParams, useRouter } from 'next/navigation';
 import FaceVerifyFlow from '@/components/faceReverify/FaceVerifyFlow';
 import type { FaceReverifyOutcome } from '@/context/FaceReverifyContext';
 import { api } from '@/api';
+import { useTranslation } from '@/context/I18nContext';
 
 /**
  * Standalone face re-verification route.
@@ -19,6 +20,7 @@ import { api } from '@/api';
 function FaceVerifyPageInner() {
     const params = useSearchParams();
     const router = useRouter();
+    const { t } = useTranslation();
 
     const challengeId = params.get('challengeId') ?? '';
     const reason = params.get('reason') ?? undefined;
@@ -41,7 +43,7 @@ function FaceVerifyPageInner() {
     if (!challengeId) {
         return (
             <div className="flex h-dvh items-center justify-center text-sm text-[#8D8D8D]">
-                Missing verification challenge.
+                {t.verification.faceReverify.missingChallenge}
             </div>
         );
     }

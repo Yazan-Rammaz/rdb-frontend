@@ -20,9 +20,20 @@ function kycBinding(): { fetch: typeof fetch } | null {
 
 
 /**
+ * KYC paths that skip the Worker and go to NestJS like any other call.
+ *
+ * `status` is a plain read of a NestJS record — the Worker added nothing but a
+ * second hop that re-derived the bearer from the cookie, and that hop answered
+ * 401 for a token NestJS accepts when asked directly. Only reads with no
+ * Worker-side logic (AWS, signing) belong here.
+ */
+const KYC_NEST_DIRECT = new Set(['/api/kyc/status']);
+
+/**
  * Generic API proxy (replaces the Cloudflare Worker's catch-all).
  *
- * - `/api/kyc/*`  → forwarded to the Worker (KYC must run on Cloudflare Workers).
+ * - `/api/kyc/*`  → forwarded to the Worker (KYC must run on Cloudflare Workers),
+ *   except the `KYC_NEST_DIRECT` reads.
  * - everything else → NestJS directly, with `Authorization: Bearer <rdb_at>` injected
  *   from the httpOnly cookie (read server-side here, where the Worker used to do it).
  *
@@ -36,7 +47,9 @@ async function proxy(req: NextRequest): Promise<NextResponse> {
     const body =
         method === 'GET' || method === 'HEAD' ? undefined : await req.arrayBuffer();
 
-    const isKyc = pathname === '/api/kyc' || pathname.startsWith('/api/kyc/');
+    const isKyc =
+        (pathname === '/api/kyc' || pathname.startsWith('/api/kyc/')) &&
+        !KYC_NEST_DIRECT.has(pathname);
 
     const contentType = req.headers.get('content-type');
     const acceptLanguage = req.headers.get('accept-language');
@@ -140,6 +153,26 @@ async function proxy(req: NextRequest): Promise<NextResponse> {
         const cause = (err as { cause?: unknown })?.cause;
         console.error(`[api proxy] ${method} ${path} → ${base} failed:`, err, '| cause:', cause);
         return NextResponse.json({ error: 'Backend unavailable' }, { status: 502 });
+    }
+
+    // A null-body status cannot carry the `{}` NextResponse.json would give it —
+    // constructing that throws, and the route answers 500 instead. The KYC
+    // camera hand-off polls `/api/kyc/signal/*`, which says "not yet" with 204
+    // every second, so pass those through bodiless.
+    if (res.status === 204 || res.status === 205 || res.status === 304) {
+        return new NextResponse(null, { status: res.status });
+    }
+
+    // The KYC Worker's own replies are passed through as they came — body and
+    // Content-Type. Not everything it says is JSON: the camera hand-off answers
+    // with a raw SDP (`application/sdp`), and re-serialising it through
+    // safeJson turned it into "{}", which WebRTC rejects with
+    // "Expect line: v=".
+    if (isKyc && !(res.headers.get('content-type') ?? '').includes('json')) {
+        return new NextResponse(await res.arrayBuffer(), {
+            status: res.status,
+            headers: { 'Content-Type': res.headers.get('content-type') ?? 'application/octet-stream' },
+        });
     }
 
     const data = await safeJson(res);
