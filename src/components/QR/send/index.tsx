@@ -23,12 +23,7 @@ type Page =
 interface QrScannerProps {
     open: boolean;
     onClose: () => void;
-    /**
-     * Handles a decoded QR string. Returns a fixed, translated error to show in
-     * the camera frame, or null when there is nothing new to say (a valid scan,
-     * or a repeat inside the cooldown). Never any part of the payload.
-     */
-    onScan: (value: string) => string | null;
+    onScan: (value: string) => void;
     parsedQR?: ParsedQR | null;
     /** For requester mode: open directly to payment request review with this code */
     paymentRequestCode?: string | null;
@@ -61,7 +56,7 @@ const QrScanner: React.FC<QrScannerProps> = ({
     // making the merchant screen look the same code up again.
     const [handedOffMerchant, setHandedOffMerchant] = useState<MerchantPaymentLookup | null>(null);
     const { setScannerNav, isTransferScan } = useScanner();
-    const { t, rtl } = useTranslation();
+    const { t } = useTranslation();
 
     // Register page navigation fns so openScannerWithCallback can control this instance
     useEffect(() => {
@@ -169,10 +164,7 @@ const QrScanner: React.FC<QrScannerProps> = ({
                 <div
                     className="flex h-full w-full"
                     style={{
-                        // translateX is physical, the flex row is not: under dir="rtl"
-                        // main-start is the right edge, so page n already sits at
-                        // -n*100% and the transform has to push it back the other way.
-                        transform: `translateX(${(rtl ? 1 : -1) * pageIndex * 100}%)`,
+                        transform: `translateX(${-pageIndex * 100}%)`,
                         transition: SLIDE_TRANSITION,
                     }}
                 >

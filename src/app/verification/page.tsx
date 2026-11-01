@@ -1,18 +1,19 @@
 'use client';
 
 import React from 'react';
-import { VerificationProvider } from '@/features/kyc/context/VerificationContext';
-import VerificationPage from '@/features/kyc/components/VerificationPage';
+import { AuthProtected } from '@/context/AuthContext';
+import PasskeyGate from '@/components/layout/PasskeyGate';
+import { VerificationProvider } from '@/context/VerificationContext';
+import VerificationPage from '@/components/verification/VerificationPage';
 
-/**
- * KYC enrolment — the root dashboard's verification screens (AWS Face
- * Liveness, the light gate, the document scanner) on rdb's backend. See
- * `src/features/kyc/components/VerificationPage.tsx`.
- */
 export default function VerificationRoute() {
     return (
-        <VerificationProvider initialStep="intro">
+        // <AuthProtected>
+        //     <PasskeyGate>
+        <VerificationProvider>
             <VerificationPage />
         </VerificationProvider>
+        //     </PasskeyGate>
+        // </AuthProtected>
     );
 }

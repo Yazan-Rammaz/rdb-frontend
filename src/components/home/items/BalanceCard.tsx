@@ -7,7 +7,6 @@ import ChartIcon from '@/assets/icons/home/balance/chart.svg';
 import QRSmall from '@/assets/icons/home/balance/qrsmall.svg';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useXdScale } from '@/scaling';
-import { useTranslation } from '@/context/I18nContext';
 
 const EASING = [0.4, 0, 0.2, 1] as const;
 const DURATION = 0.35;
@@ -111,7 +110,6 @@ const BalanceCard: React.FC<BalanceCardProps> = ({
     onAnimDone,
 }) => {
     const scale = useXdScale();
-    const { t } = useTranslation();
 
     // animKey is derived directly from wsUpdateCount so it changes in the same render
     // as `amount` — no intermediate render, stableValueRef in SlotNumber stays correct.
@@ -244,13 +242,13 @@ const BalanceCard: React.FC<BalanceCardProps> = ({
                                     <div className="relative size-xd-15">
                                         <Image
                                             src={ChartIcon}
-                                            alt=""
+                                            alt="Chart"
                                             fill
                                             className="object-contain"
                                         />
                                     </div>
                                     <span className="font-light text-[#FFFFFF] text-xd-9">
-                                        {t.home.balanceActions.chart}
+                                        Chart
                                     </span>
                                 </button>
                                 <button
@@ -262,13 +260,13 @@ const BalanceCard: React.FC<BalanceCardProps> = ({
                                     <div className="relative size-xd-15">
                                         <Image
                                             src={QRSmall}
-                                            alt=""
+                                            alt="Info"
                                             fill
                                             className="object-contain"
                                         />
                                     </div>
                                     <span className="font-light text-[#FFFFFF] text-xd-9">
-                                        {t.home.balanceActions.info}
+                                        Info
                                     </span>
                                 </button>
                             </motion.div>

@@ -201,7 +201,9 @@ const DownloadView = forwardRef<HTMLDivElement, DownloadViewProps>(
                             lineHeight: '1.6',
                         }}
                     >
-                        {t.transfer.receiveMoneyInfo}
+                        You Can Receive The Money Through All Our Centers, Or You Can Download Our
+                        Application, Open An Account, Use The Money, And Benefit From All The
+                        Services.
                     </p>
                 </div>
                 <div
@@ -220,7 +222,7 @@ const DownloadView = forwardRef<HTMLDivElement, DownloadViewProps>(
                             fontFamily: 'Quicksand, sans-serif',
                         }}
                     >
-                        {t.common.poweredBy}
+                        Powered by Ramaaz Digital Banking
                     </p>
                 </div>
             </div>

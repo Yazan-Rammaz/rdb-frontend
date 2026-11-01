@@ -11,10 +11,6 @@ interface SendButtonProps {
     isSending: boolean;
     isDisabled: boolean;
     onSend: () => void;
-    /** Overrides "Send Deposits" — a merchant order is paid, not deposited. */
-    label?: string;
-    /** Overrides the in-flight label. Only read when `label` is given. */
-    sendingLabel?: string;
 }
 
 const SendButton: React.FC<SendButtonProps> = ({
@@ -22,8 +18,6 @@ const SendButton: React.FC<SendButtonProps> = ({
     isSending,
     isDisabled,
     onSend,
-    label,
-    sendingLabel,
 }) => {
     const { t } = useTranslation();
 
@@ -57,9 +51,7 @@ const SendButton: React.FC<SendButtonProps> = ({
                     <Image src={TransferDisabledIcon} alt="Send" width={25} height={25} />
                 )}
                 <span className="text-[13px] font-medium">
-                    {isSending
-                        ? (sendingLabel ?? t.transfer.deposit.sendingButton)
-                        : (label ?? t.transfer.deposit.sendButton)}
+                    {isSending ? t.transfer.deposit.sendingButton : t.transfer.deposit.sendButton}
                 </span>
             </button>
         </div>

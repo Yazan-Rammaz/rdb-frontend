@@ -4,21 +4,12 @@ import LogoIcon from '@/assets/icons/home/qr/title.svg';
 import Image from 'next/image';
 import { CustomQRCode } from '@/components/ui/CustomQR';
 import { ActionButtons } from './ActionButtons';
-import { PaymentReceived } from './PaymentReceived';
-import { ActionButton } from '../shared/ActionButton';
-import DoneIcon from '@/assets/icons/home/transfer/done.svg';
+import { useToast } from '@/context/ToastContext';
 import html2canvas from 'html2canvas';
 import { BalancesMap } from '@/context/StoreContext';
 import { useTranslation } from '@/context/I18nContext';
 import { useTransferPurposes } from '@/hooks/useTransferPurposes';
 import { usePaymentRequestAPI } from '@/hooks/usePaymentRequestAPI';
-import {
-    usePaymentRequestStatus,
-    type WatchedPaymentRequest,
-} from '@/hooks/usePaymentRequestStatus';
-import { useIsOnline } from '@/hooks/useIsOnline';
-import { useInlineFeedback } from '@/hooks/useInlineFeedback';
-import InlineFeedback from '@/components/ui/InlineFeedback';
 import { buildPaymentRequestQr } from '@/lib/paymentRequestQr';
 import { RequestView } from './views/RequestView';
 import { type FieldValidationConfig, validateField } from '@/components/ui/field-error';
@@ -62,24 +53,19 @@ const CreatePaymentRequest = ({
 }) => {
     const scale = useXdScale();
     const { t } = useTranslation();
-    // One line for every result on this screen. Where it shows depends on the
-    // mode: under the account number (address / review), or above Generate
-    // (request) — see the two <InlineFeedback> slots below.
-    const {
-        feedback,
-        success: showSuccess,
-        error: showError,
-        clear: clearFeedback,
-    } = useInlineFeedback();
+    const { toast } = useToast();
     const { purposes } = useTransferPurposes();
-    const isOnline = useIsOnline();
     const downloadRef = useRef<HTMLDivElement>(null);
 
     // Derive account info from props BEFORE any hooks that depend on them
     const accountName = account?.name || '';
     const accountNumber = account?.number || '';
 
-    const { createPaymentRequest, isLoading: isApiLoading } = usePaymentRequestAPI();
+    const {
+        createPaymentRequest,
+        lookupPaymentRequest,
+        isLoading: isApiLoading,
+    } = usePaymentRequestAPI();
 
     const [mode, setMode] = useState<Mode>('address');
     const [qrValue, setQrValue] = useState<string | null>(null);
@@ -90,16 +76,8 @@ const CreatePaymentRequest = ({
     const [showName, setShowName] = useState(true);
     const [requestExpiresAt, setRequestExpiresAt] = useState<string | null>(null);
     const [requestIsPermanent, setRequestIsPermanent] = useState(false);
-    const [activeRequest, setActiveRequest] = useState<WatchedPaymentRequest | null>(null);
+    const [requestCode, setRequestCode] = useState<string | null>(null);
     const [isExpired, setIsExpired] = useState(false);
-
-    // Watched only while its QR is on screen and the countdown has not run out.
-    const { settled, refresh } = usePaymentRequestStatus(
-        mode === 'review' && !isExpired ? activeRequest : null,
-    );
-    const isPaid = settled?.status === 'FULFILLED';
-    // Paid wins: a request paid in its last seconds is not shown as expired.
-    const isDead = !isPaid && (isExpired || !!settled);
 
     const activeBalance = activeAssetSymbol ? balances[activeAssetSymbol] : undefined;
     const accountType = account?.type || '';
@@ -207,16 +185,13 @@ const CreatePaymentRequest = ({
                 });
 
                 if ('error' in result) {
-                    // No connection: silent — the offline pill is the message.
-                    if (result.network) return 'network' as const;
-                    // The hook no longer reports it — this line is the only report.
-                    showError(result.error);
-                    return 'failed' as const;
+                    toast.error(result.error);
+                    return false;
                 }
 
                 setQrValue(buildPaymentRequestQr(result.requestCode, aNu));
                 setHideQR(false);
-                setActiveRequest({ id: result.id, requestCode: result.requestCode });
+                setRequestCode(result.requestCode);
                 setRequestExpiresAt(result.isPermanent ? null : (result.expiresAt ?? null));
                 setRequestIsPermanent(result.isPermanent);
 
@@ -233,40 +208,37 @@ const CreatePaymentRequest = ({
             setHideQR(false);
             return true;
         },
-        [formData, mode, accountName, accountNumber, createPaymentRequest, showError],
+        [formData, mode, accountName, accountNumber, createPaymentRequest, toast],
     );
 
     const handleRequest = useCallback(
         ({
             cU,
-            notify = false,
+            toastMsg = false,
             isForceRequest = false,
         }: {
             cU?: string;
-            notify?: boolean;
+            toastMsg?: boolean;
             isForceRequest?: boolean;
         }) => {
             return (async () => {
-                const outcome = await generateQrValue({ cU, isForceRequest });
-                // 'network' is silent (offline pill); 'failed' has already shown
-                // the server's message — neither is a missing wallet.
-                if (outcome === 'network' || outcome === 'failed') return false;
+                const success = await generateQrValue({ cU, isForceRequest });
 
-                if (!outcome) {
-                    if (notify) {
-                        showError(t.home.qr.messages.noWalletIdAvailable);
+                if (!success) {
+                    if (toastMsg) {
+                        toast.warn(t.home.qr.messages.noWalletIdAvailable);
                     }
                     return false;
                 }
 
-                if (notify) {
-                    showSuccess(t.home.qr.messages.qrGenerated);
+                if (toastMsg) {
+                    toast.success(t.home.qr.messages.qrGenerated);
                 }
 
                 return true;
             })();
         },
-        [generateQrValue, showError, showSuccess, t],
+        [generateQrValue, toast, t],
     );
 
     // Generate initial QR for address mode when account info or currency becomes available
@@ -282,9 +254,9 @@ const CreatePaymentRequest = ({
 
     const handleGenerate = () => {
         touchAll();
-        if (!isFormValid || isGenerating || isApiLoading || !isOnline) return;
+        if (!isFormValid || isGenerating || isApiLoading) return;
         setIsGenerating(true);
-        void handleRequest({ notify: true, isForceRequest: true }).then((success) => {
+        void handleRequest({ toastMsg: true, isForceRequest: true }).then((success) => {
             setIsGenerating(false);
             if (success) {
                 setMode('review');
@@ -323,29 +295,29 @@ const CreatePaymentRequest = ({
 
     const handleDownload = async () => {
         if (!qrValue) {
-            showError(t.home.qr.messages.qrDownloadError);
+            toast.warn(t.home.qr.messages.qrDownloadError);
             return;
         }
         const canvas = await captureCanvas();
         if (!canvas) {
-            showError(t.home.qr.messages.qrDownloadFailed);
+            toast.error(t.home.qr.messages.qrDownloadFailed);
             return;
         }
         const link = document.createElement('a');
         link.download = `deposit-qr-${formData.accountNumber}.png`;
         link.href = canvas.toDataURL('image/png');
         link.click();
-        showSuccess(t.home.qr.messages.qrDownloadSuccess);
+        toast.success(t.home.qr.messages.qrDownloadSuccess);
     };
 
     const handleShare = async () => {
         if (!qrValue) {
-            showError(t.home.qr.messages.qrDownloadError);
+            toast.warn(t.home.qr.messages.qrDownloadError);
             return;
         }
         const canvas = await captureCanvas();
         if (!canvas) {
-            showError(t.home.qr.messages.qrDownloadFailed);
+            toast.error(t.home.qr.messages.qrDownloadFailed);
             return;
         }
         const result = await shareQRImage(
@@ -354,20 +326,20 @@ const CreatePaymentRequest = ({
             `Account: ${formData.accountName}\nNumber: ${formData.accountNumber}`,
         );
         if (result === 'shared') {
-            showSuccess(t.home.qr.messages.qrShareSuccess);
+            toast.success(t.home.qr.messages.qrShareSuccess);
         } else if (result === 'copied') {
-            showSuccess(t.home.qr.messages.qrCopied);
+            toast.success(t.home.qr.messages.qrCopied);
         }
-        // 'dismissed' — user closed the share sheet; nothing to say
+        // 'dismissed' — user closed share sheet, no toast
     };
 
     const handleCopy = async () => {
         if (!qrValue) return;
         try {
             await navigator.clipboard.writeText(qrValue);
-            showSuccess(t.home.qr.messages.qrCopied);
+            toast.success(t.home.qr.messages.qrCopied);
         } catch {
-            showError(t.home.qr.messages.qrCopyFailed);
+            toast.error(t.home.qr.messages.qrDownloadFailed);
         }
     };
 
@@ -375,70 +347,46 @@ const CreatePaymentRequest = ({
         setFormData((prev) => ({ ...prev, [field]: value }));
     };
 
-    // The countdown ran out: the server decides — it may have been paid just now.
     const handleExpired = useCallback(async () => {
-        const result = await refresh();
-        if (result?.status !== 'FULFILLED') setIsExpired(true);
-    }, [refresh]);
-
-    /** Back to the default address QR, ready for a new request. */
-    const handleDone = () => {
-        clearFeedback();
-        setActiveRequest(null);
-        setIsExpired(false);
-        setHideQR(false);
-        setTouched({});
-        setFormData((prev) => ({ ...prev, amount: '', reference: '', note: '' }));
-        setMode('address');
-    };
+        if (requestCode) {
+            try {
+                const result = await lookupPaymentRequest(requestCode);
+                if (!('error' in result)) {
+                    // confirmed by server
+                }
+            } catch {
+                // fall through
+            }
+        }
+        setIsExpired(true);
+    }, [requestCode, lookupPaymentRequest]);
 
     return (
         <div
-            className={`flex flex-col items-center w-full max-w-xd-430 mx-auto h-full relative overflow-hidden transition-colors duration-500 ${mode !== 'review' ? 'bg-background' : isPaid ? 'bg-[#F4FFFA]' : isDead ? 'bg-[#FDF3F3]' : 'bg-background'}`}
+            className={`flex flex-col items-center w-full max-w-xd-430 mx-auto h-full relative overflow-hidden transition-colors duration-500 ${mode === 'review' && isExpired ? 'bg-[#FDF3F3]' : 'bg-background'}`}
         >
             <div className="flex-1 w-full flex flex-col overflow-hidden">
-                <div className="relative flex flex-col items-center w-full">
+                <div className="flex flex-col items-center w-full">
                     <div className="relative w-xd-97 h-xd-30 mt-xd-10 mb-xd-19">
                         <Image src={LogoIcon} alt="Title Icon" fill className="object-contain" />
                     </div>
 
                     <div className="flex flex-col items-center shrink-0">
-                        {isPaid ? (
-                            <PaymentReceived
+                        <div
+                            className={hideQR || isExpired ? 'opacity-10 bg-white rounded-xl' : ''}
+                        >
+                            <CustomQRCode
+                                errorCorrectionLevel="L"
+                                value={qrValue || ''}
                                 size={Math.round(250 * scale)}
-                                amount={settled.amount ?? formData.amount}
-                                currency={settled.assetSymbol ?? formData.currency}
                             />
-                        ) : (
-                            <div
-                                className={hideQR || isDead ? 'opacity-10 bg-white rounded-xl' : ''}
-                            >
-                                <CustomQRCode
-                                    errorCorrectionLevel="L"
-                                    value={qrValue || ''}
-                                    size={Math.round(250 * scale)}
-                                />
-                            </div>
-                        )}
+                        </div>
                         <p
                             className={`text-xd-16 leading-xd-16 font-medium text-[#1D1D1D] text-center mt-xd-7 ${mode === 'request' ? 'mb-xd-15' : 'mb-xd-45'}`}
                         >
-                            {isPaid
-                                ? t.home.qr.paid
-                                : isDead
-                                  ? 'Expired Code ( Time Expired )'
-                                  : formData.accountNumber}
+                            {isExpired ? 'Expired Code ( Time Expired )' : formData.accountNumber}
                         </p>
                     </div>
-
-                    {/* Slot A (address / review): the account number's empty
-                        mb-xd-45 margin, under the QR. Out of flow — nothing moves. */}
-                    {mode !== 'request' && (
-                        <InlineFeedback
-                            feedback={feedback}
-                            className="absolute inset-x-0 bottom-0 h-xd-45 items-center px-xd-25"
-                        />
-                    )}
                 </div>
 
                 <div className="flex-1 relative overflow-hidden flex flex-col">
@@ -452,7 +400,6 @@ const CreatePaymentRequest = ({
                             expiresAt={requestExpiresAt}
                             isPermanent={requestIsPermanent}
                             onExpired={handleExpired}
-                            paid={isPaid}
                         />
                     ) : (
                         <RequestView
@@ -465,7 +412,6 @@ const CreatePaymentRequest = ({
                             onFieldTouch={onFieldTouch}
                             onGenerate={handleGenerate}
                             onCancel={() => {
-                                clearFeedback();
                                 setHideQR(false);
                                 setMode('address');
                                 setTouched({});
@@ -474,35 +420,13 @@ const CreatePaymentRequest = ({
                     )}
                 </div>
 
-                <div
-                    className={`absolute bottom-0 left-0 right-0 border-0 border-[#F2F2F2] ${isPaid ? 'bg-[#F4FFFA]' : 'bg-background'}`}
-                >
-                    {/* Slot B (request mode): the action row's empty pt-xd-20, above Generate. */}
-                    {mode === 'request' && (
-                        <InlineFeedback
-                            feedback={feedback}
-                            lines={1}
-                            className="absolute inset-x-0 top-0 h-xd-20 items-center px-xd-25"
-                        />
-                    )}
-                    {isPaid && (
-                        <div className="flex items-center justify-center px-xd-60 pt-xd-20 pb-xd-20">
-                            <ActionButton
-                                icon={DoneIcon}
-                                label={t.common.done}
-                                onClick={handleDone}
-                                bounceOnClick
-                            />
-                        </div>
-                    )}
-                    {!isDead && !isPaid && (
+                <div className="absolute bottom-0 left-0 right-0 bg-background border-0 border-[#F2F2F2]">
+                    {!isExpired && (
                         <ActionButtons
-                            // Offline, Generate reads as not ready (grey, disabled).
-                            isFormValid={isFormValid && isOnline}
+                            isFormValid={isFormValid}
                             mode={mode}
                             isLoading={isGenerating || isApiLoading}
                             onRequest={() => {
-                                clearFeedback();
                                 setHideQR(true);
                                 setMode('request');
                             }}
@@ -511,7 +435,6 @@ const CreatePaymentRequest = ({
                             onShare={handleShare}
                             onGenerate={handleGenerate}
                             onCancel={() => {
-                                clearFeedback();
                                 setHideQR(false);
                                 setMode('address');
                                 setTouched({});

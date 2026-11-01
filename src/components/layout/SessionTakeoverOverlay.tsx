@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { useAuth } from '@/context/AuthContext';
-import { useTranslation } from '@/context/I18nContext';
 import { FlexibleSpace } from '@/scaling';
 import verifiedIcon from '@/assets/icons/verification/verified-big.svg';
 import notVerifiedIcon from '@/assets/icons/verification/not-verified.svg';
@@ -21,13 +20,12 @@ import notVerifiedIcon from '@/assets/icons/verification/not-verified.svg';
  */
 export default function SessionTakeoverOverlay({ since }: { since: number }) {
     const { userData } = useAuth();
-    const { t, tr } = useTranslation();
     const user = userData?.user ?? userData;
 
     const displayName =
         [user?.firstName, user?.lastName].filter(Boolean).join(' ') ||
         user?.kycRequest?.fullName ||
-        t.sessionTakeover.fallbackName;
+        'User';
     const avatarUrl = user?.profilePictureURL;
     const kycSt = user?.kycVerification?.status?.toLowerCase();
     const isVerified = kycSt === 'verified' || kycSt === 'approved' || kycSt === 'passed';
@@ -35,11 +33,11 @@ export default function SessionTakeoverOverlay({ since }: { since: number }) {
     // Live "X ago" label, refreshed every 30s.
     const [, setTick] = useState(0);
     useEffect(() => {
-        const id = setInterval(() => setTick((n) => n + 1), 30_000);
+        const id = setInterval(() => setTick((t) => t + 1), 30_000);
         return () => clearInterval(id);
     }, []);
 
-    const { amount, suffix } = formatAgo(Date.now() - since, tr);
+    const { amount, suffix } = formatAgo(Date.now() - since);
 
     return (
         <div className="fixed inset-0 z-[200] w-full h-full overflow-hidden bg-white">
@@ -74,7 +72,7 @@ export default function SessionTakeoverOverlay({ since }: { since: number }) {
                     {/* Verified badge */}
                     <Image
                         src={isVerified ? verifiedIcon : notVerifiedIcon}
-                        alt={isVerified ? t.sessionTakeover.verified : t.sessionTakeover.notVerified}
+                        alt={isVerified ? 'Verified' : 'Not Verified'}
                         width={23}
                         height={23}
                         className="object-contain"
@@ -87,7 +85,7 @@ export default function SessionTakeoverOverlay({ since }: { since: number }) {
 
                     {/* "Logged in via web" line — replaces the PIN inputs */}
                     <p className="text-xd-12 font-normal text-[#388CFF] mb-xd-3 text-center">
-                        {t.sessionTakeover.loggedInViaWeb} <span className="font-bold">{amount}</span>
+                        You Have Logged In Via The Web <span className="font-bold">{amount}</span>
                         {suffix ? ` ${suffix}` : ''}
                     </p>
 
@@ -103,16 +101,10 @@ export default function SessionTakeoverOverlay({ since }: { since: number }) {
  * "Just Now" → { amount: 'Just Now', suffix: '' },
  * "1 Minute" + "Ago" → { amount: '1 Minute', suffix: 'Ago' }.
  */
-function formatAgo(
-    elapsedMs: number,
-    tr: (key: string, params?: Record<string, number>) => string,
-): { amount: string; suffix: string } {
+function formatAgo(elapsedMs: number): { amount: string; suffix: string } {
     const mins = Math.floor(elapsedMs / 60_000);
-    if (mins < 1) return { amount: tr('sessionTakeover.justNow'), suffix: '' };
-    const ago = tr('sessionTakeover.ago');
-    if (mins < 60) {
-        return { amount: tr(`sessionTakeover.${mins === 1 ? 'minute' : 'minutes'}`, { count: mins }), suffix: ago };
-    }
+    if (mins < 1) return { amount: 'Just Now', suffix: '' };
+    if (mins < 60) return { amount: `${mins} Minute${mins === 1 ? '' : 's'}`, suffix: 'Ago' };
     const hours = Math.floor(mins / 60);
-    return { amount: tr(`sessionTakeover.${hours === 1 ? 'hour' : 'hours'}`, { count: hours }), suffix: ago };
+    return { amount: `${hours} Hour${hours === 1 ? '' : 's'}`, suffix: 'Ago' };
 }

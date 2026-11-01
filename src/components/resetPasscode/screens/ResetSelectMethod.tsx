@@ -3,8 +3,6 @@
 import Image from 'next/image';
 import { useTranslation } from '@/context/I18nContext';
 import { FlexibleSpace } from '@/scaling';
-import InlineFeedback from '@/components/ui/InlineFeedback';
-import type { Feedback } from '@/hooks/useInlineFeedback';
 import shieldSvg from '@/assets/icons/auth/shield.svg';
 import simSvg from '@/assets/icons/auth/sim.svg';
 import smsSvg from '@/assets/icons/auth/sms.svg';
@@ -17,11 +15,7 @@ interface ResetSelectMethodProps {
     method: 'sms' | 'whatsapp' | '';
     phone?: string;
     loading?: boolean;
-    /** Offline: neither channel can be requested; the choice stays shown. */
-    disabled?: boolean;
     onClose?: () => void;
-    /** Send-code failure line, shown under the method buttons. */
-    feedback?: Feedback | null;
 }
 
 /**
@@ -34,17 +28,14 @@ export default function ResetSelectMethod({
     changeNumber,
     phone,
     loading = false,
-    disabled = false,
     onClose,
-    feedback = null,
 }: ResetSelectMethodProps) {
     const { t } = useTranslation();
-    const inert = loading || disabled;
 
     return (
         <div className="w-full h-full flex flex-col bg-white">
             {/* Close button */}
-            <div className="flex absolute justify-end end-xd-30 top-xd-30">
+            <div className="flex absolute justify-end right-xd-30 top-xd-30">
                 {onClose && (
                     <button
                         onClick={onClose}
@@ -68,7 +59,7 @@ export default function ResetSelectMethod({
                 <div className="h-1/2 flex flex-col justify-end px-xd-20">
                     <div className="h-xd-115">
                         <h2 className="text-trim-descend text-xd-30 px-xd-20 font-bold text-[#1D1D1D]">
-                            {t.resetPasscode.title}
+                            Reset Passcode !
                         </h2>
                         <div className="flex px-xd-20 flex-col pt-xd-12">
                             <p className="text-trim-descend text-xd-16 text-[#1D1D1D] font-medium">
@@ -76,7 +67,7 @@ export default function ResetSelectMethod({
                             </p>
                             <div className="flex pt-xd-8 items-center gap-xd-5">
                                 <span className="text-trim-descend text-xd-12 text-[#1D1D1D]">
-                                    {t.auth.enterPhone.verificationInfo}
+                                    We Will Send A Verification Code To The Number
                                 </span>
                                 <div className="w-xd-15 h-xd-15 shrink-0">
                                     <Image
@@ -89,10 +80,7 @@ export default function ResetSelectMethod({
                                 </div>
                             </div>
                             <div className="flex pt-xd-8 items-center gap-xd-6">
-                                <p
-                                    dir="ltr"
-                                    className="text-trim-descend text-xd-12 font-medium text-[#1D1D1D]"
-                                >
+                                <p className="text-trim-descend text-xd-12 font-medium text-[#1D1D1D]">
                                     +{phone}
                                 </p>
                                 <button
@@ -125,10 +113,10 @@ export default function ResetSelectMethod({
                 {/* Bottom half — method buttons */}
                 <div className="h-1/2 flex flex-col items-center">
                     <FlexibleSpace size={37} share={0} />
-                    <div className="relative flex w-xd-400">
+                    <div className="flex w-xd-400">
                         <button
-                            onClick={() => !inert && setMethod('whatsapp')}
-                            disabled={inert}
+                            onClick={() => !loading && setMethod('whatsapp')}
+                            disabled={loading}
                             className={`relative my-1 mx-0.5 w-xd-193 flex flex-1 flex-col items-center justify-center h-xd-60 rounded-xd-20 border border-dashed transition-all disabled:cursor-not-allowed ${
                                 method === 'whatsapp'
                                     ? 'border-[#388CFF] bg-[#FCFCFC]'
@@ -141,19 +129,17 @@ export default function ResetSelectMethod({
                                 <Image
                                     src={WhatsAppIcon}
                                     alt="whatsapp"
-                                    className={`size-xd-20 object-contain transition-opacity ${disabled ? 'opacity-40 grayscale' : ''}`}
+                                    className="size-xd-20 object-contain"
                                 />
                             </span>
-                            <span
-                                className={`text-xd-16 font-normal transition-colors ${disabled ? 'text-[#C3C3C3]' : 'text-[#1D1D1D]'}`}
-                            >
+                            <span className="text-xd-16 font-normal text-[#1D1D1D]">
                                 {t.auth.selectMethod.whatsapp}
                             </span>
                         </button>
 
                         <button
-                            onClick={() => !inert && setMethod('sms')}
-                            disabled={inert}
+                            onClick={() => !loading && setMethod('sms')}
+                            disabled={loading}
                             className={`relative my-1 mx-0.5 w-xd-193 flex flex-1 flex-col items-center justify-center h-xd-60 rounded-xd-20 border border-dashed transition-all disabled:cursor-not-allowed ${
                                 method === 'sms'
                                     ? 'border-[#388CFF] bg-[#FCFCFC]'
@@ -166,21 +152,13 @@ export default function ResetSelectMethod({
                                 <Image
                                     src={smsSvg}
                                     alt="sms"
-                                    className={`size-xd-20 object-contain transition-opacity ${disabled ? 'opacity-40 grayscale' : ''}`}
+                                    className="size-xd-20 object-contain"
                                 />
                             </span>
-                            <span
-                                className={`text-xd-16 transition-colors ${disabled ? 'text-[#C3C3C3]' : 'text-[#1D1D1D]'}`}
-                            >
+                            <span className="text-xd-16 text-[#1D1D1D]">
                                 {t.auth.selectMethod.sms}
                             </span>
                         </button>
-                        {/* Out of flow, in the empty space under the row — nothing moves. */}
-                        <InlineFeedback
-                            feedback={feedback}
-                            lines={2}
-                            className="absolute inset-x-0 top-full mt-xd-10 px-xd-10"
-                        />
                     </div>
                     <FlexibleSpace grow />
                 </div>

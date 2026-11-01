@@ -4,15 +4,11 @@ import { useState, useEffect, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import PinInputs from '@/components/ui/PinInputs';
 import { FlexibleSpace } from '@/scaling';
-import { useTranslation } from '@/context/I18nContext';
-import { isOffline } from '@/lib/networkStatus';
-import { reportUserError } from '@/lib/observe';
 
 interface ResetSetPasscodeProps {
     onSavePasscode: (passcode: string) => Promise<boolean>;
     onDone?: () => void;
-    /** Offline: the re-entered passcode cannot be submitted; digits stay. */
-    disabled?: boolean;
+    onSaveFailed?: () => void;
 }
 
 type SetStep = 'set' | 'reenter' | 'saving' | 'done';
@@ -24,23 +20,13 @@ type SetStep = 'set' | 'reenter' | 'saving' | 'done';
 export default function ResetSetPasscode({
     onSavePasscode,
     onDone,
-    disabled = false,
+    onSaveFailed,
 }: ResetSetPasscodeProps) {
-    const { t } = useTranslation();
     const [setStep, setSetStep] = useState<SetStep>('set');
     const [passcode, setPasscode] = useState('');
     const [setValue, setSetValue] = useState('');
     const [reenterValue, setReenterValue] = useState('');
     const [setIsValid, setSetIsValid] = useState<'valid' | 'notvalid' | ''>('');
-    // A failed save sends the user back to 'set'; the set label says why, in red.
-    const [saveError, setSaveError] = useState<string | null>(null);
-
-    // Borrowed label: give it back after the error-line lifetime.
-    useEffect(() => {
-        if (!saveError) return;
-        const timer = setTimeout(() => setSaveError(null), 6000);
-        return () => clearTimeout(timer);
-    }, [saveError]);
 
     const handleSetComplete = (value: string) => {
         setPasscode(value);
@@ -55,7 +41,6 @@ export default function ResetSetPasscode({
     });
 
     const handleReenterComplete = async (value: string) => {
-        if (disabled) return;
         if (value === passcode) {
             setSetIsValid('valid');
             setSetStep('saving');
@@ -64,12 +49,7 @@ export default function ResetSetPasscode({
                 setSetStep('done');
                 setTimeout(() => onDoneRef.current?.(), 2000);
             } else {
-                // Offline: the network pill already said it.
-                if (!isOffline()) {
-                    const text = t.resetPasscode.toasts.setPasscodeFailed;
-                    reportUserError(text);
-                    setSaveError(text);
-                }
+                onSaveFailed?.();
                 setPasscode('');
                 setSetValue('');
                 setReenterValue('');
@@ -101,16 +81,12 @@ export default function ResetSetPasscode({
                 <div className="w-xd-430 h-full items-start flex flex-col">
                     <div className="h-1/2 flex flex-col justify-end px-xd-40">
                         <div>
-                            <h2 className="text-xd-30 font-bold text-[#1D1D1D]">
-                                {t.resetPasscode.setPasscode.doneTitle}
-                            </h2>
+                            <h2 className="text-xd-30 font-bold text-[#1D1D1D]">Done !</h2>
                             <p className="text-xd-16 font-medium text-[#1D1D1D] mt-xd-5">
-                                {t.resetPasscode.setPasscode.doneSubtitle}
+                                Your Passcode Has Been Reset
                             </p>
                         </div>
-                        <p className="text-xd-12 text-[#1D1D1D] mt-xd-4">
-                            {t.resetPasscode.setPasscode.doneNote}
-                        </p>
+                        <p className="text-xd-12 text-[#1D1D1D] mt-xd-4">Enjoy With Our Services</p>
                         <FlexibleSpace size={80} />
                     </div>
                     <div className="h-1/2 flex flex-col items-center px-xd-40">
@@ -137,12 +113,10 @@ export default function ResetSetPasscode({
                         <div className="h-1/2 flex flex-col justify-end px-xd-35">
                             <div>
                                 <h2 className="text-xd-30 font-bold text-[#1D1D1D]">
-                                    {setStep === 'saving'
-                                        ? t.resetPasscode.setPasscode.titleDone
-                                        : t.resetPasscode.setPasscode.title}
+                                    {setStep === 'saving' ? 'New Passcode Done' : 'New Passcode'}
                                 </h2>
                                 <p className="text-xd-16 font-medium text-[#1D1D1D] mt-xd-5">
-                                    {t.resetPasscode.setPasscode.subtitle}
+                                    Set A New Passcode To Continue
                                 </p>
                             </div>
                             <FlexibleSpace size={130} share={0.2} />
@@ -152,16 +126,11 @@ export default function ResetSetPasscode({
                                 {setStep === 'set' && (
                                     <PinInputs
                                         value={setValue}
-                                        onChange={(v) => {
-                                            // Typing again is the retry — the label goes back.
-                                            if (v) setSaveError(null);
-                                            setSetValue(v);
-                                        }}
+                                        onChange={setSetValue}
                                         onComplete={handleSetComplete}
                                         disabled={false}
                                         isValidPin=""
-                                        label={saveError ?? t.resetPasscode.setPasscode.setLabel}
-                                        labelTone={saveError ? 'error' : 'default'}
+                                        label="New Passcode"
                                     />
                                 )}
                                 {(setStep === 'reenter' || setStep === 'saving') && (
@@ -169,13 +138,9 @@ export default function ResetSetPasscode({
                                         value={reenterValue}
                                         onChange={setReenterValue}
                                         onComplete={handleReenterComplete}
-                                        disabled={
-                                            disabled ||
-                                            setStep === 'saving' ||
-                                            setIsValid === 'valid'
-                                        }
+                                        disabled={setStep === 'saving' || setIsValid === 'valid'}
                                         isValidPin={setStep === 'saving' ? 'valid' : setIsValid}
-                                        label={t.resetPasscode.setPasscode.reenterLabel}
+                                        label="Reenter New Passcode"
                                     />
                                 )}
                             </div>

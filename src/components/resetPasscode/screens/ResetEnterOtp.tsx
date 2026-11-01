@@ -5,8 +5,6 @@ import Image from 'next/image';
 import OtpInputs from '@/components/ui/OtpInputs';
 import { useTranslation } from '@/context/I18nContext';
 import { FlexibleSpace } from '@/scaling';
-import InlineFeedback from '@/components/ui/InlineFeedback';
-import type { Feedback } from '@/hooks/useInlineFeedback';
 import shieldSvg from '@/assets/icons/auth/shield.svg';
 import closeSvg from '@/assets/icons/auth/close.svg';
 
@@ -23,10 +21,6 @@ interface ResetEnterOtpProps {
     changeMethod?: () => void;
     onClose?: () => void;
     timerSeconds?: number;
-    /** Offline: the code stays typed but cannot be submitted or resent. */
-    disabled?: boolean;
-    /** "Code sent" / post-OTP failure line, shown under the OTP boxes. */
-    feedback?: Feedback | null;
 }
 
 /**
@@ -46,8 +40,6 @@ export default function ResetEnterOtp({
     changeMethod,
     onClose,
     timerSeconds = 120,
-    disabled = false,
-    feedback = null,
 }: ResetEnterOtpProps) {
     const { t } = useTranslation();
     const [timeLeft, setTimeLeft] = useState(timerSeconds);
@@ -75,7 +67,6 @@ export default function ResetEnterOtp({
     };
 
     const handleResend = () => {
-        if (disabled) return;
         onResend();
         setTimeLeft(timerSeconds);
         setCanResend(false);
@@ -88,7 +79,7 @@ export default function ResetEnterOtp({
     return (
         <div className="w-full h-full flex flex-col bg-white">
             {/* Close button */}
-            <div className="flex absolute justify-end end-xd-30 top-xd-30">
+            <div className="flex absolute justify-end right-xd-30 top-xd-30">
                 {onClose && (
                     <button
                         onClick={onClose}
@@ -110,7 +101,7 @@ export default function ResetEnterOtp({
                 <div className="h-1/2 flex flex-col justify-end px-xd-20">
                     <div className="h-xd-138 relative">
                         <h2 className="text-trim-descend text-xd-30 px-xd-20 font-bold text-[#1D1D1D]">
-                            {t.resetPasscode.title}
+                            Reset Passcode !
                         </h2>
                         <div className="flex pl-xd-20 pt-xd-12 flex-col">
                             <p className="text-trim-descend text-xd-16 text-[#1D1D1D] font-medium">
@@ -136,8 +127,7 @@ export default function ResetEnterOtp({
                                 <div className="flex items-center pt-xd-8 gap-xd-5">
                                     <button
                                         onClick={handleResend}
-                                        disabled={disabled}
-                                        className="text-trim-descend text-xd-13 text-[#388CFF] underline disabled:opacity-50"
+                                        className="text-trim-descend text-xd-13 text-[#388CFF] underline"
                                     >
                                         {t.auth.enterPin.resendCode}
                                     </button>
@@ -195,32 +185,15 @@ export default function ResetEnterOtp({
                         value={pin}
                         onChange={setPin}
                         onComplete={handlePinComplete}
-                        disabled={
-                            disabled || loading === 'verify-pin' || isValidPin === 'valid' || isExpired
-                        }
+                        disabled={loading === 'verify-pin' || isValidPin === 'valid' || isExpired}
                         isValidPin={isValidPin}
                         isExpired={isExpired}
                     />
-                    {/* The codeExpired slot. The feedback line sits over it
-                        (absolute, spilling into the grow spacer), and wins while
-                        present — so neither one moves anything. It sits right
-                        under the boxes, above the top of the touch keypad. */}
-                    <div className="relative w-full">
-                        {isExpired && (
-                            <p
-                                className={`text-center text-xd-11 pt-1 font-medium text-[#1D1D1D] ${
-                                    feedback ? 'invisible' : ''
-                                }`}
-                            >
-                                {t.auth.enterPin.codeExpired}
-                            </p>
-                        )}
-                        <InlineFeedback
-                            feedback={feedback}
-                            lines={2}
-                            className="absolute inset-x-0 top-0 pt-1 px-xd-20"
-                        />
-                    </div>
+                    {isExpired && (
+                        <p className="text-xd-11 pt-1 font-medium text-[#1D1D1D]">
+                            {t.auth.enterPin.codeExpired}
+                        </p>
+                    )}
                     <FlexibleSpace grow />
                 </div>
             </div>

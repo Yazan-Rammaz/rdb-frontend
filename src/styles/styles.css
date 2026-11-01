@@ -2,7 +2,6 @@
 @import 'tailwindcss';
 /* @import "xd-config/xd-utilities.css"; */
 @import './xd-utilities.css';
-@import '../features/kyc/kyc.css';
 
 @keyframes blink {
     0%,

@@ -12,8 +12,7 @@ function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
 
 /**
  * Share a QR code image using the native share sheet (Web Share API Level 2).
- * Falls back to a clipboard copy on unsupported platforms; the caller tells
- * the user which of the two happened from the return value.
+ * Falls back to clipboard copy + toast on unsupported platforms.
  *
  * @param canvas  The rendered html2canvas result
  * @param title   Share sheet title (e.g. "Deposit QR — 100-708")

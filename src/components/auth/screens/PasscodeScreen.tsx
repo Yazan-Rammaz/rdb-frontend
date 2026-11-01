@@ -4,9 +4,6 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Image from 'next/image';
 import PinInputs from '@/components/ui/PinInputs';
-import InlineFeedback from '@/components/ui/InlineFeedback';
-import type { Feedback } from '@/hooks/useInlineFeedback';
-import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useTranslation } from '@/context/I18nContext';
 import { useAuth } from '@/context/AuthContext';
 import { FlexibleSpace } from '@/scaling';
@@ -32,20 +29,7 @@ function detectBiometricType(): BiometricType {
     return 'passkey';
 }
 
-type PasscodeScreenProps = {
-    /**
-     * Offline: every input that would send the passcode (and the forgot /
-     * switch-account / biometric shortcuts) is inert. Digits already typed stay.
-     */
-    disabled?: boolean;
-    /**
-     * A result line from the host (a failed save, a failed biometric unlock, an
-     * expired session, "passcode updated"). Enter mode shows it in place of the
-     * "Enter your passcode" label; set mode in the PIN label on the 'set' step,
-     * or under the welcome text on the done view. Nothing moves either way.
-     */
-    feedback?: Feedback | null;
-} & (
+type PasscodeScreenProps =
     | {
           mode: 'set';
           onSavePasscode: (passcode: string) => Promise<boolean>;
@@ -60,21 +44,13 @@ type PasscodeScreenProps = {
           onUseBiometric?: () => void;
           /** When provided, the "Forget Passcode ?" label becomes a button that opens the reset flow */
           onForgotPasscode?: () => void;
-          /**
-           * When provided, renders a "use another account" link under the forgot
-           * action. Confirmed first, then called — expected to be a full logout.
-           */
-          onSwitchAccount?: () => void;
-      }
-);
+      };
 
 type SetStep = 'set' | 'reenter' | 'saving' | 'done';
 
 export default function PasscodeScreen(props: PasscodeScreenProps) {
     const { t } = useTranslation();
     const { userData, partialUserPhone, loginStep } = useAuth();
-    const disabled = props.disabled ?? false;
-    const feedback = props.feedback ?? null;
 
     // ── Set mode state ──────────────────────────────────────────────
     const [setStep, setSetStep] = useState<SetStep>('set');
@@ -90,7 +66,6 @@ export default function PasscodeScreen(props: PasscodeScreenProps) {
     const [enterValue, setEnterValue] = useState('');
     const [enterIsValid, setEnterIsValid] = useState<'valid' | 'notvalid' | ''>('');
     const [loading, setLoading] = useState(false);
-    const [showSwitchDialog, setShowSwitchDialog] = useState(false);
 
     // ── Set mode handlers ───────────────────────────────────────────
     const handleSetComplete = (value: string) => {
@@ -107,7 +82,7 @@ export default function PasscodeScreen(props: PasscodeScreenProps) {
     });
 
     const handleReenterComplete = async (value: string) => {
-        if (props.mode !== 'set' || disabled) return;
+        if (props.mode !== 'set') return;
         if (value === passcode) {
             setSetIsValid('valid');
             setSetStep('saving');
@@ -146,7 +121,7 @@ export default function PasscodeScreen(props: PasscodeScreenProps) {
     });
 
     const handleEnterComplete = async (value: string) => {
-        if (props.mode !== 'enter' || disabled) return;
+        if (props.mode !== 'enter') return;
         setLoading(true);
         const ok = await props.onVerifyPasscode(value);
         setLoading(false);
@@ -190,25 +165,17 @@ export default function PasscodeScreen(props: PasscodeScreenProps) {
                     <div className="w-xd-430 h-full items-start flex flex-col">
                         <div className="h-1/2 flex flex-col justify-end px-xd-40">
                             <div>
-                                <h2 className="text-xd-30 font-bold text-[#1D1D1D]">
-                                    {t.auth.setPasscode.welcomeTitle}
-                                </h2>
+                                <h2 className="text-xd-30 font-bold text-[#1D1D1D]">Welcome !</h2>
                                 <p className="text-xd-16 font-medium text-[#1D1D1D] mt-xd-5">
                                     {displayName}
                                 </p>
                             </div>{' '}
                             <p className="text-xd-12 text-[#1D1D1D] mt-xd-4">
-                                {t.auth.setPasscode.welcomeSubtitle}
+                                Enjoy With Our Services
                             </p>
                             <FlexibleSpace size={80} />
                         </div>
-                        {/* `relative` so a late failure (the cookie save after the
-                            passcode) hangs in this empty half without moving anything. */}
-                        <div className="relative w-full h-1/2 flex flex-col items-center px-xd-40">
-                            <InlineFeedback
-                                feedback={feedback}
-                                className="absolute inset-x-xd-40 top-xd-40"
-                            />
+                        <div className="h-1/2 flex flex-col items-center px-xd-40">
                             <FlexibleSpace grow />
                         </div>
                     </div>
@@ -234,10 +201,10 @@ export default function PasscodeScreen(props: PasscodeScreenProps) {
                                     <h2 className="text-xd-30 font-bold text-[#1D1D1D]">
                                         {setStep === 'saving'
                                             ? t.auth.setPasscode.titleDone
-                                            : t.auth.setPasscode.titleSet}
+                                            : 'Set Passcode !'}
                                     </h2>
                                     <p className="text-xd-16 font-medium text-[#1D1D1D] mt-xd-5">
-                                        {t.auth.setPasscode.subtitle}
+                                        Last Step And Enjoy Our Services
                                     </p>
                                 </div>
                                 <FlexibleSpace size={130} share={0.2} />
@@ -251,18 +218,8 @@ export default function PasscodeScreen(props: PasscodeScreenProps) {
                                             onComplete={handleSetComplete}
                                             disabled={false}
                                             isValidPin=""
-                                            label={
-                                                setError ||
-                                                feedback?.text ||
-                                                t.auth.setPasscode.setLabel
-                                            }
-                                            labelTone={
-                                                setError
-                                                    ? 'error'
-                                                    : feedback
-                                                      ? feedback.tone
-                                                      : 'default'
-                                            }
+                                            label={setError || t.auth.setPasscode.setLabel}
+                                            labelTone={setError ? 'error' : 'default'}
                                         />
                                     )}
                                     {(setStep === 'reenter' || setStep === 'saving') && (
@@ -271,9 +228,7 @@ export default function PasscodeScreen(props: PasscodeScreenProps) {
                                             onChange={setReenterValue}
                                             onComplete={handleReenterComplete}
                                             disabled={
-                                                disabled ||
-                                                setStep === 'saving' ||
-                                                setIsValid === 'valid'
+                                                setStep === 'saving' || setIsValid === 'valid'
                                             }
                                             isValidPin={setStep === 'saving' ? 'valid' : setIsValid}
                                             label={
@@ -343,11 +298,7 @@ export default function PasscodeScreen(props: PasscodeScreenProps) {
                     {/* Verified badge */}
                     <Image
                         src={isVerified ? verifiedIcon : notVerifiedIcon}
-                        alt={
-                            isVerified
-                                ? t.profile.clientInfo.verified
-                                : t.profile.clientInfo.notVerified
-                        }
+                        alt={isVerified ? 'Verified' : 'Not Verified'}
                         width={23}
                         height={23}
                         className="object-contain"
@@ -358,34 +309,17 @@ export default function PasscodeScreen(props: PasscodeScreenProps) {
                         <p className="text-xd-18 text-[#1D1D1D] mb-xd-14">{displayName}</p>
                     )}
 
-                    {/* Label above inputs. A feedback line takes its place: the
-                        label keeps its box (invisible) and the line sits over it,
-                        bottom-aligned and wider, so a second line of TR/AR copy
-                        grows up into the gap under the name instead of pushing
-                        the inputs down. */}
-                    <div className="relative flex justify-center">
-                        <p
-                            className={`text-xd-12 font-bold text-[#1D1D1D] mb-xd-3 ${
-                                feedback ? 'invisible' : ''
-                            }`}
-                        >
-                            {t.auth.enterPasscode.label}
-                        </p>
-                        <InlineFeedback
-                            feedback={feedback}
-                            // Without a name above, the verified badge sits right
-                            // over the label: no room for a second line.
-                            lines={displayName ? 2 : 1}
-                            className="absolute bottom-xd-3 left-1/2 w-xd-380 -translate-x-1/2"
-                        />
-                    </div>
+                    {/* Label above inputs */}
+                    <p className="text-xd-12 font-bold text-[#1D1D1D] mb-xd-3">
+                        {t.auth.enterPasscode.label}
+                    </p>
 
                     {/* PIN inputs */}
                     <PinInputs
                         value={enterValue}
                         onChange={setEnterValue}
                         onComplete={handleEnterComplete}
-                        disabled={disabled || loading || enterIsValid === 'valid'}
+                        disabled={loading || enterIsValid === 'valid'}
                         isValidPin={enterIsValid}
                         label=""
                         autoFocus={false}
@@ -394,8 +328,7 @@ export default function PasscodeScreen(props: PasscodeScreenProps) {
                     {props.onForgotPasscode ? (
                         <button
                             onClick={props.onForgotPasscode}
-                            disabled={disabled}
-                            className="text-xd-11 font-medium text-[#388CFF] mb-xd-3 underline disabled:opacity-50"
+                            className="text-xd-11 font-medium text-[#388CFF] mb-xd-3 underline"
                         >
                             {t.auth.enterPasscode.forgotLabel}
                         </button>
@@ -404,34 +337,12 @@ export default function PasscodeScreen(props: PasscodeScreenProps) {
                             {t.auth.enterPasscode.forgotLabel}
                         </p>
                     )}
-                    {props.onSwitchAccount && (
-                        <button
-                            onClick={() => setShowSwitchDialog(true)}
-                            disabled={disabled}
-                            className="text-xd-11 font-medium text-[#388CFF] mb-xd-3 underline disabled:opacity-50"
-                        >
-                            {t.auth.enterPasscode.switchAccountLabel}
-                        </button>
-                    )}
                     {props.mode === 'enter' && props.onUseBiometric && (
-                        <BiometricButton onPress={props.onUseBiometric} disabled={disabled} />
+                        <BiometricButton onPress={props.onUseBiometric} />
                     )}
                     <FlexibleSpace size={60} />
                 </div>
             </div>
-
-            <ConfirmDialog
-                open={showSwitchDialog}
-                onConfirm={() => {
-                    setShowSwitchDialog(false);
-                    props.onSwitchAccount?.();
-                }}
-                onCancel={() => setShowSwitchDialog(false)}
-                title={t.auth.enterPasscode.switchAccountLabel}
-                message={t.profile.logoutConfirmation}
-                confirmLabel={t.profile.logout}
-                cancelLabel={t.common.cancel}
-            />
         </div>
     );
 }
@@ -440,28 +351,18 @@ export default function PasscodeScreen(props: PasscodeScreenProps) {
 // Picks fingerprint (Android) or face-id (iOS/macOS/Windows) based on
 // the actual device, not CSS media queries.
 
-// Module scope, so it carries the translation KEY; the button resolves it.
-const BIOMETRIC_CONFIG: Record<
-    BiometricType,
-    { icon: typeof fingerprintIcon; labelKey: 'fingerprint' | 'faceId' | 'passkey' }
-> = {
-    fingerprint: { icon: fingerprintIcon, labelKey: 'fingerprint' },
-    faceid: { icon: faceidIcon, labelKey: 'faceId' },
-    passkey: { icon: passkeyIcon, labelKey: 'passkey' },
+const BIOMETRIC_CONFIG: Record<BiometricType, { icon: typeof fingerprintIcon; label: string }> = {
+    fingerprint: { icon: fingerprintIcon, label: 'Use Fingerprint' },
+    faceid: { icon: faceidIcon, label: 'Use Face ID' },
+    passkey: { icon: passkeyIcon, label: 'Use Biometrics' },
 };
 
-function BiometricButton({ onPress, disabled }: { onPress: () => void; disabled: boolean }) {
-    const { t } = useTranslation();
+function BiometricButton({ onPress }: { onPress: () => void }) {
     const type = useMemo(detectBiometricType, []);
-    const { icon, labelKey } = BIOMETRIC_CONFIG[type];
-    const label = t.auth.biometric[labelKey];
+    const { icon, label } = BIOMETRIC_CONFIG[type];
 
     return (
-        <button
-            onClick={onPress}
-            disabled={disabled}
-            className="mt-xd-5 flex flex-col items-center gap-xd-5 disabled:opacity-50"
-        >
+        <button onClick={onPress} className="mt-xd-5 flex flex-col items-center gap-xd-5">
             <div className="w-xd-60 h-xd-60 rounded-full bg-white flex items-center justify-center">
                 <Image
                     src={icon}

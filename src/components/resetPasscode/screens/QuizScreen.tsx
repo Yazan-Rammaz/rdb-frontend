@@ -4,9 +4,6 @@ import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { AnimatePresence, motion, type PanInfo } from 'framer-motion';
 import { FlexibleSpace } from '@/scaling';
-import { useTranslation } from '@/context/I18nContext';
-import InlineFeedback from '@/components/ui/InlineFeedback';
-import type { Feedback } from '@/hooks/useInlineFeedback';
 import closeSvg from '@/assets/icons/auth/close.svg';
 import type { QuizQuestion, ResetAnswer } from '@/services/resetPasscode/resetPasscodeApi';
 
@@ -14,10 +11,6 @@ interface QuizScreenProps {
     questions: QuizQuestion[];
     onComplete: (answers: ResetAnswer[]) => void | Promise<void>;
     onClose?: () => void;
-    /** Offline: the last answer (which is the submit) cannot be chosen. */
-    disabled?: boolean;
-    /** Submit failure line, shown where the swipe hint sits. */
-    feedback?: Feedback | null;
 }
 
 // Slide direction follows navigation: +1 moves forward (card enters from the
@@ -52,14 +45,7 @@ const HINT_VISIBLE_MS = 5000;
  * telling the user they can swipe back to review/change answers — and selecting
  * its answer IS the submit (the chosen answers are kept and graded).
  */
-export default function QuizScreen({
-    questions,
-    onComplete,
-    onClose,
-    disabled = false,
-    feedback = null,
-}: QuizScreenProps) {
-    const { t, tr } = useTranslation();
+export default function QuizScreen({ questions, onComplete, onClose }: QuizScreenProps) {
     const [[qi, direction], setPage] = useState<[number, number]>([0, 0]);
     const [answers, setAnswers] = useState<ResetAnswer[]>([]);
     const [submitting, setSubmitting] = useState(false);
@@ -98,7 +84,7 @@ export default function QuizScreen({
     if (!q) return null;
 
     const handleSelect = (optionId: string) => {
-        if (submitting || (isLast && disabled)) return;
+        if (submitting) return;
         const next = [
             ...answers.filter((a) => a.questionId !== q.id),
             { questionId: q.id, optionId },
@@ -132,7 +118,7 @@ export default function QuizScreen({
     return (
         <div className="w-full h-full flex flex-col bg-white">
             {/* Close button */}
-            <div className="flex absolute justify-end end-xd-30 top-xd-30">
+            <div className="flex absolute justify-end right-xd-30 top-xd-30">
                 {onClose && (
                     <button
                         onClick={onClose}
@@ -140,7 +126,7 @@ export default function QuizScreen({
                     >
                         <Image
                             src={closeSvg}
-                            alt=""
+                            alt="close"
                             width={16}
                             height={16}
                             className="object-contain"
@@ -152,11 +138,9 @@ export default function QuizScreen({
             <FlexibleSpace share={0.5} size={188} />
             {/* Faded title block */}
             <div className="px-xd-40">
-                <h2 className="text-xd-30 font-bold text-[#C3C3C3]">
-                    {t.resetPasscode.quiz.title}
-                </h2>
+                <h2 className="text-xd-30 font-bold text-[#C3C3C3]">Reset Passcode !</h2>
                 <p className="text-xd-12 text-[#C3C3C3] mt-xd-8 leading-relaxed">
-                    {t.resetPasscode.quiz.description}
+                    Don&apos;t Worry, We Will Help You Reset Your Passcode By Following These Steps.
                 </p>
             </div>
 
@@ -200,7 +184,7 @@ export default function QuizScreen({
                                         variants={itemVariants}
                                         transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
                                         onClick={() => handleSelect(opt.id)}
-                                        disabled={submitting || (isLast && disabled)}
+                                        disabled={submitting}
                                         whileTap={{ scale: 0.98 }}
                                         className={`w-full h-xd-60 rounded-xd-20 border border-dashed flex items-center justify-center text-xd-16 transition-colors ${
                                             isSelected
@@ -218,14 +202,7 @@ export default function QuizScreen({
             </div>
 
             {/* Bottom: review hint (last question) + progress dots */}
-            <div className="relative px-xd-20 pb-xd-6 flex flex-col items-center gap-xd-14">
-                {/* At the swipe hint's position, out of flow. The hint is sent
-                    down before the submit, so the two never overlap. */}
-                <InlineFeedback
-                    feedback={feedback}
-                    lines={2}
-                    className="absolute inset-x-0 bottom-full mb-xd-14 px-xd-30"
-                />
+            <div className="px-xd-20 pb-xd-6 flex flex-col items-center gap-xd-14">
                 <AnimatePresence>
                     {showHint && (
                         <motion.p
@@ -235,7 +212,8 @@ export default function QuizScreen({
                             transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
                             className="text-xd-12 text-[#8E8E8E] text-center leading-relaxed px-xd-10"
                         >
-                            {t.resetPasscode.quiz.swipeHint}
+                            Not sure? Swipe left or right to review and change your earlier answers.
+                            Answering this last question submits the quiz.
                         </motion.p>
                     )}
                 </AnimatePresence>
@@ -249,9 +227,7 @@ export default function QuizScreen({
                                 key={question.id}
                                 onClick={() => goTo(index)}
                                 disabled={submitting}
-                                aria-label={tr('resetPasscode.quiz.questionNumber', {
-                                    number: index + 1,
-                                })}
+                                aria-label={`Question ${index + 1}`}
                                 className={`rounded-full transition-all duration-300 ${
                                     active
                                         ? 'w-xd-20 h-xd-8 bg-[#3B5BA5]'
