@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import shieldSvg from '@/features/kyc/assets/shield.svg';
@@ -25,9 +25,6 @@ export default function ContactSupportScreen() {
         { label: 'Birthday', value: idDocument?.birthday || '—' },
     ];
 
-    useEffect(() => {
-        console.log(`idDocument: ${idDocument}`);
-    }, [idDocument]);
     return (
         // `overflow-y-auto` is the floor under everything below: once the
         // elastic space is spent this screen scrolls instead of pushing its last
@@ -141,10 +138,10 @@ export default function ContactSupportScreen() {
                 {fields.map(({ label, value }) => (
                     <div
                         key={label}
-                        className="h-55 w-390 bg-[#FCFCFC] p-10 rad-15"
+                        className="min-h-55 w-390 bg-[#FCFCFC] p-10 rad-15"
                     >
                         <p className="fz-12 text-[#8D8D8D] pb-3">{label}</p>
-                        <p className="fz-14 text-[#1D1D1D]">{value}</p>
+                        <p className="fz-14 text-[#1D1D1D] break-words">{value}</p>
                     </div>
                 ))}
             </div>

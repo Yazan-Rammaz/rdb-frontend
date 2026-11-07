@@ -106,8 +106,6 @@ export interface IDDocument {
     birthday: string;
     /** Expiration / expiry date. */
     expiryDate?: string;
-    /** All raw text lines from Textract joined with newlines, for debugging or extra-info display. */
-    rawText?: string;
 }
 
 export type FaceMatchVerdict = 'pass' | 'review' | 'fail';

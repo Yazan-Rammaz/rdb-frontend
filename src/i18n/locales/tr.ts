@@ -792,6 +792,10 @@ const tr: TranslationSchema = {
             unsupportedId: 'Bu desteklenen bir kimlik değil. Pasaport veya kimlik kartı kullanın.',
             notReadable:
                 'Kimlik net okunamıyor. Kartı düz tutun, iyi aydınlatın ve tekrar deneyin.',
+            // MISSING_CRITICAL_DATA + missingFields — hangi alanın okunamadığı
+            missingName: 'Tam adınız okunamadı. Ad alanındaki parlamayı önleyin.',
+            missingBirthday: 'Doğum tarihiniz okunamadı. O alanı parlamadan uzak tutun.',
+            missingDocumentNumber: 'Kimlik numaranız okunamadı. O alanı parlamadan uzak tutun.',
             wrongSideFront: 'Bu kimliğinizin ön yüzü. Çevirip arka yüzü gösterin.',
             wrongSideBack: 'Bu kimliğinizin arka yüzü. Fotoğrafınızın olduğu yüzü gösterin.',
             spoofing: 'Gerçek kimlik gerekli — lütfen orijinal kimlik belgenizi gösterin.',

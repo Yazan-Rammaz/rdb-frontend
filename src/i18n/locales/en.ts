@@ -789,6 +789,10 @@ const en = {
             // Rejection reasons returned by the analyze API
             unsupportedId: 'This is not a supported ID. Use a passport or national ID.',
             notReadable: 'ID not clearly readable. Hold the card flat, well-lit, and try again.',
+            // MISSING_CRITICAL_DATA with `missingFields` — say which field
+            missingName: 'We could not read your full name. Move away from glare on the name area.',
+            missingBirthday: 'We could not read your date of birth. Keep that area free of glare.',
+            missingDocumentNumber: 'We could not read your ID number. Keep that area free of glare.',
             wrongSideFront: 'This is the front of your ID. Flip it over and show the back.',
             wrongSideBack: 'This is the back of your ID. Show the side with your photo.',
             spoofing: 'Real ID required — please present your original identity document.',

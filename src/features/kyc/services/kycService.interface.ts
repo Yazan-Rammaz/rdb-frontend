@@ -12,8 +12,9 @@ export type AnalyzeIdStatus = 'not_found' | 'error' | 'success';
 /**
  * Machine-readable error code, present when `status === 'error'`.
  *
- * - `MISSING_CRITICAL_DATA`  — Required fields (first name, DOB, document number) are
- *                              missing or below the confidence threshold.
+ * - `MISSING_CRITICAL_DATA`  — Required fields (first name, last name, DOB, document
+ *                              number) are missing or below the confidence threshold.
+ *                              On the front side `missingFields` says which.
  * - `INVALID_ID_TYPE`        — Document is not a recognised government-issued ID.
  * - `NO_TEXT_DETECTED`       — Textract found no text in the image.
  * - `WRONG_SIDE`             — Captured side doesn't match the requested side
@@ -34,6 +35,9 @@ export type AnalyzeIdCode =
  */
 export type AnalyzeIdNextStep = 'REQUIRE_BACK' | 'COMPLETE';
 
+/** Keys of `extractedData` the Worker could not read on the front side. */
+export type MissingField = 'firstName' | 'lastName' | 'birthday' | 'documentNumber';
+
 export interface AnalyzeIdResult {
     /** Structured status — the primary discriminant for all branching logic. */
     status: AnalyzeIdStatus;
@@ -41,8 +45,17 @@ export interface AnalyzeIdResult {
     /** Error code — present when `status === 'error'`. */
     code?: AnalyzeIdCode;
 
-    /** User-facing guidance message — present when `status === 'error'`. */
+    /**
+     * English fallback text — present when `status === 'error'`. Branch on
+     * `code` + `missingFields`; show this only when nothing else matches.
+     */
     message?: string;
+
+    /**
+     * Present with `MISSING_CRITICAL_DATA` when the front side fails the field
+     * policy. May be absent (nothing readable at all, or the back side).
+     */
+    missingFields?: MissingField[];
 
     /** Next UI step — present when `status === 'success'`. */
     nextStep?: AnalyzeIdNextStep;
@@ -78,7 +91,6 @@ export interface AnalyzeIdResult {
         lastName?: string;
         documentNumber?: string;
         expiryDate?: string;
-        rawText?: string;
     };
 
     /**

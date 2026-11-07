@@ -26,6 +26,9 @@ export default function IDSummaryScreen() {
 
     const kycService = React.useRef(createKycService());
     const isPassport = (idDocument?.idType ?? '').toLowerCase().includes('passport');
+    // The Worker only accepts a front with both name parts (FB-02), so this is
+    // belt-and-braces: never continue on a document that lost one of them.
+    const hasFullName = Boolean(idDocument?.firstName?.trim() && idDocument?.lastName?.trim());
 
     const fields = [
         { label: 'ID Type', value: idDocument?.idName || idDocument?.idType || '—' },
@@ -219,9 +222,11 @@ export default function IDSummaryScreen() {
             {/* Fields */}
             <div className="flex shrink-0 flex-col gap-5">
                 {fields.map(({ label, value }) => (
-                    <div key={label} className="h-55 w-390 bg-[#FCFCFC] p-10 rad-15">
+                    // min-h, not h: a long full name wraps and the card grows
+                    // instead of clipping it (FB-02).
+                    <div key={label} className="min-h-55 w-390 bg-[#FCFCFC] p-10 rad-15">
                         <p className="fz-12 text-[#8D8D8D] pb-3">{label}</p>
-                        <p className="fz-14 text-[#1D1D1D]">{value}</p>
+                        <p className="fz-14 text-[#1D1D1D] break-words">{value}</p>
                     </div>
                 ))}
             </div>
@@ -240,7 +245,7 @@ export default function IDSummaryScreen() {
                 {/* CTAs */}
                 <button
                     onClick={handleSubmit}
-                    disabled={submitting}
+                    disabled={submitting || !hasFullName}
                     // mb-12 — the flow-wide gap between a button and the text
                     // link under it. "Incorrect, Try Again" is the escape hatch
                     // from this button, not a separate section.

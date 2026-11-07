@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { useVerification } from '@/features/kyc/context/VerificationContext';
+import { useTranslation } from '@/context/I18nContext';
 import { useRouter } from 'next/navigation';
 import { useCamera } from '@/features/kyc/hooks/useCamera';
 import { createKycService } from '@/features/kyc/services';
@@ -106,8 +107,28 @@ const areImagesTooSimilar = async (base1: string, base2: string): Promise<boolea
 // the user is likely still showing the FRONT side.
 const BACK_SIDE_FACE_BLOCK_MIN_AREA_RATIO = 0.08;
 
+/**
+ * Which hint to show for a front-side `MISSING_CRITICAL_DATA`.
+ *
+ * Picked by priority, not by array position, so the hint never depends on the
+ * order the Worker lists the fields in. Name first: it is the field users cover
+ * most. Unknown values return null and the caller falls back to the generic
+ * "not readable" hint.
+ */
+function missingFieldHintKey(
+    fields: readonly string[] | undefined,
+): 'missingName' | 'missingBirthday' | 'missingDocumentNumber' | null {
+    if (!fields?.length) return null;
+    if (fields.includes('firstName') || fields.includes('lastName')) return 'missingName';
+    if (fields.includes('birthday')) return 'missingBirthday';
+    if (fields.includes('documentNumber')) return 'missingDocumentNumber';
+    return null;
+}
+
 export default function IDCaptureScreen() {
     const { goTo, setIdDocument, markCompleted } = useVerification();
+    const { t } = useTranslation();
+    const ic = t.verification.idCapture;
     const router = useRouter();
     const {
         videoRef,
@@ -221,37 +242,37 @@ export default function IDCaptureScreen() {
     */
     const isLockedOn = isCardDetected && isCardCloseEnough && isCardCentered;
 
-    /** Maps backend rejection codes/reasons to user-facing guidance. */
+    /**
+     * Maps backend rejection codes/reasons to user-facing guidance, in the
+     * app's language.
+     *
+     * Code first, server text last: the Worker's `message` is an English
+     * fallback, so it is only shown for a code this screen does not know.
+     */
     function codeToHint(
         code: string | null | undefined,
         reason: string | null | undefined,
         message?: string | null,
+        missingFields?: readonly string[],
     ): string | null {
-        // Prefer the structured message from the API when available — it's
-        // already a short, user-friendly global message.
-        if (message) return message;
-        // Legacy reason-based fallback (older API responses without `message`).
         switch (reason ?? code) {
             case 'INVALID_ID_TYPE':
             case 'invalid_id_type':
-                return 'This is not a supported ID. Use a passport or national ID.';
+                return ic.unsupportedId;
             case 'MISSING_CRITICAL_DATA':
             case 'insufficient_fields':
+                return ic[missingFieldHintKey(missingFields) ?? 'notReadable'];
             case 'NO_TEXT_DETECTED':
             case 'no_text_detected':
-                return 'ID not clearly readable. Hold the card flat, well-lit, and try again.';
+                return ic.notReadable;
             case 'WRONG_SIDE':
             case 'wrong_side':
-                return activeSide === 'back'
-                    ? 'This is the front of your ID. Flip it over and show the back.'
-                    : 'This is the back of your ID. Show the side with your photo.';
+                return activeSide === 'back' ? ic.wrongSideFront : ic.wrongSideBack;
             case 'SPOOFING_DETECTED':
             case 'spoofing_detected':
-                return (
-                    message ?? 'Real ID required — please present your original identity document.'
-                );
+                return ic.spoofing;
             default:
-                return null;
+                return message ?? null;
         }
     }
 
@@ -579,7 +600,6 @@ export default function IDCaptureScreen() {
                     documentNumber: srcData.documentNumber,
                     birthday: srcData.birthday ?? '',
                     expiryDate: srcData.expiryDate,
-                    rawText: srcData.rawText,
                 };
                 setIdDocument(fullDoc);
                 markCompleted('id-capture-back');
@@ -594,7 +614,6 @@ export default function IDCaptureScreen() {
             const { verified, reason } = verifyBackMatchesFront(
                 frontPartialRef.current ?? {},
                 backExtracted,
-                backExtracted.rawText ?? '',
             );
             if (!verified) {
                 setPollState('aligning');
@@ -623,7 +642,6 @@ export default function IDCaptureScreen() {
                 documentNumber: front?.documentNumber,
                 birthday: front?.birthday ?? '',
                 expiryDate: front?.expiryDate,
-                rawText: front?.rawText,
             };
             setIdDocument(fullDoc);
             markCompleted('id-capture-back');
@@ -698,19 +716,21 @@ export default function IDCaptureScreen() {
             setPollState('processing');
             setStatusText('Processing…');
 
-            console.log('🚀 Sending to AWS...', {
-                payloadLength: croppedBase64Card.length,
-                side: activeSide,
-            });
+            // No logging of the response: it carries the name, national number,
+            // birthday and both card images (feedback CR-04).
             const result = await kycServiceRef.current.analyzeId(
                 croppedBase64Card,
                 activeSide,
                 sessionHintRef.current,
             );
-            console.log('✅ AWS Response Received:', result);
 
             if (result.status !== 'success') {
-                const hint = codeToHint(result.code, result.reason, result.message);
+                const hint = codeToHint(
+                    result.code,
+                    result.reason,
+                    result.message,
+                    result.missingFields,
+                );
                 setCaptureHint(hint);
                 setPollState('aligning');
                 setStatusText(hint ?? 'Could not read ID — try again');
@@ -738,6 +758,8 @@ export default function IDCaptureScreen() {
         startCamera,
         captureDocument,
         captureFrame,
+        // codeToHint reads the translator; rebuild if the language changes.
+        ic,
     ]);
 
     // Corner bracket colour encodes the real-time local pre-check state:
