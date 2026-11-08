@@ -220,6 +220,22 @@ export function useDocumentScanner(
     const rafRef = useRef<number | null>(null);
     const isProcessingRef = useRef(false);
     const missesRef = useRef(0);
+    /*
+      The worker sees a DOWNSCALED frame (maxProcessingWidth, 960 by default),
+      so the corners it returns are in that frame's pixels, not the video's.
+      Everything downstream — the display mapping and the full-resolution
+      crop in `capture()` — works in video pixels, so the corners must be
+      scaled back up first. Without it a 1500-wide stream put the quad at ~64%
+      of its true position: the cutout sat up-and-left of the card, never
+      centred, never locked on, and the crop photographed the wrong patch —
+      so once a capture failed, no retry could succeed without a reload.
+      Keyed by frameId so a result is always scaled by the size it was sent at.
+    */
+    const frameScalesRef = useRef<Map<number, number>>(new Map());
+    // Results for frames sent before the last reset describe a picture that
+    // is no longer on screen (e.g. one in flight while a capture was being
+    // verified) and must not repopulate the corners that reset just cleared.
+    const minValidFrameIdRef = useRef(0);
 
     const [isReady, setIsReady] = useState(false);
     const [isDetecting, setIsDetecting] = useState(false);
@@ -240,6 +256,8 @@ export function useDocumentScanner(
             setIsStable(false);
             setIsDetecting(false);
             missesRef.current = 0;
+            minValidFrameIdRef.current = frameIdRef.current + 1;
+            frameScalesRef.current.clear();
         }
     }, [enabled]);
     useEffect(() => {
@@ -261,6 +279,9 @@ export function useDocumentScanner(
             if (data.type === 'processResult') {
                 isProcessingRef.current = false;
                 setIsDetecting(false);
+                const frameScale = frameScalesRef.current.get(data.frameId) ?? 1;
+                frameScalesRef.current.delete(data.frameId);
+                if (data.frameId < minValidFrameIdRef.current) return;
                 if (!data.detected) {
                     missesRef.current += 1;
                     if (missesRef.current >= maxMissesBeforeReset) {
@@ -274,9 +295,13 @@ export function useDocumentScanner(
                     return;
                 }
                 missesRef.current = 0;
-                const points = data.corners;
+                const points = data.corners.map((p) => ({
+                    x: p.x / frameScale,
+                    y: p.y / frameScale,
+                })) as [ScannerPoint, ScannerPoint, ScannerPoint, ScannerPoint];
 
-                // Stability check: if corners moved less than 6 pixels from last frame, we are stable and focusing is done
+                // Stability check: corners moved less than 18 px (measured in the
+                // processing frame, hence the scale) since the last result.
                 let stable = false;
                 if (rawCornersRef.current) {
                     const maxMove = Math.max(
@@ -285,7 +310,7 @@ export function useDocumentScanner(
                         distanceBetweenPoints(points[2], rawCornersRef.current[2]),
                         distanceBetweenPoints(points[3], rawCornersRef.current[3]),
                     );
-                    stable = maxMove < 18.0;
+                    stable = maxMove * frameScale < 18.0;
                 }
                 setIsStable(stable);
 
@@ -368,10 +393,12 @@ export function useDocumentScanner(
 
             isProcessingRef.current = true;
             setIsDetecting(true);
+            const frameId = ++frameIdRef.current;
+            frameScalesRef.current.set(frameId, processWidth / video.videoWidth);
             worker.postMessage(
                 {
                     type: 'process',
-                    frameId: ++frameIdRef.current,
+                    frameId,
                     width: processWidth,
                     height: processHeight,
                     rgbaBuffer: imageData.data.buffer,
