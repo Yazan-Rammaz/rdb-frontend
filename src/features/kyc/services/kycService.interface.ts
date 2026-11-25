@@ -12,8 +12,9 @@ export type AnalyzeIdStatus = 'not_found' | 'error' | 'success';
 /**
  * Machine-readable error code, present when `status === 'error'`.
  *
- * - `MISSING_CRITICAL_DATA`  — Required fields (first name, DOB, document number) are
- *                              missing or below the confidence threshold.
+ * - `MISSING_CRITICAL_DATA`  — Required fields (first AND last name, DOB, document
+ *                              number) are missing or below the confidence threshold.
+ *                              The front side names them in `missingFields`.
  * - `INVALID_ID_TYPE`        — Document is not a recognised government-issued ID.
  * - `NO_TEXT_DETECTED`       — Textract found no text in the image.
  * - `WRONG_SIDE`             — Captured side doesn't match the requested side
@@ -25,6 +26,12 @@ export type AnalyzeIdCode =
     | 'NO_TEXT_DETECTED'
     | 'WRONG_SIDE'
     | 'SPOOFING_DETECTED';
+
+/**
+ * A required front-side field the Worker could not read, named as it appears
+ * in `extractedData`. `documentNumber` covers the national number too.
+ */
+export type MissingField = 'firstName' | 'lastName' | 'birthday' | 'documentNumber';
 
 /**
  * Next UI step, present when `status === 'success'`.
@@ -41,8 +48,15 @@ export interface AnalyzeIdResult {
     /** Error code — present when `status === 'error'`. */
     code?: AnalyzeIdCode;
 
-    /** User-facing guidance message — present when `status === 'error'`. */
+    /** User-facing guidance message — present when `status === 'error'`. English only. */
     message?: string;
+
+    /**
+     * Which required fields could not be read — with `MISSING_CRITICAL_DATA`
+     * on the front side. Absent on the back side and on earlier rejections
+     * where nothing was readable at all.
+     */
+    missingFields?: MissingField[];
 
     /** Next UI step — present when `status === 'success'`. */
     nextStep?: AnalyzeIdNextStep;
@@ -117,6 +131,8 @@ export interface IKycService {
         imageData: string,
         side: 'front' | 'back',
         sessionHint?: string,
+        /** The back only: the front's ID photo, compared with the back's portrait. */
+        frontFaceImageData?: string,
     ): Promise<AnalyzeIdResult>;
     captureID(imageData: string, side: 'front' | 'back'): Promise<Partial<IDDocument>>;
     matchFaceToID(faceData: string, idData: string): Promise<MatchResult>;
