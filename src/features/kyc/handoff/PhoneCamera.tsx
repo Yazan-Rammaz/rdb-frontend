@@ -252,6 +252,8 @@ export function PhoneCamera({ room, facing }: { room: string; facing: 'user' | '
                 // stopped arriving.
                 // A passing `disconnected` gets DROP_GRACE_MS to recover (see useCameraHandoff).
                 const end = () => {
+                    // The camera too (2026-11-25): "ended" used to leave it filming.
+                    streamRef.current?.getTracks().forEach((t) => t.stop());
                     if (!doneRef.current) setPhase('ended');
                 };
                 if (pc.connectionState === 'failed' || pc.connectionState === 'closed') end();
@@ -524,7 +526,9 @@ export function PhoneCamera({ room, facing }: { room: string; facing: 'user' | '
                         <div className="h-full rounded-full bg-[#3066CC] transition-[width] duration-200" style={{ width: `${Math.round(progress * 100)}%` }} />
                     </div>
                 )}
-                {mirror && (stage === 'checking' || stage === 'passed' || stage === 'failed') && (
+                {/* Not once the computer has ended the hand-off: its last stage ("checking")
+                    stayed drawn over the ended screen, so it looked like it never stopped. */}
+                {mirror && phase !== 'ended' && (stage === 'checking' || stage === 'passed' || stage === 'failed') && (
                     <div className="absolute inset-0 z-10 overflow-hidden rad-30">
                         <LivenessVerdict phase={stage} snapshot={snapshot} onRetry={retryOnComputer} />
                     </div>

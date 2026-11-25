@@ -1044,6 +1044,11 @@ export function FaceLivenessScreen({
 
             PASSED.set(challengeId, shown);
             setPhase('passed');
+            // Let "passed" reach a hand-off phone before the caller may unmount this
+            // screen (2026-11-25). RDB's face reverify closes its overlay inside
+            // onPassed, in the same tick: the hand-off panel never rendered "passed",
+            // and the phone stayed on "checking". One render and the send is enough.
+            await new Promise((resolve) => setTimeout(resolve, 150));
 
             /*
              * ── ⚠️ THE COMMIT STARTS NOW, NOT AFTER THE HOLD ────────────────

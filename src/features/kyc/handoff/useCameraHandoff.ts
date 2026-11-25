@@ -152,6 +152,9 @@ function handoffOrigin(): string {
     return local && lan ? lan : window.location.origin;
 }
 
+/** How long a finished link stays open so its last messages reach the phone (see stop). */
+const CLOSE_DELAY_MS = 400;
+
 export function useCameraHandoff({ onPhoneRetry }: { onPhoneRetry?: () => void } = {}) {
     // Read through a ref: the channel handler is set once, the callback changes.
     const retryRef = useRef(onPhoneRetry);
@@ -188,20 +191,27 @@ export function useCameraHandoff({ onPhoneRetry }: { onPhoneRetry?: () => void }
 
         // Say so before closing (2026-11-25). Closing alone, the phone only learnt it
         // when the link timed out — up to ~30 s of its camera still filming after face
-        // reverify ended on a failure or a cancel. Best effort; the channel's close,
-        // just below, tells the phone too.
-        if (hintsRef.current?.readyState === 'open') {
+        // reverify ended. And the message must get OUT: closed in the same instant, a
+        // real network dropped it — "end", and the "passed" sent just before it — and
+        // the phone stayed on "checking". So the old link closes CLOSE_DELAY_MS later;
+        // this hook lets go of it at once, so a new hand-off never touches it.
+        const channel = hintsRef.current;
+        const pc = pcRef.current;
+        hintsRef.current = null;
+        pcRef.current = null;
+        if (channel?.readyState === 'open') {
             try {
-                hintsRef.current.send(JSON.stringify({ type: 'end' } satisfies HandoffMessage));
+                channel.send(JSON.stringify({ type: 'end' } satisfies HandoffMessage));
             } catch {
                 /* closing anyway */
             }
         }
-        hintsRef.current?.close();
-        hintsRef.current = null;
-
-        pcRef.current?.close();
-        pcRef.current = null;
+        if (channel || pc) {
+            setTimeout(() => {
+                channel?.close();
+                pc?.close();
+            }, CLOSE_DELAY_MS);
+        }
 
         streamRef.current?.getTracks().forEach(endRelayedTrack);
         streamRef.current = null;
