@@ -44,7 +44,9 @@
     "matchRetry": "Rematch",
     "matchReview": "Match accepted with low confidence — your verification will be reviewed by our team. Continuing to the next step…",
     "matchTryAgain": "Try Again With The Correction",
-    "startOver": "Open your access link again"
+    "startOver": "Open your access link again",
+    "idMissingName": "We couldn't read your full name. Move away from glare on the name and try again.",
+    "faceCameraFramerateHandoff": "Your phone's camera stopped reaching this computer. Scan the new code with your phone (same Wi-Fi, no VPN) and try again."
   },
   "ar": {
     "deviceRetry": "حاول مرة أخرى",
@@ -91,7 +93,9 @@
     "matchRetry": "إعادة المطابقة",
     "matchReview": "تم قبول المطابقة بثقة منخفضة — سيراجع فريقنا عملية التحقق. جارٍ الانتقال إلى الخطوة التالية…",
     "matchTryAgain": "أعد المحاولة بعد التصحيح",
-    "startOver": "افتح رابط الدخول من جديد"
+    "startOver": "افتح رابط الدخول من جديد",
+    "idMissingName": "لم نتمكن من قراءة اسمك الكامل. أبعد انعكاس الضوء عن منطقة الاسم وحاول مجدداً.",
+    "faceCameraFramerateHandoff": "توقفت كاميرا هاتفك عن الوصول إلى هذا الكمبيوتر. امسح الرمز الجديد بهاتفك (نفس شبكة Wi-Fi، بدون VPN) وحاول مرة أخرى."
   },
   "tr": {
     "deviceRetry": "Tekrar Dene",
@@ -138,6 +142,8 @@
     "matchRetry": "Yeniden eşleştir",
     "matchReview": "Eşleşme düşük güvenle kabul edildi — doğrulamanız ekibimiz tarafından incelenecek. Sonraki adıma geçiliyor…",
     "matchTryAgain": "Düzelterek tekrar deneyin",
-    "startOver": "Erişim bağlantınızı yeniden açın"
+    "startOver": "Erişim bağlantınızı yeniden açın",
+    "idMissingName": "Tam adınızı okuyamadık. İsim alanındaki parlamayı giderip tekrar deneyin.",
+    "faceCameraFramerateHandoff": "Telefonunuzun kamerası bu bilgisayara ulaşmayı bıraktı. Yeni kodu telefonunuzla tarayın (aynı Wi-Fi, VPN yok) ve tekrar deneyin."
   }
 }

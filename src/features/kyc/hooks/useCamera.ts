@@ -38,6 +38,8 @@ interface UseCameraReturn {
     shouldMirror: boolean;
     startCamera: () => Promise<void>;
     stopCamera: () => void;
+    /** Give the open stream away without stopping it (the caller owns it after). */
+    releaseCamera: () => MediaStream | null;
     captureFrame: () => string | null;
 }
 
@@ -141,7 +143,29 @@ export function useCamera({
         setIsActive(false);
     }, []);
 
-    const startCamera = useCallback(async () => {
+    /**
+     * Give the open stream away WITHOUT stopping it (2026-11-24) — the light check
+     * hands its camera to AWS (cameraShim's handOverCamera) instead of closing it
+     * for AWS to open again. The caller owns the stream after this.
+     */
+    const releaseCamera = useCallback((): MediaStream | null => {
+        const stream = streamRef.current;
+        streamRef.current = null;
+        if (videoRef.current) videoRef.current.srcObject = null;
+        setIsActive(false);
+        return stream;
+    }, []);
+
+    /*
+     * One camera request at a time. On a computer the camera is the phone
+     * (cameraShim's phoneOnly), so "Start" waits for its stream, and the
+     * hand-off's `onLive` asks again the moment it arrives. Both used to resolve
+     * together: the second set `srcObject` and called `play()` over the first,
+     * whose `play()` then rejected (AbortError) and showed "Failed to access
+     * camera" over a picture that was working (2026-11-23). A second call now
+     * joins the request already running.
+     */
+    const openCamera = useCallback(async () => {
         setError(null);
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
@@ -218,8 +242,12 @@ export function useCamera({
             );
 
             if (videoRef.current) {
-                videoRef.current.srcObject = stream;
-                await videoRef.current.play();
+                if (videoRef.current.srcObject !== stream) videoRef.current.srcObject = stream;
+                // A play() interrupted by a newer load is not a camera failure: the
+                // newer one is playing the same picture.
+                await videoRef.current.play().catch((e: unknown) => {
+                    if (!(e instanceof DOMException && e.name === 'AbortError')) throw e;
+                });
             }
             setIsActive(true);
         } catch (err) {
@@ -231,6 +259,17 @@ export function useCamera({
             setIsActive(false);
         }
     }, [effectiveFacing, requestedFacing, width, height, aspectRatio]);
+
+    const pendingRef = useRef<Promise<void> | null>(null);
+    const startCamera = useCallback(() => {
+        if (pendingRef.current) return pendingRef.current;
+        const run = openCamera().finally(() => {
+            pendingRef.current = null;
+        });
+        pendingRef.current = run;
+        return run;
+    }, [openCamera]);
+
 
     /**
      * Captures the current video frame to a JPEG data URL.
@@ -268,6 +307,7 @@ export function useCamera({
         shouldMirror,
         startCamera,
         stopCamera,
+        releaseCamera,
         captureFrame,
     };
 }

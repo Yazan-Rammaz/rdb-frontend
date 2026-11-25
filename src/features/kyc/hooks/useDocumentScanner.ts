@@ -165,7 +165,8 @@ function getRoundedQuadPath(
     return commands.join(' ');
 }
 
-function buildOverlayPath(corners: ScannerCorners, width: number, height: number): string {
+/** The dark mask with the card cut out (rounded corners) — also drawn on the phone during a hand-off. */
+export function buildOverlayPath(corners: ScannerCorners, width: number, height: number): string {
     return [
         `M 0 0`,
         `H ${width}`,
@@ -220,26 +221,11 @@ export function useDocumentScanner(
     const rafRef = useRef<number | null>(null);
     const isProcessingRef = useRef(false);
     const missesRef = useRef(0);
-    /*
-      The worker sees a DOWNSCALED frame (maxProcessingWidth, 960 by default),
-      so the corners it returns are in that frame's pixels, not the video's.
-      Everything downstream — the display mapping and the full-resolution
-      crop in `capture()` — works in video pixels, so the corners must be
-      scaled back up first. Without it a 1500-wide stream put the quad at ~64%
-      of its true position: the cutout sat up-and-left of the card, never
-      centred, never locked on, and the crop photographed the wrong patch —
-      so once a capture failed, no retry could succeed without a reload.
-      Keyed by frameId so a result is always scaled by the size it was sent at.
-    */
-    const frameScalesRef = useRef<Map<number, number>>(new Map());
-    // Results for frames sent before the last reset describe a picture that
-    // is no longer on screen (e.g. one in flight while a capture was being
-    // verified) and must not repopulate the corners that reset just cleared.
-    const minValidFrameIdRef = useRef(0);
 
     const [isReady, setIsReady] = useState(false);
     const [isDetecting, setIsDetecting] = useState(false);
     const [isStable, setIsStable] = useState(false);
+    const stableRef = useRef(false);
     const [corners, setCorners] = useState<ScannerCorners | null>(null);
     const [rawCorners, setRawCorners] = useState<ScannerCorners | null>(null);
     const [overlay, setOverlay] = useState<ScannerOverlay | null>(null);
@@ -256,10 +242,10 @@ export function useDocumentScanner(
             setIsStable(false);
             setIsDetecting(false);
             missesRef.current = 0;
-            minValidFrameIdRef.current = frameIdRef.current + 1;
-            frameScalesRef.current.clear();
         }
     }, [enabled]);
+    // The shrink applied to the frame last sent to the worker (see processResult).
+    const processScaleRef = useRef(1);
     useEffect(() => {
         if (typeof window === 'undefined') return;
         const worker = new Worker(new URL('../workers/documentScanner.worker.ts', import.meta.url));
@@ -279,9 +265,6 @@ export function useDocumentScanner(
             if (data.type === 'processResult') {
                 isProcessingRef.current = false;
                 setIsDetecting(false);
-                const frameScale = frameScalesRef.current.get(data.frameId) ?? 1;
-                frameScalesRef.current.delete(data.frameId);
-                if (data.frameId < minValidFrameIdRef.current) return;
                 if (!data.detected) {
                     missesRef.current += 1;
                     if (missesRef.current >= maxMissesBeforeReset) {
@@ -290,18 +273,32 @@ export function useDocumentScanner(
                         setRawCorners(null);
                         setOverlay(null);
                         setIsStable(false);
+                        stableRef.current = false;
                         missesRef.current = 0; // تصفير عداد الأخطاء
                     }
                     return;
                 }
                 missesRef.current = 0;
-                const points = data.corners.map((p) => ({
-                    x: p.x / frameScale,
-                    y: p.y / frameScale,
-                })) as [ScannerPoint, ScannerPoint, ScannerPoint, ScannerPoint];
+                /*
+                  The worker sees the frame shrunk to maxProcessingWidth and answers in
+                  THAT size; everything here (the overlay, stability, the capture
+                  crop) works in the video's own pixels. Scale back up. A laptop
+                  camera at or under 960 px never showed the gap; the phone's
+                  picture over the hand-off is wider, and its box landed small in
+                  the top-left, so "centre" never passed (2026-11-23).
+                */
+                const k = processScaleRef.current || 1;
+                const points = data.corners.map((p) => ({ x: p.x / k, y: p.y / k })) as typeof data.corners;
 
-                // Stability check: corners moved less than 18 px (measured in the
-                // processing frame, hence the scale) since the last result.
+                /*
+                  Stability: how far the corners moved since the last frame,
+                  against the CARD'S OWN SIZE. A fixed 18 px on a 960 px frame
+                  was below a hand's natural tremor, so a person holding the card
+                  as still as people can was told "Hold still" for seconds. Now:
+                  still is under 5% of the card's width, and once still it stays
+                  so until a move of 9% (hysteresis), so tremor never flips it
+                  while a real move still does.
+                */
                 let stable = false;
                 if (rawCornersRef.current) {
                     const maxMove = Math.max(
@@ -310,8 +307,11 @@ export function useDocumentScanner(
                         distanceBetweenPoints(points[2], rawCornersRef.current[2]),
                         distanceBetweenPoints(points[3], rawCornersRef.current[3]),
                     );
-                    stable = maxMove * frameScale < 18.0;
+                    const cardWidth = Math.max(distanceBetweenPoints(points[0], points[1]), distanceBetweenPoints(points[3], points[2]));
+                    const limit = Math.max(18, cardWidth * (stableRef.current ? 0.09 : 0.05));
+                    stable = maxMove < limit;
                 }
+                stableRef.current = stable;
                 setIsStable(stable);
 
                 const alpha = Math.max(0, Math.min(1, smoothingAlpha));
@@ -377,6 +377,7 @@ export function useDocumentScanner(
             if (++localFrameCounter % processEveryNFrames !== 0 || isProcessingRef.current) return;
 
             const scale = Math.min(1, maxProcessingWidth / video.videoWidth);
+            processScaleRef.current = scale;
             const processWidth = Math.max(1, Math.round(video.videoWidth * scale));
             const processHeight = Math.max(1, Math.round(video.videoHeight * scale));
 
@@ -393,12 +394,10 @@ export function useDocumentScanner(
 
             isProcessingRef.current = true;
             setIsDetecting(true);
-            const frameId = ++frameIdRef.current;
-            frameScalesRef.current.set(frameId, processWidth / video.videoWidth);
             worker.postMessage(
                 {
                     type: 'process',
-                    frameId,
+                    frameId: ++frameIdRef.current,
                     width: processWidth,
                     height: processHeight,
                     rgbaBuffer: imageData.data.buffer,
