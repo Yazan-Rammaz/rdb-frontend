@@ -7,6 +7,10 @@
 # `name` must match the connected Worker or every command targets the wrong one —
 # Cloudflare warns about exactly this drift in the Build settings page.
 name = "rdb-ms"
+# The Cloudflare account rdb-ms lives in (Yazan.adnof@ramaaz.com). The login used for
+# local deploys reaches three accounts, and without this `npm run deploy` stops with
+# "More than one account available". An account id, not a secret.
+account_id = "725421c06cddc0ed4694b7cd177ae60e"
 main = ".open-next/worker.js"
 compatibility_date = "2025-09-01"
 compatibility_flags = ["nodejs_compat"]
